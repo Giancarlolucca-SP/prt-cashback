@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.local
+dist/
+*.log
+mobile/node_modules/
+frontend/node_modules/
+mobile/.expo/
+prisma/dev.db

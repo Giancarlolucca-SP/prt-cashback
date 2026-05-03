@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Establishment {
+  id              String           @id @default(uuid())
+  name            String
+  cnpj            String           @unique
+  cashbackPercent Decimal          @default(5) @db.Decimal(5, 2)
+  minRedemption   Decimal?         @db.Decimal(10, 2)
+  phone           String?
+  address         String?
+  city            String?
+  state           String?
+  latitude        Decimal?         @db.Decimal(10, 7)
+  longitude       Decimal?         @db.Decimal(10, 7)
+  logoUrl         String?
+  createdAt       DateTime         @default(now())
+  operators       Operator[]
+  customers       Customer[]
+  transactions    Transaction[]
+  redemptions     Redemption[]
+  campaigns       Campaign[]
+  fraudSettings    FraudSettings?
+  cashbackSettings CashbackSettings?
+  blacklistedCpfs BlacklistedCpf[]
+}
+
+model Customer {
+  id              String        @id @default(uuid())
+  name            String
+  cpf             String
+  phone           String
+  balance         Decimal       @default(0) @db.Decimal(10, 2)
+  establishmentId String
+  deviceId        String?
+  selfieData         String?    @db.Text   // legacy inline base64 (kept for backward compat)
+  selfieThumbnailUrl String?               // Supabase — 100×100 thumb (face comparison)
+  selfieFullUrl      String?               // Supabase — 400×400 full (audit/admin)
+  selfieStoragePath  String?               // base path: selfies/{estId}/{custId}
+  lastVerifiedAt     DateTime?             // timestamp of last successful face verification
+  pushToken          String?
+  lastLat            Decimal?   @db.Decimal(10, 7)
+  lastLng            Decimal?   @db.Decimal(10, 7)
+  lastLocAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  transactions    Transaction[]
+  redemptions     Redemption[]
+  fraudAlerts     FraudAlert[]
+
+  @@unique([cpf, establishmentId])
+  @@index([establishmentId])
+}
+
+model Operator {
+  id              String        @id @default(uuid())
+  name            String
+  email           String        @unique
+  password        String
+  role            Role          @default(OPERATOR)
+  establishmentId String
+  createdAt       DateTime      @default(now())
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  transactions    Transaction[]
+  redemptions     Redemption[]
+  campaigns       Campaign[]
+  blacklistedCpfs BlacklistedCpf[]
+}
+
+model Transaction {
+  id              String        @id @default(uuid())
+  customerId      String
+  operatorId      String
+  establishmentId String
+  amount          Decimal       @db.Decimal(10, 2)
+  cashbackPercent Decimal       @db.Decimal(5, 2)
+  cashbackValue   Decimal       @db.Decimal(10, 2)
+  receiptCode     String        @unique
+  fuelType        String?
+  liters          Decimal?      @db.Decimal(10, 3)
+  nfceKey         String?       @unique
+  source          String?
+  status          String        @default("CONFIRMED")
+  retryCount      Int           @default(0)
+  validatedAt     DateTime?
+  qrCodeUrl       String?       @db.Text
+  photoUrl        String?       @db.Text
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  operator        Operator      @relation(fields: [operatorId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+
+  @@index([customerId])
+  @@index([establishmentId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model Redemption {
+  id              String           @id @default(uuid())
+  customerId      String
+  operatorId      String
+  establishmentId String
+  amountUsed      Decimal          @db.Decimal(10, 2)
+  status          RedemptionStatus @default(CONFIRMED)
+  receiptCode     String           @unique
+  createdAt       DateTime         @default(now())
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  operator        Operator         @relation(fields: [operatorId], references: [id])
+  establishment   Establishment    @relation(fields: [establishmentId], references: [id])
+
+  @@index([customerId])
+  @@index([establishmentId])
+  @@index([createdAt])
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  establishmentId String
+  operatorId      String
+  name            String         @default("")
+  filterType      FilterType
+  filterPeriod    FilterPeriod
+  rewardType      RewardType
+  rewardValue     Decimal        @db.Decimal(10, 2)
+  message         String
+  customerCount   Int
+  totalCost       Decimal        @db.Decimal(10, 2)
+  status          CampaignStatus @default(DRAFT)
+  createdAt       DateTime       @default(now())
+  establishment   Establishment  @relation(fields: [establishmentId], references: [id])
+  operator        Operator       @relation(fields: [operatorId], references: [id])
+
+  @@index([establishmentId])
+  @@index([createdAt])
+}
+
+model CashbackSettings {
+  id                        String        @id @default(uuid())
+  establishmentId           String        @unique
+  mode                      CashbackMode  @default(PERCENTAGE)
+  defaultPercent            Decimal       @default(5)    @db.Decimal(5, 2)
+  defaultCentsPerLiter      Decimal       @default(0.05) @db.Decimal(8, 4)
+  fuelTypes                 Json          @default("{}")
+  minFuelAmount             Decimal       @default(0)    @db.Decimal(10, 2)
+  maxCashbackPerTransaction Decimal       @default(50)   @db.Decimal(10, 2)
+  doubleBonus               Boolean       @default(false)
+  doubleBonusStart          DateTime?
+  doubleBonusEnd            DateTime?
+  rushHourBonus             Boolean       @default(false)
+  rushHourStart             String        @default("06:00")
+  rushHourEnd               String        @default("10:00")
+  rushHourPercent           Decimal       @default(10)   @db.Decimal(5, 2)
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  establishment             Establishment @relation(fields: [establishmentId], references: [id])
+}
+
+model FraudSettings {
+  id                    String        @id @default(uuid())
+  establishmentId       String        @unique
+  maxFuelsPerDay        Int           @default(1)
+  maxFuelsPerWeek       Int           @default(3)
+  maxCashbackPerDay     Decimal       @default(50) @db.Decimal(10, 2)
+  maxFuelAmount         Decimal       @default(500) @db.Decimal(10, 2)
+  maxRedeemsPerWeek     Int           @default(2)
+  alertOnCashbackExceed Boolean       @default(true)
+  alertOnSuspiciousHour Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  establishment         Establishment @relation(fields: [establishmentId], references: [id])
+}
+
+model BlacklistedCpf {
+  id              String        @id @default(uuid())
+  establishmentId String
+  cpf             String
+  reason          String
+  blockedBy       String
+  createdAt       DateTime      @default(now())
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  operator        Operator      @relation(fields: [blockedBy], references: [id])
+
+  @@unique([cpf, establishmentId])
+  @@index([establishmentId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entity     String
+  entityId   String
+  operatorId String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+enum CashbackMode {
+  PERCENTAGE
+  CENTS_PER_LITER
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+}
+
+enum RedemptionStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum FilterType {
+  ACTIVE
+  INACTIVE
+}
+
+enum FilterPeriod {
+  ONE_MONTH
+  TWO_MONTHS
+  THREE_MONTHS
+  ONE_YEAR
+}
+
+enum RewardType {
+  PER_LITER
+  FIXED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENT
+  CLOSED
+}
+
+model FraudAlert {
+  id              String         @id @default(uuid())
+  customerId      String
+  establishmentId String
+  type            FraudAlertType
+  metadata        Json?
+  resolved        Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  customer        Customer       @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([establishmentId])
+  @@index([createdAt])
+}
+
+enum FraudAlertType {
+  DUPLICATE_QR
+  DAILY_LIMIT_EXCEEDED
+  WRONG_DEVICE
+  VELOCITY_ANOMALY
+  LOCATION_MISMATCH
+  SELFIE_MISMATCH
+}
