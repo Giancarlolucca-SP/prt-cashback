@@ -89,7 +89,7 @@ function ExpoGoGate() {
               '1. Solicite o link do APK ao administrador',
               '2. No Android, acesse Configurações → Segurança → Fontes desconhecidas',
               '3. Abra o link recebido e instale o arquivo .apk',
-              '4. Abra o app "PRT Cashback" instalado',
+              '4. Abra o app "PostoCash" instalado',
             ].map((step) => (
               <Text key={step} style={{ color: '#cbd5e1', fontSize: 13, lineHeight: 22 }}>{step}</Text>
             ))}
@@ -128,7 +128,7 @@ export default function ValidarScreen() {
 
   // Pre-flight: check token
   useEffect(() => {
-    SecureStore.getItemAsync('prt_token').then((token) => {
+    SecureStore.getItemAsync('postocash_token').then((token) => {
       setTokenStatus(isTokenExpired(token) ? 'expired' : 'valid');
     }).catch(() => setTokenStatus('expired'));
   }, []);
@@ -273,7 +273,7 @@ export default function ValidarScreen() {
 
     try {
       const parsed = JSON.parse(data);
-      if (parsed.type === 'PRT_REDEEM' && parsed.code) {
+      if (parsed.type === 'PostoCash_REDEEM' && parsed.code) {
         redeem(parsed.code);
         return;
       }

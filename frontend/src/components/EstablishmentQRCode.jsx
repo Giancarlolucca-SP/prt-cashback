@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { establishmentsAPI } from '../services/api.js';
 
-const DEEP_LINK_BASE = 'https://prtcashback.app/register';
+const DEEP_LINK_BASE = 'https://postocash.app/register';
 
 export default function EstablishmentQRCode({ establishmentId }) {
   const [qrUrl,    setQrUrl]    = useState(null);

@@ -23,7 +23,7 @@
         "image": "latest"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.15.10:3000",
+        "EXPO_PUBLIC_API_URL": "https://champion-pantyhose-acre.ngrok-free.dev",
         "npm_config_legacy_peer_deps": "true"
       }
     },

@@ -7,3 +7,5 @@ mobile/node_modules/
 frontend/node_modules/
 mobile/.expo/
 prisma/dev.db
+landing/
+logos/

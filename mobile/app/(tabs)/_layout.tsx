@@ -35,7 +35,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title:       'Início',
-          headerTitle: 'PRT Cashback',
+          headerTitle: 'PostoCash',
           tabBarIcon:  tabIcon('home-outline', 'home'),
         }}
       />

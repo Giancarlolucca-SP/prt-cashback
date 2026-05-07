@@ -153,7 +153,7 @@ async function uploadLogo(establishmentId, fileBuffer) {
   return { logoUrl };
 }
 
-const DEEP_LINK_BASE = 'https://prtcashback.app/register';
+const DEEP_LINK_BASE = 'https://postocash.app/register';
 
 async function getPublicData(establishmentId) {
   const est = await prisma.establishment.findUnique({ where: { id: establishmentId } });

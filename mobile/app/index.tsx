@@ -55,7 +55,7 @@ export default function Entry() {
       if (expiresInMs < sevenDaysMs) {
         setState('refreshing');
         const { data } = await customerApi.refreshToken();
-        await SecureStore.setItemAsync('prt_token', data.token);
+        await SecureStore.setItemAsync('postocash_token', data.token);
         const store = useAuthStore.getState();
         await store.setAuth(data.token, data.cliente, store.establishmentName ?? '');
       }

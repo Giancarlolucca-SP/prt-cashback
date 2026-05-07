@@ -1,29 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { authAPI } from '../services/api.js';
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
-
-function LoginLogo() {
-  const [failed, setFailed] = useState(false);
-  const src  = localStorage.getItem('prt_last_logo');
-  const name = localStorage.getItem('prt_last_name');
-
-  if (!src || failed) {
-    return <div className="text-5xl mb-3">⛽</div>;
-  }
-  return (
-    <div className="flex justify-center mb-3">
-      <img
-        src={src}
-        alt={name || 'Logo'}
-        onError={() => setFailed(true)}
-        className="h-16 max-w-[160px] object-contain"
-      />
-    </div>
-  );
-}
 
 export default function Login() {
   const [email, setEmail]       = useState('');
@@ -32,8 +12,8 @@ export default function Login() {
   const [loading, setLoading]   = useState(false);
 
   useEffect(() => {
-    const name = localStorage.getItem('prt_last_name');
-    document.title = name ? `Login — ${name} | PRT Cashback` : 'Login | PRT Cashback';
+    const name = localStorage.getItem('postocash_last_name');
+    document.title = name ? `Login — ${name} | PostoCash` : 'Login | PostoCash';
   }, []);
 
   const { login } = useAuth();
@@ -66,9 +46,14 @@ export default function Login() {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <LoginLogo />
-          <h1 className="text-2xl font-bold text-gray-900">PRT Cashback</h1>
-          <p className="text-sm text-gray-500 mt-1">Acesso ao sistema de postos</p>
+          <div className="flex justify-center mb-4">
+            <img
+              src="/logo-vertical.svg"
+              alt="PostoCash"
+              className="h-28 w-auto object-contain"
+            />
+          </div>
+          <p className="text-sm text-gray-500">Acesso ao sistema de postos</p>
         </div>
 
         {/* Form */}

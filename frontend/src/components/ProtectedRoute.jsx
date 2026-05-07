@@ -33,9 +33,9 @@ export default function ProtectedRoute() {
   const location = useLocation();
 
   useEffect(() => {
-    const page  = PAGE_TITLES[location.pathname] || 'PRT Cashback';
+    const page  = PAGE_TITLES[location.pathname] || 'PostoCash';
     const posto = operator?.estabelecimento;
-    document.title = posto ? `${page} — ${posto}` : `${page} | PRT Cashback`;
+    document.title = posto ? `${page} — ${posto}` : `${page} | PostoCash`;
   }, [location.pathname, operator?.estabelecimento]);
 
   if (loading) {

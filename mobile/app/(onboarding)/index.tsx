@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Animated,
   useWindowDimensions, ListRenderItemInfo,
@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
 
-export const ONBOARDING_KEY = 'prt_onboarding_done';
+export const ONBOARDING_KEY = 'postocash_onboarding_done';
 
 const SLIDES = [
   {

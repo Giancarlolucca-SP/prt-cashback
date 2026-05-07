@@ -1,6 +1,6 @@
-import * as SecureStore from 'expo-secure-store';
+﻿import * as SecureStore from 'expo-secure-store';
 
-const DEVICE_ID_KEY = 'prt_device_id';
+const DEVICE_ID_KEY = 'postocash_device_id';
 
 /**
  * Returns a stable unique device identifier.

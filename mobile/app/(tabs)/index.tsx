@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
@@ -13,7 +13,7 @@ import StatementItem, { StatementEntry } from '../../src/components/StatementIte
 import { customerApi } from '../../src/api/client';
 import { useAuthStore } from '../../src/store/auth';
 
-const BALANCE_CACHE_KEY = 'prt_balance_cache';
+const BALANCE_CACHE_KEY = 'postocash_balance_cache';
 
 interface BalanceCache {
   saldo:           number;

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+﻿import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppConfig, DEFAULT_CONFIG } from '../../config/appConfig';
 import { api } from '../api/client';
@@ -13,7 +13,7 @@ const AppConfigContext = createContext<AppConfigContextValue>({
   loading: true,
 });
 
-const CACHE_KEY = 'prt_app_config';
+const CACHE_KEY = 'postocash_app_config';
 
 export function AppConfigProvider({ children }: { children: React.ReactNode }) {
   const [config,  setConfig]  = useState<AppConfig>(DEFAULT_CONFIG);

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -14,23 +13,6 @@ const NAV_ITEMS = [
   { to: '/relatorios',label: 'Relatórios',icon: '📋' },
   { to: '/configuracoes-cashback', label: 'Cashback', icon: '⚙️' },
 ];
-
-// ── Sidebar logo with fallback ────────────────────────────────────────────────
-
-function SidebarLogo({ src }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) {
-    return <span className="text-xl leading-none">⛽</span>;
-  }
-  return (
-    <img
-      src={src}
-      alt="Logo"
-      onError={() => setFailed(true)}
-      className="w-7 h-7 rounded object-contain bg-white/10"
-    />
-  );
-}
 
 // ── Link component ────────────────────────────────────────────────────────────
 
@@ -90,9 +72,12 @@ export default function Navbar({ open, onClose }) {
     >
       {/* ── Logo ────────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between h-14 px-5 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2 font-bold text-base min-w-0">
-          <SidebarLogo src={operator?.logoUrl} />
-          <span className="truncate">PRT Cashback</span>
+        <div className="flex items-center min-w-0">
+          <img
+            src="/logo-dark-bg.svg"
+            alt="PostoCash"
+            className="h-8 w-auto object-contain"
+          />
         </div>
         {/* Close button — mobile only */}
         <button

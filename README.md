@@ -1,4 +1,4 @@
-# PRT — Sistema de Cashback para Postos
+# PostoCash — Sistema de Cashback para Postos
 
 MVP de sistema de cashback standalone para postos de combustível.
 
@@ -39,7 +39,7 @@ cp .env.example .env
 Edite `.env` com sua string de conexão PostgreSQL:
 
 ```env
-DATABASE_URL="postgresql://postgres:suasenha@localhost:5432/prt_cashback"
+DATABASE_URL="postgresql://postgres:suasenha@localhost:5432/postocash"
 JWT_SECRET="chave_secreta_forte_aqui"
 STATION_NAME="Posto XYZ"
 ```

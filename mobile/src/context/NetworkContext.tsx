@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+﻿import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { networkStatus } from '../utils/networkStatus';
 
@@ -20,7 +20,7 @@ export interface OfflineAction {
   createdAt: string;
 }
 
-const QUEUE_KEY = 'prt_offline_queue';
+const QUEUE_KEY = 'postocash_offline_queue';
 
 const NetworkContext = createContext<NetworkContextValue>({
   isOnline:   true,

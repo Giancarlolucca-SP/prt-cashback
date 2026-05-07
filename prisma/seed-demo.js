@@ -1,5 +1,5 @@
 /**
- * seed-demo.js — Dados de demonstração para o PRT Cashback
+ * seed-demo.js — Dados de demonstração para o PostoCash
  *
  * Usa o estabelecimento e operador já existentes no banco.
  * Garante balances consistentes com update: { balance } após limpeza.

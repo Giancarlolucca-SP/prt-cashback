@@ -581,7 +581,7 @@ function addInfoSheet(wb, meta, type) {
 
 async function generateExcel(data) {
   const wb = new ExcelJS.Workbook();
-  wb.creator  = 'PRT Cashback';
+  wb.creator  = 'PostoCash';
   wb.created  = new Date();
   wb.modified = new Date();
 

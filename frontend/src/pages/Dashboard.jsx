@@ -1047,8 +1047,9 @@ function useCampaigns() {
     try {
       const { data: res } = await campaignsAPI.list(status, p);
       setData(res);
-    } catch {
-      setError('Erro ao carregar campanhas.');
+    } catch (err) {
+      console.error('[DASHBOARD] Campaigns error:', err);
+      setData({ campaigns: [], total: 0, page: 1, pages: 0 });
     } finally {
       setLoading(false);
     }

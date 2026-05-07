@@ -1,5 +1,5 @@
 {
-  "name": "prt-cashback",
+  "name": "postocash",
   "version": "1.0.0",
   "description": "Sistema de Cashback para Postos de Combustível",
   "main": "src/server.js",

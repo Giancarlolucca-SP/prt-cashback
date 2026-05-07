@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
@@ -15,7 +15,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const PUSH_TOKEN_KEY = 'prt_push_token_sent';
+const PUSH_TOKEN_KEY = 'postocash_push_token_sent';
 
 export function usePushNotifications() {
   useEffect(() => {
@@ -28,7 +28,7 @@ async function registerForPushNotifications() {
     // Android: create notification channel
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name:       'PRT Cashback',
+        name:       'PostoCash',
         importance:  Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#1e3a5f',
@@ -49,7 +49,7 @@ async function registerForPushNotifications() {
 
     // Get Expo push token
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: 'prt-cashback', // matches app.json slug
+      projectId: 'postocash', // matches app.json slug
     });
     const pushToken = tokenData.data;
 

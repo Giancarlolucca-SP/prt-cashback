@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PRT Cashback",
-    "slug": "prt-cashback",
+    "name": "PostoCash",
+    "slug": "postocash",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,33 +10,46 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1e3a5f"
+      "backgroundColor": "#FF6B00"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.prt.cashback",
-      "associatedDomains": ["applinks:prtcashback.app"]
+      "bundleIdentifier": "com.postocash.app",
+      "associatedDomains": [
+        "applinks:postocash.app"
+      ]
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1e3a5f"
+        "backgroundColor": "#FF6B00"
       },
-      "package": "com.prt.cashback",
+      "package": "com.postocash.app",
       "permissions": [
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "intentFilters": [
         {
           "action": "VIEW",
           "data": [
-            { "scheme": "https", "host": "prtcashback.app" },
-            { "scheme": "prtcashback" },
-            { "scheme": "prt-cashback" }
+            {
+              "scheme": "https",
+              "host": "postocash.app"
+            },
+            {
+              "scheme": "postocash"
+            },
+            {
+              "scheme": "postocash"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -56,7 +69,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permitir que o PRT Cashback acesse a câmera para ler QR codes."
+          "cameraPermission": "Permitir que o PostoCash acesse a câmera para ler QR codes."
         }
       ],
       [
@@ -76,9 +89,9 @@
       "icon": "./assets/icon.png",
       "color": "#1e3a5f",
       "androidMode": "default",
-      "androidCollapsedTitle": "PRT Cashback"
+      "androidCollapsedTitle": "PostoCash"
     },
-    "scheme": "prt-cashback",
+    "scheme": "postocash",
     "experiments": {
       "typedRoutes": true
     },
@@ -86,8 +99,9 @@
       "apiUrl": "http://192.168.15.10:3000",
       "router": {},
       "eas": {
-        "projectId": "f5706ced-7aee-4524-822e-4c0dfd7470df"
+        "projectId": "d4dfb95f-dd47-4912-b248-db2a50bce0d0"
       }
-    }
+    },
+    "owner": "tgrtech"
   }
 }

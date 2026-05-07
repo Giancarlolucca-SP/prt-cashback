@@ -40,7 +40,7 @@ app.use(apiLimiter);
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    sistema: 'PRT Cashback',
+    sistema: 'PostoCash',
     versao: '1.0.0',
     hora: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
   });

@@ -33,6 +33,7 @@ async function list(req, res, next) {
     );
     res.status(200).json(result);
   } catch (err) {
+    console.log('[CAMPAIGNS] Error:', err.message, err.stack);
     next(err);
   }
 }

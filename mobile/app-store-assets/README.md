@@ -36,7 +36,7 @@ No alpha/transparency. Background color: `#1e3a5f`.
 
 ## Full Description
 
-PRT Cashback é o programa de fidelidade do seu posto de confiança.
+PostoCash é o programa de fidelidade do seu posto de confiança.
 A cada abastecimento você acumula cashback automaticamente — sem cartões,
 sem pontos que vencem, sem complicação.
 

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { clearDeviceId } from '../utils/deviceId';
 
@@ -34,11 +34,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setAuth: async (token, user, establishmentName) => {
     const userJson  = JSON.stringify(user);
-    // Write under both key sets — prt_* used internally, auth_*/customer_*/establishment_* for compatibility
+    // Write under both key sets — postocash_* primary, auth_*/customer_*/establishment_* for compatibility
     await Promise.all([
-      SecureStore.setItemAsync('prt_token',          token),
-      SecureStore.setItemAsync('prt_user',           userJson),
-      SecureStore.setItemAsync('prt_establishment',  establishmentName),
+      SecureStore.setItemAsync('postocash_token',          token),
+      SecureStore.setItemAsync('postocash_user',           userJson),
+      SecureStore.setItemAsync('postocash_establishment',  establishmentName),
       SecureStore.setItemAsync('auth_token',         token),
       SecureStore.setItemAsync('customer_data',      userJson),
       SecureStore.setItemAsync('establishment_data', establishmentName),
@@ -51,14 +51,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!user) return;
     const updated = { ...user, saldo, saldoFormatado };
     set({ user: updated });
-    SecureStore.setItemAsync('prt_user', JSON.stringify(updated));
+    SecureStore.setItemAsync('postocash_user', JSON.stringify(updated));
   },
 
   logout: async () => {
     await Promise.all([
-      SecureStore.deleteItemAsync('prt_token'),
-      SecureStore.deleteItemAsync('prt_user'),
-      SecureStore.deleteItemAsync('prt_establishment'),
+      SecureStore.deleteItemAsync('postocash_token'),
+      SecureStore.deleteItemAsync('postocash_user'),
+      SecureStore.deleteItemAsync('postocash_establishment'),
       SecureStore.deleteItemAsync('auth_token'),
       SecureStore.deleteItemAsync('customer_data'),
       SecureStore.deleteItemAsync('establishment_data'),
@@ -69,17 +69,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setBiometrics: async (enabled) => {
-    await SecureStore.setItemAsync('prt_biometrics', enabled ? 'true' : 'false');
+    await SecureStore.setItemAsync('postocash_biometrics', enabled ? 'true' : 'false');
     set({ biometricsEnabled: enabled });
   },
 
   hydrate: async () => {
     try {
       const [token, userRaw, estab, biometrics] = await Promise.all([
-        SecureStore.getItemAsync('prt_token'),
-        SecureStore.getItemAsync('prt_user'),
-        SecureStore.getItemAsync('prt_establishment'),
-        SecureStore.getItemAsync('prt_biometrics'),
+        SecureStore.getItemAsync('postocash_token'),
+        SecureStore.getItemAsync('postocash_user'),
+        SecureStore.getItemAsync('postocash_establishment'),
+        SecureStore.getItemAsync('postocash_biometrics'),
       ]);
       set({
         token:             token ?? null,

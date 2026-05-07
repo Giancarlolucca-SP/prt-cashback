@@ -1,5 +1,5 @@
 /**
- * White-label configuration for PRT Cashback.
+ * White-label configuration for PostoCash.
  *
  * Defaults are used on first load and as fallback when offline.
  * The live values are fetched from GET /app/config on app start
@@ -35,7 +35,7 @@ export interface AppConfig {
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  appName:         'PRT Cashback',
+  appName:         'PostoCash',
   primaryColor:    '#1e3a5f',
   secondaryColor:  '#D97706',
   logoUrl:         null,

@@ -1,4 +1,4 @@
-import '../global.css';
+﻿import '../global.css';
 
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
@@ -22,7 +22,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const PRESELECTED_EST_KEY = 'prt_preselected_establishment';
+const PRESELECTED_EST_KEY = 'postocash_preselected_establishment';
 
 function parseEstablishmentId(url: string | null | undefined): string | null {
   if (!url) return null;

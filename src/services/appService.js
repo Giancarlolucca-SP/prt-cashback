@@ -22,7 +22,7 @@ const TOKEN_EXPIRES = '30d';
 
 function generateCode(length = 8) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'PRT-';
+  let code = 'PostoCash-';
   for (let i = 0; i < length; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
@@ -273,7 +273,7 @@ async function generateRedemption({ amount, latitude, longitude }, customerPaylo
   return {
     mensagem:    'Código de resgate gerado com sucesso.',
     codigo:      code,
-    qrData:      JSON.stringify({ type: 'PRT_REDEEM', code, amount: parsedAmount }),
+    qrData:      JSON.stringify({ type: 'PostoCash_REDEEM', code, amount: parsedAmount }),
     valor:       parsedAmount,
     valorFormatado: formatBRL(parsedAmount),
     expiresAt:   exp ? exp.toISOString() : null,
@@ -508,7 +508,7 @@ async function getConfig(customerPayload) {
   const establishmentId = customerPayload?.establishmentId ?? null;
 
   const defaults = {
-    appName:         'PRT Cashback',
+    appName:         'PostoCash',
     primaryColor:    '#1e3a5f',
     secondaryColor:  '#D97706',
     logoUrl:         null,

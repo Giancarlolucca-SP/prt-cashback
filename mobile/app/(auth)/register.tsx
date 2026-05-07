@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -12,7 +12,7 @@ import { maskCpfInput, isValidCpf, maskPhone } from '../../src/utils/formatters'
 import { useAppConfig } from '../../src/context/AppConfigContext';
 import { api } from '../../src/api/client';
 
-const PRESELECTED_EST_KEY = 'prt_preselected_establishment';
+const PRESELECTED_EST_KEY = 'postocash_preselected_establishment';
 
 interface EstablishmentPreview {
   establishmentId: string;

@@ -1,7 +1,7 @@
 /**
  * scheduler.js
  *
- * Background jobs for PRT Cashback.
+ * Background jobs for PostoCash.
  * Uses node-cron — jobs run in the same process as the Express server.
  *
  * Jobs:

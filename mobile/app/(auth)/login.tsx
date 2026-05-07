@@ -81,7 +81,7 @@ export default function LoginScreen() {
           {/* Hero */}
           <View className="items-center justify-center pt-16 pb-10 px-6">
             <Text className="text-5xl mb-3">⛽</Text>
-            <Text className="text-white text-3xl font-bold">PRT Cashback</Text>
+            <Text className="text-white text-3xl font-bold">PostoCash</Text>
             <Text className="text-white/60 text-sm mt-1">Seu cashback no posto de gasolina</Text>
           </View>
 

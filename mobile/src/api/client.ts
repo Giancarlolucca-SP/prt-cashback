@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { getOrCreateDeviceId } from '../utils/deviceId';
@@ -42,7 +42,7 @@ export function isTokenExpired(token: string | null | undefined): boolean {
 
 api.interceptors.request.use(async (config) => {
   const [token, deviceId] = await Promise.all([
-    SecureStore.getItemAsync('prt_token'),
+    SecureStore.getItemAsync('postocash_token'),
     getOrCreateDeviceId(),
   ]);
   if (token)    config.headers.Authorization = `Bearer ${token}`;
@@ -57,14 +57,14 @@ let pendingResolve: (() => void) | null = null;
 
 async function tryRefreshToken(): Promise<string | null> {
   try {
-    const token = await SecureStore.getItemAsync('prt_token');
+    const token = await SecureStore.getItemAsync('postocash_token');
     if (!token) return null;
     // Backend accepts expired tokens on this endpoint (ignoreExpiration: true)
     const { data } = await api.post('/app/token/refresh', {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const newToken: string = data.token;
-    await SecureStore.setItemAsync('prt_token', newToken);
+    await SecureStore.setItemAsync('postocash_token', newToken);
     return newToken;
   } catch {
     return null;
@@ -73,9 +73,9 @@ async function tryRefreshToken(): Promise<string | null> {
 
 async function clearSession() {
   await Promise.all([
-    SecureStore.deleteItemAsync('prt_token'),
-    SecureStore.deleteItemAsync('prt_user'),
-    SecureStore.deleteItemAsync('prt_establishment'),
+    SecureStore.deleteItemAsync('postocash_token'),
+    SecureStore.deleteItemAsync('postocash_user'),
+    SecureStore.deleteItemAsync('postocash_establishment'),
     SecureStore.deleteItemAsync('auth_token'),
     SecureStore.deleteItemAsync('customer_data'),
     SecureStore.deleteItemAsync('establishment_data'),
@@ -112,7 +112,7 @@ api.interceptors.response.use(
     // If another request is already refreshing, wait for it
     if (isRefreshing) {
       await new Promise<void>((resolve) => { pendingResolve = resolve; });
-      const newToken = await SecureStore.getItemAsync('prt_token');
+      const newToken = await SecureStore.getItemAsync('postocash_token');
       if (newToken) {
         error.config.headers.Authorization = `Bearer ${newToken}`;
         return api(error.config);
@@ -135,7 +135,7 @@ api.interceptors.response.use(
       }
 
       // ── Step 2: biometric re-auth gate ────────────────────────────────────────
-      const biometricsEnabled = await SecureStore.getItemAsync('prt_biometrics');
+      const biometricsEnabled = await SecureStore.getItemAsync('postocash_biometrics');
       if (biometricsEnabled === 'true') {
         const [compatible, enrolled] = await Promise.all([
           LocalAuthentication.hasHardwareAsync(),
