@@ -1,24 +1,78 @@
-# PostoCash — Sistema de Cashback para Postos
+# PostoCash — Sistema de Cashback para Postos de Combustível
 
-MVP de sistema de cashback standalone para postos de combustível.
+MVP multi-tenant de cashback para postos de combustível, com app mobile, painel administrativo, campanhas WhatsApp e assinaturas Stripe.
 
 ---
 
 ## Stack
 
-- **Node.js** (Express)
-- **PostgreSQL** + **Prisma ORM**
-- **JWT** para autenticação
-- Validação de CPF brasileiro
-- Formatação em BRL (R$)
-- Cupons em texto ESC/POS
+| Camada | Tecnologia |
+|--------|-----------|
+| Backend | Node.js + Express (porta 3000) |
+| Frontend/Admin | React + Vite (porta 5173) |
+| Mobile | React Native + Expo |
+| Banco de dados | PostgreSQL via Supabase |
+| Storage | Supabase Storage (logos, selfies) |
+| Pagamentos | Stripe (assinaturas recorrentes) |
+| WhatsApp | Z-API (campanhas) |
+| Landing page | HTML estático |
+
+---
+
+## Arquitetura
+
+```
+/
+├── src/                    # Backend Node.js + Express
+│   ├── controllers/        # Recebem req/res e delegam para services
+│   ├── services/           # Lógica de negócio
+│   ├── routes/             # Definição dos endpoints
+│   ├── middlewares/        # Auth, rate limit, error handler
+│   ├── workers/            # Fila de mensagens WhatsApp
+│   ├── app.js              # Express app
+│   └── server.js           # Entry point
+├── frontend/               # Painel admin React + Vite
+│   └── src/
+│       ├── pages/          # Dashboard, ConfiguracoesPosto, etc.
+│       └── services/       # API client
+├── mobile/                 # App React Native + Expo
+│   ├── app/
+│   │   ├── (auth)/         # Login, registro, boas-vindas
+│   │   └── (tabs)/         # Home, validar, configurações
+│   └── src/
+│       ├── context/        # AppConfigContext (branding)
+│       └── hooks/          # useBranding
+├── landing/                # Landing page HTML estático
+├── prisma/
+│   ├── schema.prisma       # Modelos do banco de dados
+│   └── seed-demo.js        # Dados de demonstração
+├── render.yaml             # Deploy Render (backend)
+├── DEPLOY.md               # Guia completo de deploy
+└── package.json
+```
+
+---
+
+## Módulos
+
+| Módulo | Descrição |
+|--------|-----------|
+| Multi-tenant | Múltiplos estabelecimentos com branding próprio |
+| Clientes | Cadastro por CPF, biometria facial |
+| Transações | Cashback via QR Code NF-e + validação por foto |
+| Resgates | Controle de saldo, limites diários, cooldown |
+| Campanhas | Envio WhatsApp em massa via fila (Z-API) |
+| Antifraude | Blacklist, limites, geolocalização |
+| Relatórios | Exportação PDF + Excel |
+| Assinaturas | Planos recorrentes via Stripe |
 
 ---
 
 ## Pré-requisitos
 
 - Node.js >= 18
-- PostgreSQL rodando localmente (ou via Docker)
+- Conta Supabase (banco + storage)
+- Variáveis de ambiente configuradas (ver `.env.example`)
 
 ---
 
@@ -36,25 +90,32 @@ npm install
 cp .env.example .env
 ```
 
-Edite `.env` com sua string de conexão PostgreSQL:
+Edite `.env` com suas credenciais:
 
 ```env
-DATABASE_URL="postgresql://postgres:suasenha@localhost:5432/postocash"
+DATABASE_URL="postgresql://..."
 JWT_SECRET="chave_secreta_forte_aqui"
-STATION_NAME="Posto XYZ"
+SUPABASE_URL="https://seu-projeto.supabase.co"
+SUPABASE_SERVICE_KEY="sua_service_key"
+SUPABASE_ANON_KEY="sua_anon_key"
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_PUBLISHABLE_KEY="pk_test_..."
+STRIPE_PRICE_ID="price_..."
+ZAPI_INSTANCE_ID="seu_instance_id"
+ZAPI_TOKEN="seu_token"
 ```
 
-### 3. Criar o banco e aplicar migrations
+### 3. Gerar client Prisma e aplicar schema
 
 ```bash
-npm run db:generate
-npm run db:migrate
+npx prisma generate
+npx prisma db push
 ```
 
-### 4. Popular com dados de teste (seed)
+### 4. Popular com dados de demonstração
 
 ```bash
-npm run db:seed
+node prisma/seed-demo.js
 ```
 
 ### 5. Iniciar o servidor
@@ -67,35 +128,46 @@ npm run dev
 npm start
 ```
 
-O servidor sobe em `http://localhost:3000`.
+Backend disponível em `http://localhost:3000`.
+
+### 6. Iniciar o frontend admin
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Painel disponível em `http://localhost:5173`.
+
+### 7. Iniciar o app mobile
+
+```bash
+cd mobile
+npm install
+npx expo start --tunnel
+```
 
 ---
 
-## Credenciais do seed
+## Credenciais de teste (seed)
 
-| Perfil   | E-mail                 | Senha        |
-|----------|------------------------|--------------|
-| Admin    | admin@posto.com        | admin123     |
-| Operador | operador@posto.com     | operador123  |
+| Perfil | E-mail | Senha |
+|--------|--------|-------|
+| Admin posto (Dilma) | admin@autoposto.com | Admin@1234 |
+| Admin geral | admin@posto.com | admin123 |
 
-| Cliente      | CPF             | Saldo     |
-|-------------|-----------------|-----------|
-| João Silva  | 529.982.247-25  | R$ 25,00  |
-| Maria Souza | 877.482.488-00  | R$ 0,00   |
-
----
-
-## Regras de negócio configuráveis (via .env)
-
-| Variável                     | Padrão  | Descrição                          |
-|------------------------------|---------|------------------------------------|
-| `MIN_REDEMPTION_AMOUNT`      | 10.00   | Valor mínimo para resgatar         |
-| `MAX_DAILY_REDEMPTION`       | 500.00  | Limite diário de resgate por cliente |
-| `REDEMPTION_COOLDOWN_MINUTES`| 5       | Minutos entre resgates (antifraude)|
+| Cliente | CPF | Saldo |
+|---------|-----|-------|
+| João Silva | 529.982.247-25 | R$ 25,00 |
+| Maria Souza | 877.482.488-00 | R$ 0,00 |
 
 ---
 
 ## Endpoints da API
+
+> Todos os endpoints protegidos exigem o header:
+> `Authorization: Bearer <token>`
 
 ### Autenticação
 
@@ -103,7 +175,7 @@ O servidor sobe em `http://localhost:3000`.
 ```bash
 curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"operador@posto.com","password":"operador123"}'
+  -d '{"email":"admin@autoposto.com","password":"Admin@1234"}'
 ```
 
 **Resposta:**
@@ -111,16 +183,40 @@ curl -X POST http://localhost:3000/auth/login \
 {
   "mensagem": "Login realizado com sucesso.",
   "token": "eyJhbGciOi...",
-  "operador": { "id": "...", "nome": "Carlos Operador", "perfil": "OPERATOR" }
+  "operador": { "id": "...", "nome": "Dilma Admin", "perfil": "ADMIN" }
 }
 ```
 
 ---
 
-### Clientes
+### App Mobile
 
-> Todos os endpoints abaixo exigem o header:
-> `Authorization: Bearer <token>`
+#### `POST /app/register` — Cadastro de cliente via app
+```bash
+curl -X POST http://localhost:3000/app/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ana Lima","cpf":"529.982.247-25","phone":"11999990003","establishmentId":"uuid-do-posto"}'
+```
+
+#### `POST /app/validate-nfce` — Validar QR Code NF-e para gerar cashback
+```bash
+curl -X POST http://localhost:3000/app/validate-nfce \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"qrCodeData":"...","cpf":"52998224725"}'
+```
+
+#### `POST /app/validate-photo` — Validar abastecimento por foto
+```bash
+curl -X POST http://localhost:3000/app/validate-photo \
+  -H "Authorization: Bearer TOKEN" \
+  -F "photo=@/caminho/para/foto.jpg" \
+  -F "cpf=52998224725"
+```
+
+---
+
+### Clientes
 
 #### `POST /customers` — Criar ou localizar cliente por CPF
 ```bash
@@ -156,7 +252,7 @@ curl http://localhost:3000/customers \
 
 ---
 
-### Transações (Acúmulo de cashback)
+### Transações
 
 #### `POST /transactions` — Registrar abastecimento e gerar cashback
 ```bash
@@ -177,8 +273,7 @@ curl -X POST http://localhost:3000/transactions \
     "cashbackGerado": "R$ 10,00",
     "novoSaldo": "R$ 35,00",
     "data": "14/04/2026 10:30"
-  },
-  "cupom": "========================================\n          POSTO XYZ\n    COMPROVANTE DE CASHBACK\n..."
+  }
 }
 ```
 
@@ -210,8 +305,7 @@ curl -X POST http://localhost:3000/redeem \
     "saldoAnterior": "R$ 35,00",
     "novoSaldo": "R$ 20,00",
     "data": "14/04/2026 10:35"
-  },
-  "cupom": "..."
+  }
 }
 ```
 
@@ -221,15 +315,63 @@ curl -X POST http://localhost:3000/redeem \
 - `400` — Limite diário atingido
 - `429` — Cooldown ativo (resgates muito frequentes)
 
-#### `GET /redeem/:cpf` — Histórico de resgates
+---
+
+### Campanhas WhatsApp
+
+#### `POST /campaigns` — Criar campanha
 ```bash
-curl http://localhost:3000/redeem/52998224725 \
+curl -X POST http://localhost:3000/campaigns \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"name":"Promoção Junho","message":"Olá {nome}, ganhe 10% de cashback hoje!","targetAudience":"ALL"}'
+```
+
+#### `GET /campaigns` — Listar campanhas
+```bash
+curl http://localhost:3000/campaigns \
   -H "Authorization: Bearer TOKEN"
 ```
 
 ---
 
-### Dashboard (somente admin)
+### Relatórios
+
+#### `GET /reports/export/pdf` — Exportar relatório em PDF
+```bash
+curl http://localhost:3000/reports/export/pdf \
+  -H "Authorization: Bearer TOKEN" \
+  --output relatorio.pdf
+```
+
+#### `GET /reports/export/excel` — Exportar relatório em Excel
+```bash
+curl http://localhost:3000/reports/export/excel \
+  -H "Authorization: Bearer TOKEN" \
+  --output relatorio.xlsx
+```
+
+---
+
+### Assinaturas Stripe
+
+#### `POST /stripe/confirm-subscription` — Confirmar assinatura
+```bash
+curl -X POST http://localhost:3000/stripe/confirm-subscription \
+  -H "Content-Type: application/json" \
+  -d '{"paymentMethodId":"pm_...","establishmentData":{...}}'
+```
+
+#### `POST /stripe/activate` — Ativar estabelecimento após pagamento
+```bash
+curl -X POST http://localhost:3000/stripe/activate \
+  -H "Content-Type: application/json" \
+  -d '{"subscriptionId":"sub_..."}'
+```
+
+---
+
+### Dashboard
 
 #### `GET /dashboard`
 ```bash
@@ -263,36 +405,37 @@ curl http://localhost:3000/health
 
 ---
 
-## Estrutura do projeto
+## Build do App Mobile
 
-```
-/
-├── prisma/
-│   ├── schema.prisma       # Modelos do banco de dados
-│   └── seed.js             # Dados iniciais
-├── src/
-│   ├── controllers/        # Recebem req/res e delegam para services
-│   ├── services/           # Lógica de negócio
-│   ├── routes/             # Definição dos endpoints
-│   ├── middlewares/        # Auth, rate limit, error handler
-│   ├── utils/              # CPF, moeda, data, código de cupom
-│   ├── app.js              # Express app
-│   └── server.js           # Entry point
-├── .env.example
-└── package.json
+```bash
+cd mobile
+
+# Preview (APK para testes)
+npx eas-cli build --platform android --profile preview
+
+# Produção (AAB para Google Play)
+npx eas-cli build --platform android --profile production
 ```
 
 ---
 
 ## Antifraude implementado
 
-| Proteção                    | Descrição                                        |
-|-----------------------------|--------------------------------------------------|
-| Cooldown entre resgates     | Configurável via `REDEMPTION_COOLDOWN_MINUTES`   |
-| Limite diário por cliente   | Configurável via `MAX_DAILY_REDEMPTION`          |
-| Valor mínimo de resgate     | Configurável via `MIN_REDEMPTION_AMOUNT`         |
-| Saldo nunca negativo        | Verificação + rollback atômico via Prisma        |
-| Código único por operação   | `TXN-XXXXXXXX` e `RSG-XXXXXXXX` por operação    |
-| Log de auditoria completo   | Toda ação registrada na tabela `AuditLog`        |
-| Rate limit no resgate       | 10 resgates/minuto por IP (ajustável)            |
-| JWT com expiração           | Tokens expiram em 8h por padrão                  |
+| Proteção | Descrição |
+|----------|-----------|
+| Cooldown entre resgates | Configurável via `REDEMPTION_COOLDOWN_MINUTES` |
+| Limite diário por cliente | Configurável via `MAX_DAILY_REDEMPTION` |
+| Valor mínimo de resgate | Configurável via `MIN_REDEMPTION_AMOUNT` |
+| Saldo nunca negativo | Verificação + rollback atômico via Prisma |
+| Código único por operação | `TXN-XXXXXXXX` e `RSG-XXXXXXXX` por operação |
+| Log de auditoria completo | Toda ação registrada na tabela `AuditLog` |
+| Rate limit no resgate | 10 resgates/minuto por IP (ajustável) |
+| JWT com expiração | Tokens expiram em 8h por padrão |
+| Blacklist de clientes | Bloqueio manual por CPF |
+| Validação geolocalização | Verificação de proximidade ao posto |
+
+---
+
+## Deploy
+
+Consulte o [DEPLOY.md](./DEPLOY.md) para o guia completo de deploy em produção (Render + Vercel + Google Play).
