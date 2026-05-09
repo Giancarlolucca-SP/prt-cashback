@@ -3,6 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-WBWMCLX4');</script>
+  <!-- End Google Tag Manager -->
   <title>PostoCash | Sistema de Fidelidade para Postos com Cashback</title>
   <meta name="description" content="Sistema de fidelidade para postos de combustível com cashback, campanhas no celular, antifraude e relatórios para aumentar faturamento e recorrência." />
   <meta name="keywords" content="sistema de fidelidade para postos, cashback para postos de gasolina, aumentar faturamento do posto, programa de fidelidade para posto de combustível, software de cashback para postos" />
@@ -515,6 +522,10 @@
 </head>
 
 <body class="antialiased min-h-screen selection:bg-stone-900 selection:text-white">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WBWMCLX4"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
   <div class="noise"></div>
 
   <!-- MAIN WRAPPER -->
@@ -637,7 +648,7 @@
                 <iconify-icon icon="solar:card-linear" class="text-base group-hover:translate-x-1 transition-transform"></iconify-icon>
               </span>
             </button>
-            <a href="#produto-dashboard" class="px-7 py-4 border border-stone-400 hover:bg-white/80 hover:border-stone-900 transition-all rounded-sm text-stone-700 font-mono text-[11px] uppercase tracking-widest">
+            <a href="#produto-dashboard" onclick="trackEvent('cta_click',{button:'ver_na_pratica'})" class="px-7 py-4 border border-stone-400 hover:bg-white/80 hover:border-stone-900 transition-all rounded-sm text-stone-700 font-mono text-[11px] uppercase tracking-widest">
               Ver na Prática
             </a>
           </div>
@@ -1644,6 +1655,8 @@
         button.innerHTML = '<span class="inline-flex items-center gap-2"><span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span> Redirecionando para o Stripe</span>';
       }
 
+      trackEvent('cta_click', { button: 'assinar_agora' });
+      trackEvent('plan_select', { plan: 'essencial', value: 200, currency: 'BRL' });
       trackEvent('checkout_start', {
         plan_name: 'PostoCash Essencial',
         value: 200,
@@ -1718,7 +1731,10 @@
     }
 
     document.querySelectorAll('[data-demo-open]').forEach(link => {
-      link.addEventListener('click', openDemoModal);
+      link.addEventListener('click', (e) => {
+        trackEvent('cta_click', { button: 'agendar_demonstracao' });
+        openDemoModal(e);
+      });
     });
 
     document.querySelectorAll('[data-demo-close], [data-demo-backdrop]').forEach(el => {
@@ -1869,6 +1885,7 @@
           email:        fd.get('email').trim(),
           operatorName: fd.get('operatorName').trim() || fd.get('nome').trim(),
         };
+        trackEvent('form_submit', { form: 'cadastro_posto', step: 'dados_posto' });
         goToRegisterStep(2);
       });
     }
@@ -1925,6 +1942,7 @@
           }
 
           if (result.success) {
+            trackEvent('form_submit', { form: 'cadastro_posto', step: 'pagamento_concluido' });
             showCredentials(result.credentials);
             return;
           }
