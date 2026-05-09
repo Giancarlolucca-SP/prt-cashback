@@ -1,5 +1,14 @@
 const dashboardService = require('../services/dashboardService');
 
+async function getAttendantRanking(req, res, next) {
+  try {
+    const result = await dashboardService.getAttendantRanking(req.operator, req.query);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getSummary(req, res, next) {
   try {
     const result = await dashboardService.getAnalytics(req.operator, req.query);
@@ -27,4 +36,4 @@ async function getFuelTypes(req, res, next) {
   }
 }
 
-module.exports = { getSummary, getCampaignResults, getFuelTypes };
+module.exports = { getSummary, getCampaignResults, getFuelTypes, getAttendantRanking };

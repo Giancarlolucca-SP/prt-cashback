@@ -887,6 +887,138 @@ function StatusBadge({ status }) {
   );
 }
 
+// ── Queue Monitor Widget ──────────────────────────────────────────────────────
+
+function QueueMonitorWidget({ isAdmin }) {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const { data: res } = await campaignsAPI.getGlobalQueue();
+      setData(res);
+    } catch {
+      // silently ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (!isAdmin || loading || !data) return null;
+  if (data.totalPending === 0 && data.totalProcessing === 0) return null;
+
+  const total = data.totalPending + data.totalProcessing + data.totalSent + data.totalFailed;
+  const done  = data.totalSent + data.totalFailed;
+  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📨</span>
+          <p className="text-sm font-semibold text-blue-800">Fila de Mensagens WhatsApp</p>
+          {data.dentroHorario ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              Ativo
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full font-medium">
+              Fora do horário
+            </span>
+          )}
+        </div>
+        <button onClick={load} className="text-xs text-blue-400 hover:text-blue-600 transition-colors">↻</button>
+      </div>
+
+      <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
+        <div
+          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-blue-700">
+        <span>Aguardando: <strong>{data.totalPending}</strong></span>
+        <span>Processando: <strong>{data.totalProcessing}</strong></span>
+        <span>Enviados hoje: <strong>{data.totalSentToday}</strong></span>
+        {data.totalFailed > 0 && (
+          <span className="text-red-500">Falhas: <strong>{data.totalFailed}</strong></span>
+        )}
+        {(data.totalPending + data.totalProcessing) > 0 && (
+          <span className="ml-auto text-blue-500">{data.estimatedClearTime}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Campaign Queue Progress Bar ───────────────────────────────────────────────
+
+function CampaignQueueProgress({ campaignId }) {
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const { data } = await campaignsAPI.getQueueStatus(campaignId);
+        if (!cancelled) {
+          setStatus(data);
+          if (!data.completo) {
+            setTimeout(poll, 30_000);
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+
+    poll();
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
+  if (!status) return null;
+  if (status.total === 0) return null;
+
+  const { sent, failed, total, percentComplete, completo, previsao } = status;
+
+  if (completo) {
+    return (
+      <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 rounded-lg px-3 py-2">
+        <span>✅</span>
+        <span>Todas as mensagens foram enviadas!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+        <span>Enviando mensagens… {sent} de {total}</span>
+        <span>{percentComplete}%</span>
+      </div>
+      <div className="w-full bg-gray-100 rounded-full h-1.5">
+        <div
+          className="bg-amber-400 h-1.5 rounded-full transition-all duration-500"
+          style={{ width: `${percentComplete}%` }}
+        />
+      </div>
+      {failed > 0 && (
+        <p className="text-xs text-red-400 mt-1">{failed} falha(s)</p>
+      )}
+      <p className="text-xs text-gray-400 mt-1">{previsao}</p>
+    </div>
+  );
+}
+
 function CampaignCard({ campaign, onClose }) {
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -952,8 +1084,11 @@ function CampaignCard({ campaign, onClose }) {
         </div>
       )}
 
+      {/* Queue progress */}
+      <CampaignQueueProgress campaignId={campaign.id} />
+
       {/* Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mt-3">
         {campaign.status !== 'CLOSED' ? (
           <button
             onClick={handleClose}
@@ -1164,6 +1299,171 @@ function CampaignSection() {
   );
 }
 
+// ── Attendant Ranking ─────────────────────────────────────────────────────────
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function AttendantRankingWidget({ params }) {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const paramsKey = JSON.stringify(params);
+
+  useEffect(() => {
+    setLoading(true);
+    setData(null);
+    dashboardAPI.getAttendants(params)
+      .then((res) => setData(res.data))
+      .catch(() => setData([]))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramsKey]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-48 mb-4" />
+        {[0,1,2].map((i) => (
+          <div key={i} className="flex gap-3 py-3 border-b border-gray-100">
+            <div className="h-4 bg-gray-100 rounded w-6 shrink-0" />
+            <div className="h-4 bg-gray-200 rounded flex-1" />
+            <div className="h-4 bg-gray-100 rounded w-16" />
+            <div className="h-4 bg-gray-100 rounded w-20" />
+            <div className="h-4 bg-gray-100 rounded w-20" />
+            <div className="h-4 bg-gray-100 rounded w-24" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!data?.length) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center">
+        <p className="text-2xl mb-2">🏷️</p>
+        <p className="text-sm font-medium text-gray-700">Sem dados de atendentes</p>
+        <p className="text-xs text-gray-400 mt-1">
+          Os atendentes aparecem aqui após cupons NF-e serem validados pelo app.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Ranking de Atendentes
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Baseado em abastecimentos via NF-e no período
+          </p>
+        </div>
+        <span className="text-xs text-gray-400">{data.length} atendente{data.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto -mx-4 px-4">
+        <table className="w-full text-sm min-w-[480px]">
+          <thead>
+            <tr className="text-xs text-gray-400 border-b border-gray-100">
+              <th className="text-left pb-2 pr-3 font-medium w-6">#</th>
+              <th className="text-left pb-2 pr-3 font-medium">Nome</th>
+              <th className="text-right pb-2 pr-3 font-medium">Abastec.</th>
+              <th className="text-right pb-2 pr-3 font-medium">Litros</th>
+              <th className="text-right pb-2 pr-3 font-medium">Valor (R$)</th>
+              <th className="text-right pb-2 font-medium">Cashback gerado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((att, idx) => {
+              const medal     = MEDALS[idx] ?? null;
+              const isTop     = idx < 3;
+              const isWarning = att.belowAverage;
+
+              return (
+                <tr
+                  key={att.name}
+                  className={[
+                    'border-b border-gray-50 last:border-0 transition-colors',
+                    isTop ? 'hover:bg-amber-50' : 'hover:bg-gray-50',
+                  ].join(' ')}
+                >
+                  {/* Position */}
+                  <td className="py-3 pr-3 text-xs text-gray-400 font-medium">
+                    {medal ?? idx + 1}
+                  </td>
+
+                  {/* Name */}
+                  <td className="py-3 pr-3">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={[
+                          'text-sm font-semibold',
+                          isTop ? 'text-gray-900' : 'text-gray-700',
+                        ].join(' ')}
+                      >
+                        {att.name}
+                      </span>
+                      {isWarning && (
+                        <span
+                          className="text-amber-500 text-xs"
+                          title="Abaixo da média do período"
+                        >
+                          ⚠️
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Count */}
+                  <td className="py-3 pr-3 text-right">
+                    <span
+                      className={[
+                        'text-sm font-bold tabular-nums',
+                        isTop ? 'text-amber-600' : 'text-gray-700',
+                      ].join(' ')}
+                    >
+                      {att.count.toLocaleString('pt-BR')}
+                    </span>
+                  </td>
+
+                  {/* Liters */}
+                  <td className="py-3 pr-3 text-right text-sm text-gray-600 tabular-nums">
+                    {att.totalLiters > 0
+                      ? `${att.totalLiters.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} L`
+                      : '—'}
+                  </td>
+
+                  {/* Value */}
+                  <td className="py-3 pr-3 text-right text-sm text-gray-700 tabular-nums font-medium">
+                    {fmtBRL(att.totalValue)}
+                  </td>
+
+                  {/* Cashback */}
+                  <td className="py-3 text-right">
+                    <span className="text-sm text-green-600 font-semibold tabular-nums">
+                      {fmtBRL(att.totalCashback)}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+        <span className="flex items-center gap-1">⚠️ Abaixo de 50% da média do grupo</span>
+        <span className="flex items-center gap-1 ml-auto">🥇🥈🥉 Top 3</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Main dashboard ────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -1346,6 +1646,9 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* ── Queue monitor (admin only, shown when there are pending messages) ── */}
+      <QueueMonitorWidget isAdmin={isAdmin} />
+
       {/* ── Cashback a Resgatar ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 bg-purple-50 border border-purple-200 rounded-xl px-5 py-4">
         <div className="shrink-0 w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-xl">
@@ -1433,6 +1736,11 @@ export default function Dashboard() {
       {/* ── Campaign list ────────────────────────────────────────────────────── */}
       <div className="border-t border-gray-200 pt-6">
         <CampaignSection />
+      </div>
+
+      {/* ── Attendant Ranking ────────────────────────────────────────────────── */}
+      <div className="border-t border-gray-200 pt-6">
+        <AttendantRankingWidget params={apiParams} />
       </div>
 
     </div>

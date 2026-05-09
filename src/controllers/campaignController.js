@@ -1,4 +1,5 @@
 const campaignService = require('../services/campaignService');
+const messageQueueService = require('../services/messageQueueService');
 const { formatBRL } = require('../utils/currencyFormatter');
 const { formatDateBR } = require('../utils/dateFormatter');
 
@@ -62,4 +63,22 @@ async function listReturnees(req, res, next) {
   }
 }
 
-module.exports = { preview, create, list, close, listReturnees };
+async function getQueueStatus(req, res, next) {
+  try {
+    const result = await messageQueueService.getCampaignQueueStatus(req.params.id);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getGlobalQueueStatus(req, res, next) {
+  try {
+    const result = await messageQueueService.getGlobalQueueStatus();
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { preview, create, list, close, listReturnees, getQueueStatus, getGlobalQueueStatus };

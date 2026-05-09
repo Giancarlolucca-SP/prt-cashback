@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: '/antifraude',label: 'Antifraude',icon: '🔒' },
   { to: '/clientes',  label: 'Clientes',  icon: '👥' },
   { to: '/relatorios',label: 'Relatórios',icon: '📋' },
+  { to: '/ranking',   label: 'Ranking',   icon: '🏆' },
   { to: '/configuracoes-cashback', label: 'Cashback', icon: '⚙️' },
 ];
 

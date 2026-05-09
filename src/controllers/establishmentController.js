@@ -43,4 +43,18 @@ async function getQRCode(req, res, next) {
   }
 }
 
-module.exports = { create, listAll, uploadLogo, getQRCode };
+async function updateBranding(req, res, next) {
+  try {
+    const { primaryColor, secondaryColor } = req.body;
+    const result = await establishmentService.updateBranding(
+      req.params.id,
+      { primaryColor, secondaryColor },
+      req.operator?.id ?? null,
+    );
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { create, listAll, uploadLogo, updateBranding, getQRCode };

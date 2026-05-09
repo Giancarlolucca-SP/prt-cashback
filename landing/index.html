@@ -1,0 +1,2020 @@
+﻿<!DOCTYPE html>
+<html class="scroll-smooth" lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>PostoCash | Sistema de Fidelidade para Postos com Cashback</title>
+  <meta name="description" content="Sistema de fidelidade para postos de combustível com cashback, campanhas no celular, antifraude e relatórios para aumentar faturamento e recorrência." />
+  <meta name="keywords" content="sistema de fidelidade para postos, cashback para postos de gasolina, aumentar faturamento do posto, programa de fidelidade para posto de combustível, software de cashback para postos" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="author" content="PostoCash" />
+  <link rel="canonical" href="./index.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="PostoCash" />
+  <meta property="og:title" content="PostoCash | Sistema de Fidelidade para Postos com Cashback" />
+  <meta property="og:description" content="Cashback para postos de gasolina com campanhas no celular, antifraude e gestão de clientes para aumentar a recorrência." />
+  <meta property="og:image" content="assets/logo-orange-bg.svg" />
+  <meta property="og:url" content="./index.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="PostoCash | Sistema de Fidelidade para Postos" />
+  <meta name="twitter:description" content="Aumente o faturamento do posto com cashback, campanhas no celular e fidelização automática." />
+  <meta name="twitter:image" content="assets/logo-orange-bg.svg" />
+  <script type="application/ld+json">
+    [{
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "PostoCash",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Android, iOS",
+      "description": "Sistema de fidelidade para postos de combustível com cashback, campanhas no celular, antifraude e relatórios para aumentar faturamento e recorrência.",
+      "offers": {
+        "@type": "Offer",
+        "availability": "https://schema.org/InStock",
+        "priceCurrency": "BRL",
+        "price": "200",
+        "billingDuration": "P1M"
+      },
+      "audience": {
+        "@type": "Audience",
+        "audienceType": "Donos de postos de combustível e gestores de redes de varejo físico"
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "name": "Sistema de fidelidade e cashback para postos de combustível",
+      "serviceType": "Sistema B2B de fidelização, cashback e recorrência para postos",
+      "provider": {
+        "@type": "Organization",
+        "name": "PostoCash",
+        "logo": "assets/logo-orange-bg.svg"
+      },
+      "areaServed": {
+        "@type": "Country",
+        "name": "Brasil"
+      },
+      "audience": {
+        "@type": "BusinessAudience",
+        "audienceType": "Donos de postos de combustível, gestores de redes e varejo físico"
+      },
+      "description": "Serviço B2B para aumentar faturamento do posto com cashback, campanhas no celular, app exclusivo, gestão de clientes, ranking de frentistas e antifraude.",
+      "offers": {
+        "@type": "Offer",
+        "availability": "https://schema.org/InStock",
+        "priceCurrency": "BRL",
+        "price": "200",
+        "billingDuration": "P1M"
+      }
+    }]
+  </script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'page_view',
+      page_type: 'landing',
+      product: 'PostoCash'
+    });
+  </script>
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;800&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            display: ['Space Grotesk', 'sans-serif'],
+          },
+          colors: {
+            stone: {
+              50:'#fafaf9',100:'#f5f5f4',200:'#e7e5e4',300:'#d6d3d1',
+              400:'#a8a29e',500:'#78716c',600:'#57534e',700:'#44403c',
+              800:'#292524',900:'#1c1917',
+            },
+          },
+          animation: {
+            'spin-slow': 'spin 8s linear infinite',
+            'spin-med': 'spin 4s linear infinite',
+            'shimmer': 'shimmer 3s linear infinite',
+            'float': 'float 7s ease-in-out infinite',
+            'float2': 'float 9s ease-in-out infinite',
+            'marquee': 'marquee 35s linear infinite',
+            'pulse-ring': 'pulseRing 2s ease-out infinite',
+            'ticker': 'ticker 12s ease-in-out infinite',
+          },
+          keyframes: {
+            shimmer: { from:{backgroundPosition:'0 0'}, to:{backgroundPosition:'-200% 0'} },
+            float: { '0%,100%':{transform:'translateY(0)'}, '50%':{transform:'translateY(-18px)'} },
+            marquee: { '0%':{transform:'translateX(0)'}, '100%':{transform:'translateX(-50%)'} },
+            pulseRing: { '0%':{transform:'scale(1)',opacity:'1'}, '100%':{transform:'scale(2.2)',opacity:'0'} },
+            ticker: {
+              '0%,18%':{transform:'translateY(0)'},
+              '25%,43%':{transform:'translateY(-25%)'},
+              '50%,68%':{transform:'translateY(-50%)'},
+              '75%,93%':{transform:'translateY(-75%)'},
+              '100%':{transform:'translateY(0)'},
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ── RESET & BASE ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #EAEAE5;
+      color: #1c1917;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #EAEAE5; }
+    ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+
+    /* ── NOISE GRAIN ──────────────────────────────────────── */
+    .noise {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      opacity: 0.045; pointer-events: none; z-index: 9999;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ── GRID BACKGROUND ──────────────────────────────────── */
+    .bg-grid {
+      background-size: 40px 40px;
+      background-image:
+        linear-gradient(to right,  rgba(0,0,0,0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+    }
+    .bg-grid-light {
+      background-size: 40px 40px;
+      background-image:
+        linear-gradient(to right,  rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+    }
+
+    /* ── REVEAL ANIMATIONS ────────────────────────────────── */
+    .reveal {
+      opacity: 0; transform: translateY(2rem);
+      transition: all 1s cubic-bezier(0.16,1,0.3,1);
+    }
+    .reveal.active { opacity:1; transform:translateY(0); }
+
+    .motion-enter { opacity:0; }
+    .motion-enter.active {
+      animation: slideUpFade 1s cubic-bezier(0.16,1,0.3,1) forwards;
+    }
+    @keyframes slideUpFade {
+      from { opacity:0; transform:translateY(40px) scale(0.98); filter:blur(8px); }
+      to   { opacity:1; transform:translateY(0)    scale(1);    filter:blur(0);   }
+    }
+
+    /* ── TEXT REVEAL (MASKED) ─────────────────────────────── */
+    .text-reveal-wrapper {
+      overflow: hidden; display: inline-block; vertical-align: bottom;
+    }
+    .text-reveal-content {
+      display: block;
+      transform: translateY(110%); opacity: 0;
+      transition: transform 1.2s cubic-bezier(0.16,1,0.3,1), opacity 1.2s ease;
+    }
+    .reveal-active .text-reveal-content { transform:translateY(0); opacity:1; }
+
+    /* ── STAGGER DELAYS ───────────────────────────────────── */
+    .delay-100 { transition-delay:.1s; animation-delay:.1s; }
+    .delay-200 { transition-delay:.2s; animation-delay:.2s; }
+    .delay-300 { transition-delay:.3s; animation-delay:.3s; }
+    .delay-500 { transition-delay:.5s; animation-delay:.5s; }
+    .delay-700 { transition-delay:.7s; animation-delay:.7s; }
+    .delay-900 { transition-delay:.9s; animation-delay:.9s; }
+
+    /* ── TRANSPARENT STROKE TEXT ──────────────────────────── */
+    .text-outline {
+      -webkit-text-stroke: 1.5px rgba(28,25,23,0.75);
+      color: transparent;
+      transition: color .5s ease, -webkit-text-stroke .5s ease;
+    }
+    .text-outline:hover {
+      color: #1c1917; -webkit-text-stroke-color: transparent;
+    }
+    .text-outline-light {
+      -webkit-text-stroke: 1.5px rgba(255,255,255,0.35);
+      color: transparent;
+    }
+    .text-outline-faint {
+      -webkit-text-stroke: 1px rgba(28,25,23,0.07);
+      color: transparent; user-select:none; pointer-events:none;
+    }
+
+    /* ── SHIMMER TEXT ─────────────────────────────────────── */
+    .shimmer-text {
+      background: linear-gradient(90deg, #1c1917 0%, #78716c 45%, #1c1917 100%);
+      background-size: 200% auto;
+      color: transparent; -webkit-background-clip: text; background-clip: text;
+      animation: shimmer 3s linear infinite;
+    }
+
+    /* ── BEAM BUTTON (conic spin border) ──────────────────── */
+    .btn-beam { position:relative; z-index:10; overflow:hidden; }
+    .btn-beam::before {
+      content:""; position:absolute; inset:-2px; z-index:-1;
+      background: conic-gradient(from 90deg at 50% 50%, #E2E8F0 0%, #000 50%, #E2E8F0 100%);
+      animation: spin 4s linear infinite;
+      border-radius: inherit; opacity:0; transition:opacity .3s;
+    }
+    .btn-beam:hover::before { opacity:1; }
+    .btn-beam-content {
+      background-color: #1c1917; color:white;
+      position:relative; z-index:10;
+      width:100%; height:100%; border-radius:inherit;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid rgba(255,255,255,0.1);
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── BEAM BUTTON V2 (spinner inside) ──────────────────── */
+    .beam-btn { position:relative; overflow:hidden; border-radius:999px; padding:1px; background:rgba(0,0,0,0.08); cursor:pointer; }
+    .beam-btn-content {
+      background:#fff; color:#000; padding:12px 28px; border-radius:999px;
+      position:relative; z-index:2; transition:background .3s;
+      font-weight:600; letter-spacing:.04em; text-transform:uppercase; font-size:.75rem;
+    }
+    .beam-btn:hover .beam-btn-content { background:#f5f5f4; }
+    .beam-spinner {
+      position:absolute; inset:-50%; width:200%; height:200%;
+      background:conic-gradient(from 0deg, transparent 0 340deg, #000 360deg);
+      animation: spin 3s linear infinite;
+    }
+
+    /* ── FLASHLIGHT CARD ──────────────────────────────────── */
+    .flashlight-card { position:relative; overflow:hidden; }
+    .flashlight-card::before {
+      content:""; position:absolute; inset:0px;
+      background:radial-gradient(600px circle at var(--mouse-x,0) var(--mouse-y,0), rgba(255,255,255,0.85), transparent 40%);
+      opacity:0; transition:opacity .5s; pointer-events:none; z-index:2;
+    }
+    .flashlight-card:hover::before { opacity:1; }
+
+    /* ── GLOW CARD ────────────────────────────────────────── */
+    .glow-card { position:relative; overflow:hidden; }
+    .glow-card::after {
+      content:''; position:absolute;
+      width:500px; height:500px;
+      background:radial-gradient(circle, rgba(0,0,0,0.04) 0%, transparent 60%);
+      top:var(--y,-250px); left:var(--x,-250px);
+      transform:translate(-50%,-50%); pointer-events:none;
+      opacity:0; transition:opacity .3s;
+    }
+    .glow-card:hover::after { opacity:1; }
+
+    /* ── HOVER LIFT ───────────────────────────────────────── */
+    .hover-lift {
+      transition:transform .4s cubic-bezier(0.16,1,0.3,1), box-shadow .4s cubic-bezier(0.16,1,0.3,1);
+    }
+    .hover-lift:hover { transform:translateY(-5px); box-shadow:0 16px 40px -12px rgba(0,0,0,0.12); }
+
+    /* ── NAV LOAD ─────────────────────────────────────────── */
+    .nav-load { opacity:0; transform:translateY(-8px); transition:all .6s ease-out; }
+    .nav-load.loaded { opacity:1; transform:translateY(0); }
+
+    /* ── ORBS ─────────────────────────────────────────────── */
+    .orb {
+      position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none;
+    }
+
+    /* ── CLIP ENTER ───────────────────────────────────────── */
+    .clip-enter {
+      clip-path: inset(100% 0 0 0);
+      transition: clip-path 1.2s cubic-bezier(0.16,1,0.3,1);
+    }
+    .clip-enter.active { clip-path: inset(0 0 0 0); }
+
+    /* ── SCROLLBAR NAV HIDE ───────────────────────────────── */
+    #navbar { transition:transform .4s ease; }
+    #navbar.hide { transform:translateY(-100%); }
+
+    /* ── TEXT BALANCE ─────────────────────────────────────── */
+    .text-balance { text-wrap:balance; }
+
+    /* ── GRADIENT TEXT ────────────────────────────────────── */
+    .gradient-text {
+      background: linear-gradient(135deg, #1c1917 0%, #78716c 100%);
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+    }
+
+    /* ── TICKER SCROLL ────────────────────────────────────── */
+    .ticker-wrap { height:1.5rem; overflow:hidden; }
+    .ticker-inner { animation: ticker 12s ease-in-out infinite; }
+
+    :root {
+      --pc-orange:#FF6B00;
+      --pc-blue:#0ea5e9;
+      --pc-teal:#0f766e;
+      --pc-green:#10b981;
+      --pc-navy:#0f172a;
+    }
+    .product-mesh {
+      background:
+        radial-gradient(circle at 12% 20%, rgba(255,107,0,.10), transparent 28%),
+        radial-gradient(circle at 82% 18%, rgba(14,165,233,.055), transparent 26%),
+        radial-gradient(circle at 76% 78%, rgba(16,185,129,.075), transparent 28%),
+        linear-gradient(135deg,#f7f5ef 0%,#f3f5ef 52%,#f4f2ed 100%);
+      background-size:130% 130%;
+      animation: meshDrift 15s ease-in-out infinite alternate;
+    }
+    @keyframes meshDrift {
+      from { background-position:0% 0%; }
+      to { background-position:100% 85%; }
+    }
+    .phone-enter.active { animation: phoneEnter .95s cubic-bezier(.16,1,.3,1) both; }
+    @keyframes phoneEnter {
+      from { opacity:0; transform:translateX(64px) scale(.96); filter:blur(10px); }
+      to { opacity:1; transform:translateX(0) scale(1); filter:blur(0); }
+    }
+    .phone-stage { position:relative; width:min(430px,88vw); min-height:690px; display:flex; align-items:center; justify-content:center; }
+    .phone-shell {
+      position:relative;
+      width:304px;
+      height:620px;
+      border-radius:40px;
+      padding:12px;
+      background:linear-gradient(145deg,#2b2b2b 0%,#101010 50%,#1a1a1a 100%);
+      box-shadow:0 34px 90px rgba(0,0,0,.58),0 0 0 1px rgba(255,255,255,.12),inset 0 0 0 2px rgba(255,255,255,.05),inset 0 -28px 42px rgba(0,0,0,.38);
+    }
+    .phone-shell::before,
+    .phone-shell::after {
+      content:"";
+      position:absolute;
+      width:4px;
+      border-radius:999px;
+      background:linear-gradient(180deg,#343434,#111);
+      box-shadow:inset 1px 0 0 rgba(255,255,255,.16);
+    }
+    .phone-shell::before { left:-4px; top:128px; height:76px; }
+    .phone-shell::after { right:-4px; top:176px; height:92px; }
+    .phone-button-extra {
+      position:absolute;
+      left:-4px;
+      top:222px;
+      width:4px;
+      height:54px;
+      border-radius:999px;
+      background:linear-gradient(180deg,#343434,#111);
+      box-shadow:inset 1px 0 0 rgba(255,255,255,.16);
+    }
+    .phone-screen {
+      position:relative;
+      width:100%;
+      height:100%;
+      border-radius:31px;
+      overflow:hidden;
+      background:#050816;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.09);
+    }
+    .phone-camera {
+      position:absolute;
+      top:18px;
+      left:50%;
+      z-index:8;
+      width:13px;
+      height:13px;
+      border-radius:999px;
+      transform:translateX(-50%);
+      background:#030712;
+      box-shadow:0 0 0 3px rgba(0,0,0,.32), inset 0 0 0 2px rgba(255,255,255,.08);
+    }
+    .phone-home {
+      position:absolute;
+      left:50%;
+      bottom:10px;
+      z-index:8;
+      width:104px;
+      height:4px;
+      border-radius:999px;
+      transform:translateX(-50%);
+      background:rgba(255,255,255,.82);
+    }
+    .phone-shine {
+      position:absolute;
+      inset:0;
+      z-index:7;
+      pointer-events:none;
+      background:linear-gradient(115deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,.08) 22%, transparent 42%),radial-gradient(circle at 70% 0%, rgba(255,255,255,.18), transparent 28%);
+      mix-blend-mode:screen;
+      opacity:.58;
+    }
+    .app-static-screen {
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#f8fafc;
+    }
+    .app-static-screen img {
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      object-position:center center;
+      display:block;
+    }
+    .glass-float {
+      position:absolute;
+      z-index:12;
+      padding:13px 16px;
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:18px;
+      background:rgba(255,255,255,.12);
+      backdrop-filter:blur(18px);
+      color:#fff;
+      box-shadow:0 24px 60px rgba(0,0,0,.28);
+      animation: softBounce 5.5s ease-in-out infinite;
+      white-space:nowrap;
+    }
+    .glass-float strong { display:block; font-size:14px; line-height:1.15; }
+    .glass-float span { display:block; margin-top:3px; color:rgba(255,255,255,.62); font-size:11px; }
+    .float-delay-1 { animation-delay:.7s; }
+    .float-delay-2 { animation-delay:1.4s; }
+    @keyframes softBounce {
+      0%,100% { transform:translateY(0); }
+      50% { transform:translateY(-12px); }
+    }
+    .vivid-cta {
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      border-radius:999px;
+      padding:15px 22px;
+      background:#1c1917;
+      color:#fff;
+      font-weight:800;
+      border:1px solid rgba(28,25,23,.12);
+      box-shadow:0 18px 42px rgba(28,25,23,.18);
+      transition:transform .25s ease, background .25s ease, box-shadow .25s ease;
+    }
+    .vivid-cta:hover { transform:translateY(-2px); background:#292524; box-shadow:0 24px 56px rgba(28,25,23,.22); }
+    .feature-check { display:flex; align-items:flex-start; gap:12px; color:#57534e; font-size:15px; line-height:1.45; }
+    .feature-check iconify-icon { color:var(--pc-green); flex:0 0 auto; margin-top:2px; }
+    .laptop-showcase { position:relative; min-height:520px; display:flex; align-items:center; justify-content:center; }
+    .laptop-pro {
+      position:relative;
+      width:min(760px,92vw);
+      filter:drop-shadow(0 54px 80px rgba(0,0,0,.55));
+      transform:perspective(1200px) rotateX(3deg) rotateY(-5deg);
+      transition:transform .55s cubic-bezier(.16,1,.3,1);
+    }
+    .laptop-pro:hover { transform:perspective(1200px) rotateX(0deg) rotateY(0deg); }
+    .laptop-lid {
+      padding:14px 14px 0;
+      border-radius:22px 22px 7px 7px;
+      background:linear-gradient(145deg,#475569,#111827 44%,#020617);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.18), 0 0 0 1px rgba(255,255,255,.09);
+    }
+    .laptop-camera { width:8px; height:8px; margin:0 auto 10px; border-radius:999px; background:#020617; box-shadow:inset 0 0 0 2px rgba(255,255,255,.12); }
+    .laptop-screen { position:relative; overflow:hidden; aspect-ratio:16/9; border-radius:8px 8px 0 0; border:1px solid rgba(255,255,255,.1); background:#020617; }
+    .laptop-screen img { width:100%; height:100%; object-fit:cover; object-position:50% 0%; display:block; }
+    .laptop-screen::after { content:""; position:absolute; inset:0; background:linear-gradient(115deg,rgba(255,255,255,.18),transparent 34%); pointer-events:none; }
+    .laptop-base { position:relative; height:34px; border-radius:0 0 26px 26px; background:linear-gradient(180deg,#334155,#111827 70%,#020617); box-shadow:0 24px 60px rgba(0,0,0,.45); }
+    .laptop-base::before { content:""; position:absolute; left:38%; top:0; width:24%; height:9px; border-radius:0 0 12px 12px; background:rgba(255,255,255,.13); }
+    .metric-card {
+      min-width:176px;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:18px;
+      background:rgba(15,23,42,.62);
+      backdrop-filter:blur(18px);
+      padding:14px 16px;
+      color:#fff;
+      box-shadow:0 22px 54px rgba(0,0,0,.32);
+    }
+    .metric-card b { display:block; font-family:'Space Grotesk',sans-serif; font-size:20px; line-height:1; }
+    .metric-card span { display:block; margin-top:6px; color:rgba(255,255,255,.58); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+    .metric-1 { left:0; top:48px; }
+    .metric-2 { right:6px; top:74px; }
+    .metric-3 { left:42px; bottom:54px; }
+    .metric-4 { right:44px; bottom:28px; }
+    @media (max-width: 1023px) {
+      .phone-stage { min-height:640px; }
+      .metric-card { position:static !important; min-width:0; }
+      .laptop-showcase { min-height:auto; display:block; }
+    }
+    @media (max-width: 520px) {
+      .phone-shell { width:276px; height:566px; }
+      .phone-stage { min-height:600px; }
+    }
+  </style>
+</head>
+
+<body class="antialiased min-h-screen selection:bg-stone-900 selection:text-white">
+  <div class="noise"></div>
+
+  <!-- MAIN WRAPPER -->
+  <div class="max-w-[1440px] mx-auto border-x border-stone-300 relative bg-[#EAEAE5] shadow-2xl shadow-stone-200/60">
+
+    <!-- VERTICAL GRID LINES -->
+    <div class="absolute inset-0 pointer-events-none grid grid-cols-12 gap-0 z-0 opacity-30">
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 border-r border-stone-300 h-full"></div>
+      <div class="col-span-1 h-full"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         NAVBAR
+    ══════════════════════════════════════════════ -->
+    <header id="navbar" class="relative z-50 border-b border-stone-300 bg-white/60 backdrop-blur-md sticky top-0">
+      <div class="flex justify-between items-center px-6 py-4 nav-load">
+        <div class="flex items-center">
+          <img src="assets/logo-minimal.svg" alt="Logo PostoCash, sistema de fidelidade e cashback para postos" class="h-9 w-auto object-contain" fetchpriority="high" decoding="async" />
+        </div>
+        <nav class="hidden md:flex items-center gap-8 text-[11px] font-mono uppercase tracking-widest text-stone-500">
+          <a href="#produto-dashboard" class="hover:text-stone-900 transition-colors">O Sistema</a>
+          <a href="#produto-campanhas" class="hover:text-stone-900 transition-colors">Recorrência</a>
+          <a href="#produto-app" class="hover:text-stone-900 transition-colors">App Exclusivo</a>
+          <a href="#assinar" class="hover:text-stone-900 transition-colors">Preço</a>
+          <a href="blog.html" class="hover:text-stone-900 transition-colors">Blog / Sucesso</a>
+          <a href="#area-do-posto" data-system-login class="hover:text-stone-900 transition-colors">Área do Posto</a>
+          <a href="#contato" class="hover:text-stone-900 transition-colors">Contato</a>
+        </nav>
+        <a href="#agendar-demonstracao" data-demo-open class="btn-beam px-1 py-1 rounded-full group">
+          <div class="btn-beam-content px-5 py-2.5 rounded-full text-[11px] font-mono uppercase tracking-widest transition-colors">
+            Agendar Demonstração
+          </div>
+        </a>
+      </div>
+    </header>
+
+    <!-- ══════════════════════════════════════════════
+         HERO
+    ══════════════════════════════════════════════ -->
+    <section class="relative z-10 min-h-[92vh] flex flex-col justify-center border-b border-stone-300 overflow-hidden">
+
+      <!-- Background layers -->
+      <div class="absolute inset-0 pointer-events-none">
+        <!-- Giant watermark text -->
+        <div class="absolute inset-0 flex items-center justify-center overflow-hidden">
+          <span class="font-display font-bold text-outline-faint whitespace-nowrap select-none"
+                style="font-size:clamp(90px,18vw,260px);line-height:1;letter-spacing:-0.05em;">
+            CASHBACK
+          </span>
+        </div>
+        <!-- Orbs -->
+        <div class="orb w-[600px] h-[600px] top-[-15%] right-[-5%] bg-gradient-to-br from-stone-200/80 to-transparent animate-float opacity-60"></div>
+        <div class="orb w-[500px] h-[500px] bottom-[-20%] left-[-8%] bg-gradient-to-tr from-white to-stone-300/40 animate-float2 opacity-50"></div>
+        <div class="orb w-[300px] h-[300px] top-[30%] left-[35%] bg-gradient-to-br from-emerald-100/40 to-transparent opacity-30" style="animation:float 11s ease-in-out infinite;"></div>
+        <!-- Grid -->
+        <div class="bg-grid absolute inset-0 opacity-25"></div>
+        <!-- Gradient vignettes -->
+        <div class="absolute inset-0 bg-gradient-to-b from-[#EAEAE5]/70 via-transparent to-[#EAEAE5]/80"></div>
+      </div>
+
+      <!-- Content grid -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-0 relative">
+
+        <!-- LEFT: Text -->
+        <div class="col-span-12 md:col-span-8 p-8 md:p-16 lg:p-24 flex flex-col justify-center">
+
+          <!-- Badge -->
+          <div class="inline-flex items-center gap-2.5 mb-10 reveal delay-100 w-fit">
+            <span class="relative flex items-center gap-1.5 px-3 py-1.5 bg-white/80 border border-stone-200 rounded-full text-[11px] font-mono uppercase tracking-widest text-stone-500 shadow-sm">
+              <span class="relative flex h-1.5 w-1.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              Sistema v1.0 — Produção
+            </span>
+          </div>
+
+          <!-- Headline -->
+          <h1 class="font-display font-bold tracking-tight leading-[1.08] mb-8 z-20" id="hero-title"
+              style="font-size:clamp(48px,7.6vw,108px);">
+            <span class="text-reveal-wrapper block">
+              <span class="text-reveal-content text-stone-400 font-light" style="font-size:0.55em;letter-spacing:-.01em;">Aumente a</span>
+            </span>
+            <span class="text-reveal-wrapper block" style="padding-top:.24em;margin-top:-.12em;">
+              <span class="text-reveal-content text-outline delay-200 cursor-default">RECORRÊNCIA</span>
+            </span>
+            <span class="text-reveal-wrapper block">
+              <span class="text-reveal-content delay-300" style="font-size:0.48em;letter-spacing:-.01em;color:#44403c;">do seu posto.</span>
+            </span>
+          </h1>
+
+          <!-- Description -->
+          <p class="text-base md:text-lg text-stone-500 max-w-xl leading-relaxed reveal delay-500 font-light text-balance">
+            Fidelize clientes com cashback em tempo real, validação por QR Code, campanhas automáticas via WhatsApp, ranking de atendentes e antifraude em uma única plataforma.
+          </p>
+
+          <!-- CTAs -->
+          <div class="mt-10 flex flex-wrap gap-4 reveal delay-700">
+            <a href="#agendar-demonstracao" data-demo-open class="group relative px-7 py-4 bg-stone-900 text-white overflow-hidden rounded-sm transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0">
+              <div class="absolute inset-0 w-full h-full bg-stone-700 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
+              <span class="relative z-10 font-mono text-[11px] uppercase tracking-widest flex items-center gap-2">
+                Agendar Demonstração
+                <iconify-icon icon="solar:arrow-right-linear" class="text-base group-hover:translate-x-1 transition-transform"></iconify-icon>
+              </span>
+            </a>
+            <button type="button" onclick="handleCheckout(event)" class="group relative px-7 py-4 bg-[#FF6B00] text-white overflow-hidden rounded-sm transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0">
+              <div class="absolute inset-0 w-full h-full bg-[#e76000] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
+              <span class="relative z-10 font-mono text-[11px] uppercase tracking-widest flex items-center gap-2">
+                Assinar — R$ 200/mês
+                <iconify-icon icon="solar:card-linear" class="text-base group-hover:translate-x-1 transition-transform"></iconify-icon>
+              </span>
+            </button>
+            <a href="#produto-dashboard" class="px-7 py-4 border border-stone-400 hover:bg-white/80 hover:border-stone-900 transition-all rounded-sm text-stone-700 font-mono text-[11px] uppercase tracking-widest">
+              Ver na Prática
+            </a>
+          </div>
+
+          <!-- Mini stats -->
+          <div class="mt-12 flex flex-wrap items-center gap-6 reveal delay-900">
+            <div class="flex items-center gap-2 text-stone-500">
+              <span class="font-display font-semibold text-stone-900 text-xl">+30%</span>
+              <span class="text-[11px] font-mono uppercase tracking-widest">de retorno médio</span>
+            </div>
+            <span class="text-stone-300 hidden sm:block">·</span>
+            <div class="flex items-center gap-2 text-stone-500">
+              <span class="font-display font-semibold text-stone-900 text-xl">Web & Mobile</span>
+              <span class="text-[11px] font-mono uppercase tracking-widest">integração</span>
+            </div>
+            <span class="text-stone-300 hidden sm:block">·</span>
+            <div class="flex items-center gap-2 text-stone-500">
+              <span class="font-display font-semibold text-stone-900 text-xl">R$&thinsp;2,4M</span>
+              <span class="text-[11px] font-mono uppercase tracking-widest">em transações</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Visual panel -->
+        <div class="col-span-12 md:col-span-4 border-l border-stone-300 bg-white/30 backdrop-blur-sm p-8 md:p-12 flex flex-col justify-between gap-8">
+
+          <!-- Notification card -->
+          <div class="reveal delay-300 flashlight-card border border-stone-200 bg-white/90 rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-700 group cursor-default"
+               onmousemove="updateFlashlight(event,this)">
+            <!-- Card header -->
+            <div class="px-5 pt-5 pb-3 border-b border-stone-100 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 bg-stone-900 rounded-md flex items-center justify-center">
+                  <iconify-icon icon="solar:gas-station-bold-duotone" class="text-xs text-white"></iconify-icon>
+                </div>
+                <span class="text-xs font-semibold text-stone-800">PostoCash</span>
+              </div>
+              <span class="text-[10px] font-mono text-stone-400">agora mesmo</span>
+            </div>
+            <!-- Card body -->
+            <div class="p-5">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="relative">
+                  <span class="w-2 h-2 bg-emerald-500 rounded-full block"></span>
+                  <span class="animate-ping absolute top-0 left-0 w-2 h-2 bg-emerald-400 rounded-full opacity-75"></span>
+                </div>
+                <span class="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Cashback Creditado!</span>
+              </div>
+              <p class="font-display font-semibold text-stone-900 text-lg leading-tight mb-1">Lucas Rodrigues</p>
+              <p class="text-2xl font-display font-bold text-stone-900 mb-3">+ R$&thinsp;24,50</p>
+              <div class="space-y-1.5 text-[11px] font-mono text-stone-500">
+                <div class="flex items-center gap-1.5">
+                  <iconify-icon icon="solar:gas-station-linear" class="text-stone-400"></iconify-icon>
+                  Gasolina Comum · 50L
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <iconify-icon icon="solar:buildings-linear" class="text-stone-400"></iconify-icon>
+                  Auto Posto Dilma LTDA
+                </div>
+              </div>
+              <!-- Live ticker -->
+              <div class="mt-4 pt-4 border-t border-stone-100">
+                <div class="text-[10px] font-mono text-stone-400 uppercase tracking-widest mb-2">Eventos ao vivo</div>
+                <div class="ticker-wrap text-[11px] font-mono text-stone-600">
+                  <div class="ticker-inner">
+                    <div class="flex items-center gap-1.5 h-6"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>Ana B. ganhou R$&thinsp;12,00</div>
+                    <div class="flex items-center gap-1.5 h-6"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>Carlos P. resgatou R$&thinsp;45,50</div>
+                    <div class="flex items-center gap-1.5 h-6"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>Fernanda C. ganhou R$&thinsp;87,25</div>
+                    <div class="flex items-center gap-1.5 h-6"><span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>Campanha enviada → 6 clientes</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Operational cards -->
+          <div class="grid gap-4">
+            <div class="reveal delay-500 border border-stone-200 bg-white p-5 transition-transform duration-300 hover:scale-[1.02]">
+              <h4 class="font-display text-lg font-bold text-stone-900">Retenção Inteligente</h4>
+              <p class="mt-1.5 text-sm leading-relaxed text-stone-500">Identifica e reativa clientes inativos automaticamente via WhatsApp.</p>
+            </div>
+            <div class="reveal delay-700 border border-stone-200 bg-white p-5 transition-transform duration-300 hover:scale-[1.02]">
+              <h4 class="font-display text-lg font-bold text-stone-900">Custo Zero de Setup</h4>
+              <p class="mt-1.5 text-sm leading-relaxed text-stone-500">Implementação imediata via nuvem, sem necessidade de hardware caro.</p>
+            </div>
+            <div class="reveal delay-900 border border-stone-200 bg-white p-5 transition-transform duration-300 hover:scale-[1.02]">
+              <h4 class="font-display text-lg font-bold text-stone-900">Fluxo de Caixa</h4>
+              <p class="mt-1.5 text-sm leading-relaxed text-stone-500">Estimula o abastecimento recorrente, aumentando a previsibilidade do seu faturamento.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Marquee divider -->
+      <div class="border-t border-stone-300 bg-stone-100/60 py-4 overflow-hidden">
+        <div class="animate-marquee whitespace-nowrap flex">
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Cashback</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Fidelidade</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Postos de Combustível</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Antifraude</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Campanhas</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">WhatsApp</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Relatórios</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Cashback</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Fidelidade</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Postos de Combustível</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Antifraude</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Campanhas</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">WhatsApp</span>
+          <span class="mx-4 text-stone-300">★</span>
+          <span class="mx-6 text-[11px] font-mono uppercase tracking-widest text-stone-400">Relatórios</span>
+          <span class="mx-4 text-stone-300">★</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════
+         PRODUCT SHOWCASE — Screenshots reais
+    ══════════════════════════════════════════════ -->
+
+    <!-- ── SECTION 1: Dashboard ────────────────────── -->
+    <section id="produto-dashboard" class="relative z-10 overflow-hidden border-b border-stone-200 product-mesh">
+      <div class="bg-grid-light absolute inset-0 pointer-events-none"></div>
+      <div class="orb w-[700px] h-[700px] opacity-20 pointer-events-none"
+           style="background:radial-gradient(circle,rgba(14,165,233,.35),transparent);top:-200px;right:-120px;"></div>
+      <div class="orb w-[500px] h-[500px] opacity-15 pointer-events-none"
+           style="background:radial-gradient(circle,rgba(255,107,0,.32),transparent);bottom:-80px;left:80px;"></div>
+
+      <div class="relative px-8 md:px-16 py-24 md:py-36 max-w-[1400px] mx-auto">
+        <div class="flex flex-col lg:flex-row items-center gap-16">
+
+          <!-- Text -->
+          <div class="lg:w-5/12 reveal">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6"
+                 style="background:rgba(14,165,233,.12);border:1px solid rgba(14,165,233,.25);">
+              <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+              <span class="text-[11px] font-mono uppercase tracking-widest text-sky-700">Gestão em tempo real</span>
+            </div>
+            <h2 class="font-display font-bold text-stone-900 leading-tight mb-5"
+                style="font-size:clamp(2rem,4vw,3.25rem);">
+              Controle vendas, cashback<br/>
+              <span style="background:linear-gradient(90deg,#0ea5e9,#10b981,#FF6B00);-webkit-background-clip:text;background-clip:text;color:transparent;">e retorno de clientes</span>
+            </h2>
+            <p class="text-stone-500 text-lg leading-relaxed mb-10">
+              Acompanhe abastecimentos, volume vendido, cashback gerado, campanhas, ranking de atendentes e clientes que voltaram ao posto. Tudo atualizado em tempo real para tomar decisão sem planilha.
+            </p>
+          </div>
+
+          <!-- Laptop Mockup -->
+          <div class="lg:w-7/12 reveal delay-300">
+            <div class="laptop-showcase">
+              <div class="metric-card metric-1 glass-float">
+                <b>R$ 285.000</b>
+                <span>em vendas</span>
+              </div>
+              <div class="metric-card metric-2 glass-float float-delay-1">
+                <b>1.247</b>
+                <span>abastecimentos</span>
+              </div>
+              <div class="metric-card metric-3 glass-float float-delay-2">
+                <b>672</b>
+                <span>clientes ativos</span>
+              </div>
+              <div class="metric-card metric-4 glass-float">
+                <b>86%</b>
+                <span>taxa de retorno</span>
+              </div>
+
+              <div class="laptop-pro animate-float">
+                <div class="laptop-lid">
+                  <div class="laptop-camera"></div>
+                  <div class="laptop-screen">
+                    <img src="assets/screenshots/dashboard.png" alt="Dashboard web do PostoCash com vendas, cashback e métricas de fidelidade para postos" loading="lazy" decoding="async" />
+                  </div>
+                </div>
+                <div class="laptop-base"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SECTION 2: Campanhas ─────────────────────── -->
+    <section id="produto-campanhas" class="relative z-10 overflow-hidden border-b border-stone-200"
+             style="background:radial-gradient(circle at 12% 18%,rgba(255,107,0,.11),transparent 28%),radial-gradient(circle at 86% 22%,rgba(14,165,233,.13),transparent 30%),radial-gradient(circle at 72% 82%,rgba(16,185,129,.12),transparent 28%),linear-gradient(135deg,#f7f5ef 0%,#eef7f4 52%,#f4f2ed 100%);">
+      <div class="bg-grid absolute inset-0 opacity-25 pointer-events-none"></div>
+      <div class="orb w-[600px] h-[600px] opacity-25 pointer-events-none"
+           style="background:radial-gradient(circle,rgba(14,165,233,.28),transparent);top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+
+      <div class="relative px-8 md:px-16 py-24 md:py-36 max-w-[1400px] mx-auto">
+
+        <!-- Header -->
+        <div class="text-center mb-20 reveal">
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6"
+               style="background:rgba(14,165,233,.12);border:1px solid rgba(14,165,233,.25);">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+            <span class="text-[11px] font-mono uppercase tracking-widest text-sky-700">Recorrência & Retorno</span>
+          </div>
+          <h2 class="font-display font-bold text-stone-900 leading-tight mb-5"
+              style="font-size:clamp(2rem,4vw,3.25rem);">
+            Traga clientes de volta<br/>
+            <span style="background:linear-gradient(90deg,#0ea5e9,#10b981,#FF6B00);-webkit-background-clip:text;background-clip:text;color:transparent;">sem usar seu WhatsApp pessoal</span>
+          </h2>
+          <p class="text-stone-500 text-lg max-w-2xl mx-auto">
+            Crie campanhas automáticas pelo PostoCash com mensagens personalizadas para clientes ativos, inativos ou melhores compradores. O sistema envia por um canal integrado, acompanha quem recebeu e mostra quem voltou a abastecer.
+          </p>
+        </div>
+
+        <!-- Laptop + badges -->
+        <div class="max-w-5xl mx-auto reveal delay-200" style="padding:0 60px;">
+
+          <!-- position:relative anchors badges; animate-float makes them move with the laptop -->
+          <div class="animate-float" style="position:relative;">
+
+            <!-- Badge 1: bottom-left (green) -->
+            <div class="hidden lg:block" style="position:absolute;bottom:16px;left:0;z-index:20;transform:translateX(-44%) translateY(0);animation:badgePop .6s cubic-bezier(.34,1.56,.64,1) .4s both;">
+              <div style="min-width:150px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(5,46,22,.96),rgba(6,78,59,.94));border:1px solid rgba(110,231,183,.45);box-shadow:0 18px 40px rgba(0,0,0,.5);">
+                <div style="font-size:24px;font-weight:700;color:#6ee7b7;font-family:'Space Grotesk',system-ui;line-height:1.1;">+34%</div>
+                <div style="font-size:11px;font-family:monospace;color:#10b981;margin-top:3px;text-transform:uppercase;letter-spacing:.05em;">mais retorno</div>
+              </div>
+            </div>
+
+            <!-- Badge 2: top-right (orange) -->
+            <div class="hidden lg:block" style="position:absolute;top:18px;right:0;z-index:20;transform:translateX(44%) translateY(0);animation:badgePop .6s cubic-bezier(.34,1.56,.64,1) .65s both;">
+              <div style="min-width:160px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(67,20,7,.96),rgba(124,45,18,.94));border:1px solid rgba(253,186,116,.45);box-shadow:0 18px 40px rgba(0,0,0,.5);">
+                <div style="font-size:24px;font-weight:700;color:#fdba74;font-family:'Space Grotesk',system-ui;line-height:1.1;">R$18.400</div>
+                <div style="font-size:11px;font-family:monospace;color:#f97316;margin-top:3px;text-transform:uppercase;letter-spacing:.05em;">vendas reativadas</div>
+              </div>
+            </div>
+
+            <!-- Badge 3: bottom-right (blue) -->
+            <div class="hidden lg:block" style="position:absolute;bottom:18px;right:0;z-index:20;transform:translateX(44%) translateY(0);animation:badgePop .6s cubic-bezier(.34,1.56,.64,1) .9s both;">
+              <div style="min-width:174px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(8,47,73,.96),rgba(12,74,110,.94));border:1px solid rgba(125,211,252,.45);box-shadow:0 18px 40px rgba(0,0,0,.5);">
+                <div style="font-size:24px;font-weight:700;color:#7dd3fc;font-family:'Space Grotesk',system-ui;line-height:1.1;">1.280</div>
+                <div style="font-size:11px;font-family:monospace;color:#38bdf8;margin-top:3px;text-transform:uppercase;letter-spacing:.05em;">mensagens entregues</div>
+              </div>
+            </div>
+
+            <!-- Laptop frame -->
+            <div style="filter:drop-shadow(0 60px 80px rgba(14,165,233,.32));">
+              <div style="perspective:1400px;">
+                <div style="transform:rotateX(3deg);transform-style:preserve-3d;">
+                  <div style="background:linear-gradient(145deg,#2d3748,#1a202c);border-radius:14px 14px 0 0;padding:10px 10px 0;box-shadow:0 0 0 1px rgba(255,255,255,.07);">
+                    <div style="display:flex;justify-content:center;align-items:center;height:22px;margin-bottom:6px;">
+                      <div style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.12);"></div>
+                    </div>
+                    <div style="border-radius:5px 5px 0 0;overflow:hidden;line-height:0;border:1px solid rgba(255,255,255,.06);">
+                      <img src="assets/screenshots/historico-campanhas.png" alt="Tela de histórico de campanhas do PostoCash para recorrência de clientes de postos"
+                           style="width:100%;display:block;" loading="lazy" decoding="async"/>
+                      <div style="position:absolute;top:0;left:0;right:0;height:35%;background:linear-gradient(to bottom,rgba(255,255,255,.04),transparent);pointer-events:none;"></div>
+                    </div>
+                  </div>
+                  <div style="background:linear-gradient(to bottom,#232d3d,#151d2b);border-radius:0 0 6px 6px;height:16px;box-shadow:0 20px 50px rgba(0,0,0,.6);"></div>
+                  <div style="background:#0d1524;height:6px;border-radius:0 0 28px 28px;margin:0 14%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 reveal delay-500">
+          <div class="p-5 rounded-2xl text-center"
+               style="background:rgba(255,255,255,.72);border:1px solid rgba(28,25,23,.08);box-shadow:0 14px 34px rgba(28,25,23,.06);">
+            <div class="font-display font-bold text-stone-900 text-2xl mb-1">1.280</div>
+            <div class="text-[11px] font-mono text-stone-400 uppercase tracking-widest">mensagens enviadas</div>
+          </div>
+          <div class="p-5 rounded-2xl text-center"
+               style="background:rgba(255,255,255,.72);border:1px solid rgba(28,25,23,.08);box-shadow:0 14px 34px rgba(28,25,23,.06);">
+            <div class="font-display font-bold text-emerald-400 text-2xl mb-1">42%</div>
+            <div class="text-[11px] font-mono text-stone-400 uppercase tracking-widest">clientes engajados</div>
+          </div>
+          <div class="p-5 rounded-2xl text-center"
+               style="background:rgba(255,255,255,.72);border:1px solid rgba(28,25,23,.08);box-shadow:0 14px 34px rgba(28,25,23,.06);">
+            <div class="font-display font-bold text-orange-400 text-2xl mb-1">+34%</div>
+            <div class="text-[11px] font-mono text-stone-400 uppercase tracking-widest">volta ao posto</div>
+          </div>
+          <div class="p-5 rounded-2xl text-center"
+               style="background:rgba(255,255,255,.72);border:1px solid rgba(28,25,23,.08);box-shadow:0 14px 34px rgba(28,25,23,.06);">
+            <div class="font-display font-bold text-sky-400 text-2xl mb-1">R$18,4k</div>
+            <div class="text-[11px] font-mono text-stone-400 uppercase tracking-widest">venda incremental</div>
+          </div>
+        </div>
+        <p class="text-center text-[11px] font-mono text-stone-400 uppercase tracking-widest mt-5 reveal delay-700">
+          Exemplo simulado de campanha para clientes inativos há 30 dias
+        </p>
+      </div>
+    </section>
+
+    <!-- ── SECTION 3: Clientes ──────────────────────── -->
+    <section id="produto-clientes" class="relative z-10 overflow-hidden border-b border-stone-200 bg-white">
+      <div class="bg-grid absolute inset-0 opacity-30 pointer-events-none"></div>
+      <div class="orb w-[600px] h-[600px] opacity-10 pointer-events-none"
+           style="background:radial-gradient(circle,#10b981,transparent);top:-100px;left:-100px;"></div>
+
+      <div class="relative px-8 md:px-16 py-24 md:py-36 max-w-[1400px] mx-auto">
+        <div class="flex flex-col-reverse lg:flex-row items-center gap-16">
+
+          <!-- Laptop Mockup -->
+          <div class="lg:w-7/12 reveal">
+            <div class="animate-float2" style="filter:drop-shadow(0 40px 60px rgba(0,0,0,.18));">
+              <div style="perspective:1400px;">
+                <div style="transform:rotateX(3deg) rotateY(5deg);transform-style:preserve-3d;transition:transform .6s ease;">
+                  <div style="background:linear-gradient(145deg,#e2e8f0,#cbd5e1);border-radius:14px 14px 0 0;padding:10px 10px 0;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 40px 80px rgba(0,0,0,.18);">
+                    <div style="display:flex;justify-content:center;align-items:center;height:22px;margin-bottom:6px;">
+                      <div style="width:7px;height:7px;border-radius:50%;background:rgba(0,0,0,.15);"></div>
+                    </div>
+                    <div style="border-radius:5px 5px 0 0;overflow:hidden;line-height:0;border:1px solid rgba(0,0,0,.06);">
+                      <img src="assets/screenshots/clientes-cadastrados.png" alt="Tela de clientes cadastrados no PostoCash com histórico de abastecimento e cashback"
+                           style="width:100%;display:block;" loading="lazy" decoding="async"/>
+                      <div style="position:absolute;top:0;left:0;right:0;height:30%;background:linear-gradient(to bottom,rgba(255,255,255,.15),transparent);pointer-events:none;"></div>
+                    </div>
+                  </div>
+                  <div style="background:linear-gradient(to bottom,#d1d5db,#9ca3af);border-radius:0 0 6px 6px;height:16px;box-shadow:0 20px 40px rgba(0,0,0,.2);"></div>
+                  <div style="background:#9ca3af;height:6px;border-radius:0 0 28px 28px;margin:0 14%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Text -->
+          <div class="lg:w-5/12 reveal delay-300">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6"
+                 style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span class="text-[11px] font-mono uppercase tracking-widest" style="color:#059669;">Gestão de Clientes</span>
+            </div>
+            <h2 class="font-display font-bold text-stone-900 leading-tight mb-5"
+                style="font-size:clamp(2rem,4vw,3.25rem);">
+              Conheça melhor<br/>
+              <span style="background:linear-gradient(90deg,#059669,#0ea5e9);-webkit-background-clip:text;background-clip:text;color:transparent;">cada cliente do seu posto</span>
+            </h2>
+            <p class="text-stone-500 text-lg leading-relaxed mb-8">
+              Acompanhe consumo, último abastecimento, cashback, ticket médio e histórico completo em uma única tela. Busque por nome, CPF ou telefone e transforme dados em campanhas mais certeiras.
+            </p>
+            <div class="space-y-3">
+              <div class="flex items-start gap-3 p-4 rounded-xl bg-stone-50 border border-stone-100">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style="background:rgba(16,185,129,.1);">
+                  <iconify-icon icon="solar:users-group-two-rounded-bold-duotone" class="text-emerald-600"></iconify-icon>
+                </div>
+                <div>
+                  <div class="font-semibold text-stone-800 text-sm">Clientes ativos e inativos</div>
+                  <div class="text-stone-500 text-xs mt-0.5">Identifique quem abastece com frequência e quem precisa ser reativado.</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-4 rounded-xl bg-stone-50 border border-stone-100">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style="background:rgba(14,165,233,.1);">
+                  <iconify-icon icon="solar:magnifer-bold-duotone" class="text-sky-600"></iconify-icon>
+                </div>
+                <div>
+                  <div class="font-semibold text-stone-800 text-sm">Busca rápida por nome, CPF ou telefone</div>
+                  <div class="text-stone-500 text-xs mt-0.5">Encontre qualquer cliente em segundos com dados protegidos pela LGPD.</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-4 rounded-xl bg-stone-50 border border-stone-100">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style="background:rgba(249,115,22,.1);">
+                  <iconify-icon icon="solar:chart-bold-duotone" class="text-orange-600"></iconify-icon>
+                </div>
+                <div>
+                  <div class="font-semibold text-stone-800 text-sm">Histórico completo de consumo</div>
+                  <div class="text-stone-500 text-xs mt-0.5">Veja abastecimentos, datas, valores, combustíveis e cashback gerado.</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-4 rounded-xl bg-stone-50 border border-stone-100">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style="background:rgba(37,211,102,.12);">
+                  <iconify-icon icon="ic:baseline-whatsapp" class="text-emerald-600"></iconify-icon>
+                </div>
+                <div>
+                  <div class="font-semibold text-stone-800 text-sm">Ação direta pelo WhatsApp</div>
+                  <div class="text-stone-500 text-xs mt-0.5">Fale com o cliente ou envie campanhas segmentadas a partir do painel.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SECTION 4: App Mobile ────────────────────── -->
+    <section id="produto-app" class="relative z-10 overflow-hidden border-b border-stone-200 product-mesh">
+      <div class="bg-grid absolute inset-0 opacity-25 pointer-events-none"></div>
+      <div class="orb w-[700px] h-[700px] opacity-20 pointer-events-none"
+           style="background:radial-gradient(circle,rgba(255,107,0,.35),transparent);top:-100px;right:-200px;"></div>
+      <div class="orb w-[400px] h-[400px] opacity-15 pointer-events-none"
+           style="background:radial-gradient(circle,rgba(16,185,129,.32),transparent);bottom:-100px;left:100px;"></div>
+
+      <div class="relative px-8 md:px-16 py-24 md:py-36 max-w-[1400px] mx-auto">
+        <div class="flex flex-col lg:flex-row items-center gap-16">
+
+          <!-- Text -->
+          <div class="lg:w-1/2 reveal">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6"
+                 style="background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.25);">
+              <span class="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+              <span class="text-[11px] font-mono uppercase tracking-widest text-orange-700">Aplicativo Mobile</span>
+            </div>
+            <h2 class="font-display font-bold text-stone-900 leading-tight mb-5"
+                style="font-size:clamp(2rem,4vw,3.25rem);">
+              App com a sua marca,<br/>
+              <span style="color:#FF6B00;">do seu jeito</span>
+            </h2>
+            <p class="text-stone-500 text-lg leading-relaxed mb-10">
+              Seus clientes baixam um app personalizado com o logo e cores do seu posto. Experiência premium, zero complicação.
+            </p>
+            <div class="space-y-4 mb-10">
+              <div class="feature-check">
+                <iconify-icon icon="solar:check-circle-bold" class="text-xl"></iconify-icon>
+                <span>Validação de cupom fiscal por QR Code</span>
+              </div>
+              <div class="feature-check">
+                <iconify-icon icon="solar:check-circle-bold" class="text-xl"></iconify-icon>
+                <span>Saldo de cashback em tempo real</span>
+              </div>
+              <div class="feature-check">
+                <iconify-icon icon="solar:check-circle-bold" class="text-xl"></iconify-icon>
+                <span>Histórico completo de abastecimentos</span>
+              </div>
+              <div class="feature-check">
+                <iconify-icon icon="solar:check-circle-bold" class="text-xl"></iconify-icon>
+                <span>Resgate com biometria facial</span>
+              </div>
+              <div class="feature-check">
+                <iconify-icon icon="solar:check-circle-bold" class="text-xl"></iconify-icon>
+                <span>Notificações de campanhas e promoções</span>
+              </div>
+            </div>
+            <a href="#agendar-demonstracao" data-demo-open class="vivid-cta">
+              Quero meu app personalizado
+              <iconify-icon icon="solar:arrow-right-up-linear" class="text-xl"></iconify-icon>
+            </a>
+          </div>
+
+          <!-- Phone Mockup -->
+          <div class="lg:w-1/2 flex justify-center reveal delay-300 phone-enter">
+            <div class="phone-stage">
+              <div class="phone-shell">
+                <span class="phone-button-extra"></span>
+                <div class="phone-screen">
+                  <div class="app-static-screen">
+                    <img src="assets/screenshots/app-posto-cash.png" alt="Aplicativo mobile PostoCash com saldo de cashback, resgate, histórico e validação por QR Code" loading="lazy" decoding="async" />
+                  </div>
+                  <span class="phone-camera"></span>
+                  <span class="phone-shine"></span>
+                  <span class="phone-home"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SECTION 5: Funcionalidades ────────────────────── -->
+    <section id="funcionalidades" class="relative z-10 overflow-hidden border-b border-stone-200 bg-white px-8 py-20 md:px-16 md:py-28">
+      <div class="bg-grid absolute inset-0 opacity-25 pointer-events-none"></div>
+      <div class="relative mx-auto max-w-7xl">
+        <div class="mx-auto max-w-3xl text-center">
+          <p class="mb-3 text-[11px] font-mono uppercase tracking-widest text-orange-600">Plataforma completa</p>
+          <h2 class="font-display text-4xl font-semibold tracking-tight text-stone-900 md:text-5xl">
+            Tudo que o posto precisa para fidelizar, validar e vender mais.
+          </h2>
+          <p class="mx-auto mt-5 max-w-2xl text-stone-500">
+            Do app do cliente ao painel administrativo, o PostoCash reúne cashback, campanhas, antifraude, relatórios e gestão multi-estabelecimento.
+          </p>
+        </div>
+
+        <div class="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+              <iconify-icon icon="solar:smartphone-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">App do Cliente</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>CPF, biometria facial e login sem senha</li>
+              <li>Saldo e extrato de cashback em tempo real</li>
+              <li>QR Code SEFAZ, OCR e histórico com filtros</li>
+              <li>Resgate com biometria e notificações push</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+              <iconify-icon icon="solar:chart-2-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Portal Administrativo</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Dashboard com métricas em tempo real</li>
+              <li>Vendas, volume, investimento e passivo</li>
+              <li>Ranking de clientes e atendentes</li>
+              <li>Filtros por período e calendário personalizado</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <iconify-icon icon="solar:chat-round-money-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Campanhas</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Criação em 5 passos por perfil de cliente</li>
+              <li>WhatsApp automático via Z-API</li>
+              <li>Envio das 08h às 20h com delay anti-ban</li>
+              <li>Retry automático até 3x por mensagem</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600">
+              <iconify-icon icon="solar:shield-check-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Antifraude</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Limites por dia, semana e abastecimento</li>
+              <li>Blacklist de CPFs e bloqueio manual</li>
+              <li>Alertas de horário e comportamento suspeito</li>
+              <li>Validação por encerrantes e atendente</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+              <iconify-icon icon="solar:wallet-money-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Cashback</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Percentual ou centavos por litro</li>
+              <li>Configuração por tipo de combustível</li>
+              <li>Lavagem, conveniência e cashback dobrado</li>
+              <li>Bônus por horário de baixo movimento</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <iconify-icon icon="solar:document-text-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Relatórios</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Transações, resgates e clientes</li>
+              <li>Resumo geral por período personalizado</li>
+              <li>Exportação em PDF e Excel</li>
+              <li>Dados mascarados para LGPD</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-100 text-yellow-700">
+              <iconify-icon icon="solar:cup-star-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Ranking</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Ranking de atendentes com pódio top 3</li>
+              <li>Evolução por período e por atendente</li>
+              <li>Tendência de performance</li>
+              <li>Alertas para atendentes abaixo da média</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-stone-200 text-stone-700">
+              <iconify-icon icon="solar:buildings-3-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Multi-estabelecimento</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>Múltiplos postos com dados isolados</li>
+              <li>Seletor de posto no dashboard</li>
+              <li>QR Code único por estabelecimento</li>
+              <li>Logo, cores e links personalizados</li>
+            </ul>
+          </div>
+
+          <div class="border border-stone-200 bg-stone-50/80 p-6">
+            <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100 text-teal-700">
+              <iconify-icon icon="solar:lock-keyhole-linear" class="text-2xl"></iconify-icon>
+            </div>
+            <h3 class="font-display text-xl font-semibold text-stone-900">Segurança</h3>
+            <ul class="mt-4 space-y-2 text-sm leading-relaxed text-stone-600">
+              <li>JWT com expiração e rate limiting por rota</li>
+              <li>CORS configurado e Helmet nos headers</li>
+              <li>Senhas protegidas com bcrypt</li>
+              <li>Dados mascarados LGPD e biometria facial</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <style>
+      @keyframes badgePop {
+        from { opacity:0; transform:scale(.6) translateY(10px); }
+        to   { opacity:1; transform:scale(1)  translateY(0);    }
+      }
+      .laptop-tilt:hover { transform:rotateX(0deg) rotateY(0deg) !important; }
+    </style>
+
+    <!-- ══════════════════════════════════════════════
+         01 TYPOGRAPHY
+    ══════════════════════════════════════════════ -->
+    <section id="assinar" class="relative z-10 overflow-hidden border-b border-stone-200 px-8 py-20 md:px-16 md:py-28"
+             style="background:linear-gradient(135deg,#f7f5ef 0%,#fff 52%,#f4f2ed 100%);">
+      <div class="bg-grid absolute inset-0 opacity-20 pointer-events-none"></div>
+      <div class="relative mx-auto max-w-6xl">
+        <div class="mx-auto max-w-3xl text-center">
+          <p class="mb-3 text-[11px] font-mono uppercase tracking-widest text-orange-600">Mensalidade Fixa</p>
+          <h2 class="font-display text-4xl font-semibold tracking-tight text-stone-900 md:text-5xl">
+            Um plano simples para colocar seu posto no modo recorrência.
+          </h2>
+          <p class="mx-auto mt-5 max-w-2xl text-stone-500">
+            Invista menos de um abastecimento por mês para dominar sua região.
+          </p>
+        </div>
+
+        <div class="mx-auto mt-8 max-w-md overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xl shadow-stone-200/60">
+          <div class="border-b border-stone-100 bg-stone-950 px-6 py-4 text-white">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-[11px] font-mono uppercase tracking-widest text-orange-300">PostoCash Essencial</p>
+                <h3 class="mt-1 font-display text-xl font-semibold">Mensalidade Fixa</h3>
+              </div>
+              <span class="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-stone-200">
+                Sem surpresa
+              </span>
+            </div>
+          </div>
+
+          <div class="p-6 text-center">
+            <div class="text-xs font-medium text-stone-500">Apenas</div>
+            <div class="mt-1.5 font-display text-5xl font-bold tracking-tight text-stone-900 md:text-6xl">
+              R$ 200,00<span class="align-baseline text-lg font-semibold text-stone-500">/mês</span>
+            </div>
+            <div class="mt-2 text-xs font-medium text-stone-500">por unidade cadastrada</div>
+
+            <div class="mt-6 grid gap-2.5 text-left font-sans text-sm text-stone-600">
+              <div class="flex items-center gap-2"><iconify-icon icon="solar:check-circle-bold" class="text-lg text-emerald-500"></iconify-icon> Cashback e saldo em tempo real</div>
+              <div class="flex items-center gap-2"><iconify-icon icon="solar:check-circle-bold" class="text-lg text-emerald-500"></iconify-icon> Campanhas para recorrência</div>
+              <div class="flex items-center gap-2"><iconify-icon icon="solar:check-circle-bold" class="text-lg text-emerald-500"></iconify-icon> Gestão de clientes</div>
+              <div class="flex items-center gap-2"><iconify-icon icon="solar:check-circle-bold" class="text-lg text-emerald-500"></iconify-icon> Antifraude operacional</div>
+            </div>
+
+            <button type="button" onclick="handleCheckout(event)" class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#FF6B00] px-5 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-950/20 transition hover:-translate-y-0.5 hover:bg-[#e76000] disabled:cursor-not-allowed disabled:opacity-70">
+              Assinar e Começar Agora
+              <iconify-icon icon="solar:card-transfer-linear" class="text-lg"></iconify-icon>
+            </button>
+            <p id="checkout-error" class="mt-3 hidden text-sm font-medium text-red-500"></p>
+
+            <p class="mt-4 border-t border-stone-100 pt-4 text-xs font-medium text-stone-400">
+              Sem taxas de adesão ou fidelidade obrigatória.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <footer id="contato" class="border-t border-stone-200 bg-stone-950 px-6 py-8 text-stone-300 md:px-14">
+      <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 text-center md:flex-row md:text-left">
+        <img src="assets/logo-dark-bg.svg" alt="Logo PostoCash" class="h-9 w-auto object-contain" loading="lazy" decoding="async" />
+        <div class="flex flex-col items-center gap-2 text-sm md:flex-row md:gap-6">
+          <a href="mailto:tgr.tecno@gmail.com" class="transition hover:text-white">tgr.tecno@gmail.com</a>
+          <a href="https://wa.me/5511985498727?text=Ol%C3%A1%2C%20quero%20falar%20com%20o%20PostoCash." target="_blank" rel="noopener" class="transition hover:text-white">
+            (11) 98549-8727
+          </a>
+        </div>
+      </div>
+    </footer>
+
+  </div><!-- /main wrapper -->
+
+  <a href="https://wa.me/5511985498727?text=Ol%C3%A1%2C%20quero%20saber%20mais%20sobre%20o%20PostoCash."
+     target="_blank" rel="noopener"
+     class="fixed bottom-5 right-5 z-[80] flex items-center gap-3 rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-900/30 transition hover:-translate-y-1 hover:bg-[#1ebe5d]">
+    <iconify-icon icon="ic:baseline-whatsapp" class="text-2xl"></iconify-icon>
+    <span class="hidden sm:inline">Falar no WhatsApp</span>
+  </a>
+
+  <!-- ══════════════════════════════════════════════
+       REGISTRATION MODAL — Stripe payment
+  ══════════════════════════════════════════════ -->
+  <div id="register-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-stone-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="register-modal-title">
+    <div data-register-backdrop class="absolute inset-0"></div>
+    <div class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl max-h-[92vh] overflow-y-auto">
+
+      <!-- Header -->
+      <div class="flex items-start justify-between gap-4 border-b border-stone-200 px-6 py-5 sticky top-0 bg-white z-10">
+        <div>
+          <p class="mb-1 text-[11px] font-mono uppercase tracking-widest text-orange-600">PostoCash</p>
+          <h2 id="register-modal-title" class="font-display text-xl font-semibold text-stone-900">Ativar minha conta</h2>
+        </div>
+        <!-- Step indicator -->
+        <div class="flex items-center gap-1.5 mr-8">
+          <div id="step-dot-1" class="w-2 h-2 rounded-full bg-orange-500"></div>
+          <div id="step-dot-2" class="w-2 h-2 rounded-full bg-stone-200"></div>
+          <div id="step-dot-3" class="w-2 h-2 rounded-full bg-stone-200"></div>
+        </div>
+        <button type="button" data-register-close class="absolute top-5 right-5 grid h-9 w-9 place-items-center rounded-full border border-stone-200 text-stone-400 hover:bg-stone-100 hover:text-stone-800 transition" aria-label="Fechar">
+          <iconify-icon icon="solar:close-circle-linear" class="text-xl"></iconify-icon>
+        </button>
+      </div>
+
+      <!-- ── Step 1: Dados do posto ─────────────────── -->
+      <div id="register-step-1" class="register-step px-6 py-6">
+        <p class="text-sm text-stone-500 mb-5">Preencha os dados do seu posto para criar a conta.</p>
+        <form id="register-form-1" class="space-y-4" novalidate>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block sm:col-span-2">
+              <span class="mb-1.5 block text-xs font-semibold text-stone-700">Nome do posto <span class="text-red-500">*</span></span>
+              <input name="nome" required autocomplete="organization"
+                class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="Auto Posto São Paulo" />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-xs font-semibold text-stone-700">CNPJ <span class="text-red-500">*</span></span>
+              <input name="cnpj" required id="register-cnpj" maxlength="18"
+                class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200 font-mono"
+                placeholder="00.000.000/0001-00" />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-xs font-semibold text-stone-700">WhatsApp <span class="text-red-500">*</span></span>
+              <input name="telefone" required type="tel"
+                class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="(11) 99999-9999" />
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="mb-1.5 block text-xs font-semibold text-stone-700">E-mail do responsável <span class="text-red-500">*</span></span>
+              <input name="email" required type="email" autocomplete="email"
+                class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="gerente@seuposto.com.br" />
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="mb-1.5 block text-xs font-semibold text-stone-700">Nome do responsável</span>
+              <input name="operatorName"
+                class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                placeholder="João Silva" />
+            </label>
+          </div>
+          <p id="register-step1-error" class="text-sm text-red-500 hidden"></p>
+          <button type="submit"
+            class="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-700">
+            Continuar para pagamento
+            <iconify-icon icon="solar:arrow-right-linear" class="text-lg"></iconify-icon>
+          </button>
+        </form>
+      </div>
+
+      <!-- ── Step 2: Pagamento ──────────────────────── -->
+      <div id="register-step-2" class="register-step hidden px-6 py-6">
+        <!-- Plan summary -->
+        <div class="mb-6 rounded-xl bg-orange-50 border border-orange-200 px-4 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-bold text-stone-900">PostoCash</p>
+            <p class="text-xs text-stone-500 mt-0.5">Acesso completo · App exclusivo · Antifraude</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xl font-bold text-orange-600">R$ 200</p>
+            <p class="text-xs text-stone-500">/mês</p>
+          </div>
+        </div>
+
+        <form id="register-form-2" class="space-y-4" novalidate>
+          <div>
+            <label class="mb-1.5 block text-xs font-semibold text-stone-700">Dados do cartão</label>
+            <div id="card-element"
+              class="w-full rounded-xl border border-stone-300 px-4 py-3.5 bg-white focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-200 transition">
+              <!-- Stripe Card Element mounts here -->
+            </div>
+            <p id="card-error" class="mt-2 text-sm text-red-500 hidden"></p>
+          </div>
+
+          <!-- Card brand logos -->
+          <div class="flex items-center gap-2">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" class="h-5 opacity-60" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" class="h-5 opacity-60" />
+          </div>
+
+          <button id="pay-btn" type="submit"
+            class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF6B00] px-5 py-4 text-sm font-bold text-white transition hover:bg-[#e76000] disabled:opacity-60 disabled:cursor-not-allowed">
+            <iconify-icon icon="solar:lock-password-linear" class="text-lg"></iconify-icon>
+            Ativar minha conta — R$ 200/mês
+          </button>
+          <p class="text-center text-xs text-stone-400">
+            🔒 Pagamento seguro via Stripe · Cancele a qualquer momento
+          </p>
+          <button type="button" id="register-back-btn"
+            class="w-full text-center text-xs text-stone-400 hover:text-stone-700 transition py-1">
+            ← Voltar e editar dados
+          </button>
+        </form>
+      </div>
+
+      <!-- ── Step 3: Sucesso ────────────────────────── -->
+      <div id="register-step-3" class="register-step hidden px-6 py-8 text-center">
+        <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4 text-3xl">✅</div>
+        <h3 class="font-display text-xl font-bold text-stone-900 mb-2">Conta ativada com sucesso!</h3>
+        <p class="text-sm text-stone-500 mb-6">Seu acesso ao painel PostoCash está pronto.</p>
+
+        <div class="bg-stone-50 border border-stone-200 rounded-xl px-5 py-4 text-left space-y-3 mb-6">
+          <p class="text-xs font-mono uppercase tracking-widest text-stone-400 mb-3">Seu primeiro acesso</p>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-stone-500">E-mail</span>
+            <span id="cred-email" class="font-mono font-semibold text-stone-900"></span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-stone-500">Senha</span>
+            <span id="cred-password" class="font-mono font-bold text-orange-600 text-lg tracking-widest"></span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-stone-500">Acesse em</span>
+            <a id="cred-url" href="#" target="_blank" rel="noopener" class="font-medium text-blue-600 hover:underline text-xs"></a>
+          </div>
+        </div>
+
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-xs text-yellow-700 mb-6">
+          Guarde sua senha em local seguro. Você poderá alterá-la após o primeiro acesso.
+        </div>
+
+        <a id="cred-access-btn" href="#" target="_blank" rel="noopener"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-700">
+          Acessar o painel agora
+          <iconify-icon icon="solar:arrow-right-up-linear" class="text-lg"></iconify-icon>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="demo-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-stone-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
+    <div data-demo-backdrop class="absolute inset-0"></div>
+    <div class="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div class="flex items-start justify-between gap-6 border-b border-stone-200 px-6 py-5">
+        <div>
+          <p class="mb-1 text-[11px] font-mono uppercase tracking-widest text-orange-600">Demonstração PostoCash</p>
+          <h2 id="demo-modal-title" class="font-display text-2xl font-semibold text-stone-900">Agende uma demonstração</h2>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">Preencha os dados e envie sua solicitação para tgr.tecno@gmail.com.</p>
+        </div>
+        <button type="button" data-demo-close class="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-100 hover:text-stone-900" aria-label="Fechar formulário">
+          <iconify-icon icon="solar:close-circle-linear" class="text-2xl"></iconify-icon>
+        </button>
+      </div>
+
+      <form id="demo-form" class="space-y-4 px-6 py-6">
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold text-stone-700">Nome</span>
+            <input name="nome" required class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="Seu nome" />
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold text-stone-700">Telefone / WhatsApp</span>
+            <input name="telefone" required class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="(11) 99999-9999" />
+          </label>
+        </div>
+        <label class="block">
+          <span class="mb-1.5 block text-xs font-semibold text-stone-700">Nome do posto</span>
+          <input name="posto" class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="Auto Posto..." />
+        </label>
+        <label class="block">
+          <span class="mb-1.5 block text-xs font-semibold text-stone-700">O que você quer melhorar?</span>
+          <select name="interesse" class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900">
+            <option>Aumentar a recorrência de clientes</option>
+            <option>Criar campanhas por WhatsApp</option>
+            <option>Implantar cashback com antifraude</option>
+            <option>Premiar frentistas por metas</option>
+            <option>Ver a plataforma completa</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="mb-1.5 block text-xs font-semibold text-stone-700">Mensagem</span>
+          <textarea name="mensagem" rows="3" class="w-full resize-none rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="Conte rapidamente sobre seu posto ou melhor horário para contato."></textarea>
+        </label>
+
+        <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-700">
+          Enviar
+          <iconify-icon icon="solar:letter-linear" class="text-xl"></iconify-icon>
+        </button>
+        <a href="mailto:tgr.tecno@gmail.com?subject=Agendar%20demonstra%C3%A7%C3%A3o%20PostoCash"
+           class="block text-center text-xs font-medium text-stone-500 transition hover:text-stone-900">
+          Preferir abrir o e-mail direto
+        </a>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SCRIPTS
+  ══════════════════════════════════════════════ -->
+  <script>
+    // ── NAV LOAD ──────────────────────────────────
+    document.querySelector('.nav-load').classList.add('loaded');
+
+    // ── NAVBAR HIDE ON SCROLL DOWN ─────────────────
+    const navbar = document.getElementById('navbar');
+    let lastScroll = 0;
+    window.addEventListener('scroll', () => {
+      const current = window.scrollY;
+      if (current > lastScroll && current > 100) {
+        navbar.classList.add('hide');
+      } else {
+        navbar.classList.remove('hide');
+      }
+      lastScroll = current;
+    }, { passive: true });
+
+    // ── INTERSECTION OBSERVER ──────────────────────
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+          // trigger text reveal children
+          entry.target.querySelectorAll('.text-reveal-wrapper').forEach(w => w.classList.add('reveal-active'));
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal, .motion-enter, .clip-enter, section, .hover-lift').forEach(el => {
+      observer.observe(el);
+    });
+
+    // ── HERO TITLE IMMEDIATE ───────────────────────
+    setTimeout(() => {
+      const heroTitle = document.getElementById('hero-title');
+      if (heroTitle) heroTitle.classList.add('reveal-active');
+      document.querySelectorAll('.reveal').forEach(el => {
+        if (el.getBoundingClientRect().top < window.innerHeight) {
+          el.classList.add('active');
+        }
+      });
+    }, 200);
+
+    // ── FLASHLIGHT EFFECT ──────────────────────────
+    function updateFlashlight(e, card) {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+    }
+
+    document.querySelectorAll('.glow-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--x', `${e.clientX - r.left}px`);
+        card.style.setProperty('--y', `${e.clientY - r.top}px`);
+      });
+    });
+
+    // ── PARALLAX HERO ──────────────────────────────
+    const heroTitle = document.querySelector('#hero-title');
+    window.addEventListener('scroll', () => {
+      if (heroTitle) {
+        heroTitle.style.transform = `translateY(${window.scrollY * 0.06}px)`;
+      }
+    }, { passive: true });
+
+    const demoModal     = document.getElementById('demo-modal');
+    const registerModal = document.getElementById('register-modal');
+    const demoForm      = document.getElementById('demo-form');
+    const demoEmail     = 'tgr.tecno@gmail.com';
+
+    function trackEvent(eventName, params = {}) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: eventName,
+        ...params
+      });
+    }
+
+    function getTrackingParams() {
+      const search = new URLSearchParams(window.location.search);
+      const fields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'];
+
+      return fields.reduce((params, key) => {
+        params[key] = search.get(key) || localStorage.getItem(`postocash_${key}`) || '';
+        if (search.get(key)) localStorage.setItem(`postocash_${key}`, search.get(key));
+        return params;
+      }, {});
+    }
+
+    async function handleCheckout(event) {
+      if (event) event.preventDefault();
+
+      const button = event?.currentTarget;
+      const errorEl = document.getElementById('checkout-error');
+      const originalButtonHtml = button?.innerHTML;
+      if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+      }
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="inline-flex items-center gap-2"><span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span> Redirecionando para o Stripe</span>';
+      }
+
+      trackEvent('checkout_start', {
+        plan_name: 'PostoCash Essencial',
+        value: 200,
+        currency: 'BRL',
+        ...getTrackingParams()
+      });
+
+      try {
+        const checkoutPayload = {
+          plan: 'postocash_essencial',
+          priceInCents: 20000,
+          billingInterval: 'month',
+          successUrl: `${window.location.origin}${window.location.pathname}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}${window.location.pathname}#assinar`,
+          utms: getTrackingParams(),
+          metadata: {
+            source: 'landing_postocash',
+            product: 'PostoCash',
+            supabaseAction: 'create_establishment_profile_after_payment'
+          }
+        };
+
+        // Backend esperado:
+        // 1. POST /stripe/create-checkout-session cria uma assinatura mensal no Stripe.
+        // 2. Webhook checkout.session.completed valida o pagamento.
+        // 3. Depois da confirmacao, o backend cria o perfil do estabelecimento no Supabase
+        //    usando metadata, customerId, subscriptionId, email do Checkout e UTMs.
+        const response = await fetch(`${POSTOCASH_API}/stripe/create-checkout-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(checkoutPayload),
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.sessionId) {
+          throw new Error(result.erro || 'Nao foi possivel iniciar o checkout.');
+        }
+
+        const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+        const { error } = await stripe.redirectToCheckout({ sessionId: result.sessionId });
+        if (error) throw error;
+      } catch (err) {
+        console.error(err);
+        if (errorEl) {
+          errorEl.textContent = 'Nao conseguimos abrir o checkout agora. Tente novamente em alguns instantes.';
+          errorEl.classList.remove('hidden');
+        }
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = originalButtonHtml;
+        }
+      }
+    }
+
+    function openDemoModal(event) {
+      if (event) event.preventDefault();
+      trackEvent('lead_form_open', {
+        form_name: 'agendar_demonstracao',
+        trigger_text: event?.currentTarget?.innerText?.trim() || 'unknown'
+      });
+      demoModal.classList.remove('hidden');
+      demoModal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      const firstInput = demoModal.querySelector('input');
+      if (firstInput) setTimeout(() => firstInput.focus(), 80);
+    }
+
+    function closeDemoModal() {
+      demoModal.classList.add('hidden');
+      demoModal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('[data-demo-open]').forEach(link => {
+      link.addEventListener('click', openDemoModal);
+    });
+
+    document.querySelectorAll('[data-demo-close], [data-demo-backdrop]').forEach(el => {
+      el.addEventListener('click', () => {
+        trackEvent('lead_form_close', { form_name: 'agendar_demonstracao' });
+        closeDemoModal();
+      });
+    });
+
+    document.querySelectorAll('[data-system-login]').forEach(link => {
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        trackEvent('system_area_click', { link_text: 'Área do Posto' });
+        alert('A Área do Posto será conectada ao sistema administrativo em breve.');
+      });
+    });
+
+    document.querySelectorAll('a[href^="https://wa.me/"]').forEach(link => {
+      link.addEventListener('click', () => {
+        trackEvent('whatsapp_click', {
+          link_text: link.innerText.trim() || 'WhatsApp',
+          destination: link.href
+        });
+      });
+    });
+
+    document.querySelectorAll('a[href="blog.html"], a[href="login.html"]').forEach(link => {
+      link.addEventListener('click', () => {
+        trackEvent('navigation_click', {
+          link_text: link.innerText.trim(),
+          destination: link.getAttribute('href')
+        });
+      });
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        if (!demoModal.classList.contains('hidden'))     closeDemoModal();
+        if (!registerModal.classList.contains('hidden')) closeRegisterModal();
+      }
+    });
+
+    // ── REGISTRATION MODAL (Stripe) ───────────────
+    const POSTOCASH_API = 'https://postocash-api.onrender.com';
+    const STRIPE_PUBLISHABLE_KEY = 'pk_test_51TUculLJIRKdmHRylGa6FR0zxjTGa3TVN7GHTZqIIZtb38NGPcdMn1bUEljT5d44P8UzzimHSGvaTbEishOEczh700Yc84HzA3';
+    let stripeInstance   = null;
+    let cardElement      = null;
+    let registerFormData = {};
+    let currentStep      = 1;
+
+    function setStepDots(step) {
+      [1, 2, 3].forEach(n => {
+        const dot = document.getElementById(`step-dot-${n}`);
+        if (dot) dot.className = `w-2 h-2 rounded-full ${n <= step ? 'bg-orange-500' : 'bg-stone-200'}`;
+      });
+    }
+
+    function goToRegisterStep(step) {
+      currentStep = step;
+      document.querySelectorAll('.register-step').forEach(el => el.classList.add('hidden'));
+      const el = document.getElementById(`register-step-${step}`);
+      if (el) el.classList.remove('hidden');
+      setStepDots(step);
+      if (step === 2) setTimeout(mountCard, 80);
+    }
+
+    function mountCard() {
+      if (cardElement) return;
+      if (typeof Stripe === 'undefined') {
+        console.error('Stripe.js não carregado');
+        return;
+      }
+      stripeInstance = Stripe(STRIPE_PUBLISHABLE_KEY);
+      const elements = stripeInstance.elements({ locale: 'pt-BR' });
+      cardElement = elements.create('card', {
+        style: {
+          base: {
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '15px',
+            color: '#1c1917',
+            '::placeholder': { color: '#a8a29e' },
+          },
+          invalid: { color: '#ef4444' },
+        },
+        hidePostalCode: true,
+      });
+      cardElement.mount('#card-element');
+    }
+
+    function openRegisterModal(event) {
+      if (event) event.preventDefault();
+      registerModal.classList.remove('hidden');
+      registerModal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      goToRegisterStep(1);
+      setTimeout(() => {
+        const first = document.querySelector('#register-form-1 input');
+        if (first) first.focus();
+      }, 80);
+    }
+
+    function closeRegisterModal() {
+      registerModal.classList.add('hidden');
+      registerModal.classList.remove('flex');
+      document.body.style.overflow = '';
+      goToRegisterStep(1);
+      const f = document.getElementById('register-form-1');
+      if (f) f.reset();
+      const err = document.getElementById('register-step1-error');
+      if (err) { err.textContent = ''; err.classList.add('hidden'); }
+      const cardErr = document.getElementById('card-error');
+      if (cardErr) { cardErr.textContent = ''; cardErr.classList.add('hidden'); }
+      if (cardElement) { cardElement.destroy(); cardElement = null; }
+      registerFormData = {};
+    }
+
+    // CNPJ formatter
+    const cnpjInput = document.getElementById('register-cnpj');
+    if (cnpjInput) {
+      cnpjInput.addEventListener('input', () => {
+        let v = cnpjInput.value.replace(/\D/g, '').slice(0, 14);
+        if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+        else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d+)$/, '$1.$2.$3/$4');
+        else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d+)$/, '$1.$2.$3');
+        else if (v.length > 2) v = v.replace(/^(\d{2})(\d+)$/, '$1.$2');
+        cnpjInput.value = v;
+      });
+    }
+
+    // Step 1 submit
+    const registerForm1 = document.getElementById('register-form-1');
+    if (registerForm1) {
+      registerForm1.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('register-step1-error');
+        const fd = new FormData(registerForm1);
+        const cnpjRaw = fd.get('cnpj').replace(/\D/g, '');
+        if (cnpjRaw.length !== 14) {
+          errEl.textContent = 'CNPJ inválido. Digite os 14 dígitos.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        errEl.classList.add('hidden');
+        registerFormData = {
+          nome:         fd.get('nome').trim(),
+          cnpj:         cnpjRaw,
+          telefone:     fd.get('telefone').trim(),
+          email:        fd.get('email').trim(),
+          operatorName: fd.get('operatorName').trim() || fd.get('nome').trim(),
+        };
+        goToRegisterStep(2);
+      });
+    }
+
+    // Step 2 back button
+    const backBtn = document.getElementById('register-back-btn');
+    if (backBtn) backBtn.addEventListener('click', () => goToRegisterStep(1));
+
+    // Step 2 submit (payment)
+    const registerForm2 = document.getElementById('register-form-2');
+    if (registerForm2) {
+      registerForm2.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payBtn  = document.getElementById('pay-btn');
+        const cardErr = document.getElementById('card-error');
+        cardErr.textContent = '';
+        cardErr.classList.add('hidden');
+        payBtn.disabled = true;
+        payBtn.innerHTML = '<svg class="w-4 h-4 animate-spin mr-2 inline" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="white" stroke-width="4"/><path class="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8H4z"/></svg> Processando…';
+
+        function resetBtn() {
+          payBtn.disabled = false;
+          payBtn.innerHTML = '<iconify-icon icon="solar:lock-password-linear" class="text-lg"></iconify-icon> Ativar minha conta — R$ 200/mês';
+        }
+
+        try {
+          // 1. Create payment method
+          const { paymentMethod, error } = await stripeInstance.createPaymentMethod({
+            type: 'card',
+            card: cardElement,
+            billing_details: { name: registerFormData.nome, email: registerFormData.email },
+          });
+
+          if (error) {
+            cardErr.textContent = error.message;
+            cardErr.classList.remove('hidden');
+            resetBtn();
+            return;
+          }
+
+          // 2. Call backend
+          const resp = await fetch(`${POSTOCASH_API}/stripe/confirm-subscription`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentMethodId: paymentMethod.id, ...registerFormData }),
+          });
+          const result = await resp.json();
+
+          if (!resp.ok) {
+            cardErr.textContent = result.erro || 'Erro ao processar. Tente novamente.';
+            cardErr.classList.remove('hidden');
+            resetBtn();
+            return;
+          }
+
+          if (result.success) {
+            showCredentials(result.credentials);
+            return;
+          }
+
+          // 3. Requires 3D Secure
+          if (result.requiresAction && result.clientSecret) {
+            const { error: confirmErr } = await stripeInstance.confirmCardPayment(result.clientSecret);
+            if (confirmErr) {
+              cardErr.textContent = confirmErr.message;
+              cardErr.classList.remove('hidden');
+              resetBtn();
+              return;
+            }
+
+            const activateResp = await fetch(`${POSTOCASH_API}/stripe/activate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                subscriptionId: result.subscriptionId,
+                customerId:     result.customerId,
+                ...registerFormData,
+              }),
+            });
+            const activateResult = await activateResp.json();
+            if (activateResult.success) {
+              showCredentials(activateResult.credentials);
+            } else {
+              cardErr.textContent = 'Erro ao ativar conta após pagamento. Entre em contato: suporte@postocash.com.br';
+              cardErr.classList.remove('hidden');
+              resetBtn();
+            }
+            return;
+          }
+
+          cardErr.textContent = result.erro || 'Erro inesperado. Tente novamente.';
+          cardErr.classList.remove('hidden');
+          resetBtn();
+
+        } catch (err) {
+          console.error(err);
+          cardErr.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
+          cardErr.classList.remove('hidden');
+          resetBtn();
+        }
+      });
+    }
+
+    function showCredentials(creds) {
+      document.getElementById('cred-email').textContent    = creds.email;
+      document.getElementById('cred-password').textContent = creds.password;
+      const url = creds.adminUrl || 'https://app.postocash.com.br';
+      document.getElementById('cred-url').href        = url;
+      document.getElementById('cred-url').textContent = url;
+      document.getElementById('cred-access-btn').href = url;
+      goToRegisterStep(3);
+    }
+
+    document.querySelectorAll('[data-register-open]').forEach(el => {
+      el.addEventListener('click', openRegisterModal);
+    });
+    document.querySelectorAll('[data-register-close], [data-register-backdrop]').forEach(el => {
+      el.addEventListener('click', closeRegisterModal);
+    });
+
+    // ── DEMO FORM ──────────────────────────────────
+    if (demoForm) {
+      demoForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(demoForm);
+        const message = [
+          'Olá, quero agendar uma demonstração do PostoCash.',
+          '',
+          `Nome: ${data.get('nome') || ''}`,
+          `Telefone / WhatsApp: ${data.get('telefone') || ''}`,
+          `Posto: ${data.get('posto') || ''}`,
+          `Interesse: ${data.get('interesse') || ''}`,
+          `Mensagem: ${data.get('mensagem') || ''}`
+        ].join('\n');
+        const subject = encodeURIComponent('Agendar demonstração PostoCash');
+        const body = encodeURIComponent(message);
+        trackEvent('lead_form_submit', {
+          form_name: 'agendar_demonstracao',
+          destination: demoEmail,
+          interest: data.get('interesse') || ''
+        });
+        window.location.href = `mailto:${demoEmail}?subject=${subject}&body=${body}`;
+      });
+    }
+  </script>
+</body>
+</html>
+
+

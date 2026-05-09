@@ -8,9 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Input from '../../src/components/ui/Input';
 import Button from '../../src/components/ui/Button';
+import BrandLogo from '../../src/components/BrandLogo';
 import { authApi } from '../../src/api/client';
 import { useAuthStore } from '../../src/store/auth';
 import { maskCpfInput, isValidCpf, stripCpf, maskCnpj, maskPhone } from '../../src/utils/formatters';
+import { useBranding } from '../../src/hooks/useBranding';
 
 type Step = 'credentials' | 'phone';
 
@@ -19,11 +21,8 @@ export default function LoginScreen() {
   const [cpf,   setCpf]   = useState('');
   const [cnpj,  setCnpj]  = useState('');
   const [phone, setPhone] = useState('');
-  const setAuth = useAuthStore((s) => s.setAuth);
-
-  // ── Step 1: verify CPF exists, then collect phone ──────────────────────────
-  // We do a lightweight login first — if the customer exists, ask for phone to send OTP.
-  // If they registered without OTP flow (legacy), we fall back to a direct login check.
+  const setAuth  = useAuthStore((s) => s.setAuth);
+  const { primaryColor, tagline } = useBranding();
 
   const { mutate: checkAndSendOtp, isPending: isSending } = useMutation({
     mutationFn: () =>
@@ -69,9 +68,9 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-primary-700">
+    <SafeAreaView style={{ flex: 1, backgroundColor: primaryColor }}>
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
@@ -79,19 +78,18 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Hero */}
-          <View className="items-center justify-center pt-16 pb-10 px-6">
-            <Text className="text-5xl mb-3">⛽</Text>
-            <Text className="text-white text-3xl font-bold">PostoCash</Text>
-            <Text className="text-white/60 text-sm mt-1">Seu cashback no posto de gasolina</Text>
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 48, paddingBottom: 32, paddingHorizontal: 24 }}>
+            <BrandLogo size="lg" variant="white" />
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 6 }}>{tagline}</Text>
           </View>
 
           {/* Card */}
-          <View className="flex-1 bg-slate-50 rounded-t-3xl px-6 pt-8 pb-6">
+          <View style={{ flex: 1, backgroundColor: '#f8fafc', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24 }}>
 
             {step === 'credentials' ? (
               <>
-                <Text className="text-primary-700 text-2xl font-bold mb-1">Entrar</Text>
-                <Text className="text-slate-500 text-sm mb-6">
+                <Text style={{ color: '#1e293b', fontSize: 22, fontWeight: '700', marginBottom: 4 }}>Entrar</Text>
+                <Text style={{ color: '#64748b', fontSize: 14, marginBottom: 24 }}>
                   Acesse sua conta com CPF e o CNPJ do posto.
                 </Text>
 
@@ -119,20 +117,20 @@ export default function LoginScreen() {
                   title="Continuar"
                   fullWidth
                   onPress={handleCredentialsSubmit}
-                  className="mt-2"
+                  style={{ marginTop: 8, backgroundColor: primaryColor }}
                 />
               </>
             ) : (
               <>
                 <TouchableOpacity
                   onPress={() => setStep('credentials')}
-                  className="flex-row items-center gap-1 mb-4"
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}
                 >
-                  <Text className="text-primary-600 text-sm font-semibold">← Voltar</Text>
+                  <Text style={{ color: primaryColor, fontSize: 14, fontWeight: '600' }}>← Voltar</Text>
                 </TouchableOpacity>
 
-                <Text className="text-primary-700 text-2xl font-bold mb-1">Verificação</Text>
-                <Text className="text-slate-500 text-sm mb-6">
+                <Text style={{ color: '#1e293b', fontSize: 22, fontWeight: '700', marginBottom: 4 }}>Verificação</Text>
+                <Text style={{ color: '#64748b', fontSize: 14, marginBottom: 24 }}>
                   Informe seu celular para receber o código de verificação.
                 </Text>
 
@@ -151,24 +149,24 @@ export default function LoginScreen() {
                   fullWidth
                   loading={isSending}
                   onPress={handlePhoneSubmit}
-                  className="mt-2"
+                  style={{ marginTop: 8, backgroundColor: primaryColor }}
                 />
               </>
             )}
 
-            <View className="flex-row items-center justify-center mt-6 gap-1">
-              <Text className="text-slate-500 text-sm">Não tem conta?</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 4 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>Não tem conta?</Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-                <Text className="text-primary-700 text-sm font-bold"> Cadastre-se</Text>
+                <Text style={{ color: primaryColor, fontSize: 14, fontWeight: '700' }}> Cadastre-se</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               onPress={() => router.push('/(auth)/recovery')}
-              className="flex-row items-center justify-center mt-3 gap-1"
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, gap: 4 }}
             >
-              <Text className="text-slate-400 text-xs">Reinstalou o app?</Text>
-              <Text className="text-primary-500 text-xs font-semibold"> Recuperar acesso</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 12 }}>Reinstalou o app?</Text>
+              <Text style={{ color: primaryColor, fontSize: 12, fontWeight: '600' }}> Recuperar acesso</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

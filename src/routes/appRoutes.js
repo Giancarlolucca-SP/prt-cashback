@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const ctrl = require('../controllers/appController');
 const { validateDeviceId } = require('../middlewares/deviceMiddleware');
+const { nfceLimiter, registerLimiter } = require('../middlewares/rateLimitMiddleware');
 
 // ── Customer auth middleware ───────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function authenticateExpiredCustomer(req, res, next) {
 
 router.get ('/establishment/:id/qrcode-data', ctrl.getEstablishmentQRCodeData);
 
-router.post('/register',              ctrl.register);
+router.post('/register',              registerLimiter, ctrl.register);
 router.post('/login',                 ctrl.login);
 router.post('/verify-cpf',            ctrl.verifyCpf);
 router.post('/verify-face',           ctrl.verifyFace);
@@ -74,7 +75,7 @@ router.get ('/statement',        authenticateCustomer, validateDeviceId, ctrl.ge
 router.post('/token/refresh',    authenticateExpiredCustomer, ctrl.refreshToken);
 router.post('/push-token',       authenticateCustomer, ctrl.savePushToken);
 router.post('/register-selfie',  authenticateCustomer, ctrl.registerSelfie);
-router.post('/validate-nfce',    authenticateCustomer, validateDeviceId, ctrl.validateNfce);
-router.post('/validate-photo',   authenticateCustomer, validateDeviceId, ctrl.validatePhoto);
+router.post('/validate-nfce',    nfceLimiter, authenticateCustomer, validateDeviceId, ctrl.validateNfce);
+router.post('/validate-photo',   nfceLimiter, authenticateCustomer, validateDeviceId, ctrl.validatePhoto);
 
 module.exports = router;

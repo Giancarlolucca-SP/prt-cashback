@@ -276,4 +276,46 @@ async function getFuelTypes(operator, query = {}) {
   }
 }
 
-module.exports = { getAnalytics, getCampaignResults, getFuelTypes };
+// ── Attendant Ranking ─────────────────────────────────────────────────────────
+
+async function getAttendantRanking(operator, query = {}) {
+  const { start: startDate, end: endDate } = resolveRange(query);
+  const establishmentId = resolveEstablishmentId(operator, query);
+
+  try {
+    const groups = await prisma.transaction.groupBy({
+      by:    ['attendantName'],
+      where: {
+        establishmentId,
+        createdAt:     { gte: startDate, lte: endDate },
+        attendantName: { not: null },
+        status:        'CONFIRMED',
+      },
+      _sum:    { liters: true, amount: true, cashbackValue: true },
+      _count:  { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    });
+
+    if (!groups.length) return [];
+
+    const ranking = groups.map((g) => ({
+      name:         g.attendantName,
+      count:        g._count.id || 0,
+      totalLiters:  round2(safeFloat(g._sum.liters)),
+      totalValue:   round2(safeFloat(g._sum.amount)),
+      totalCashback: round2(safeFloat(g._sum.cashbackValue)),
+    }));
+
+    // Flag attendants whose count is below 50% of the group average
+    const avgCount = safeDivide(ranking.reduce((s, r) => s + r.count, 0), ranking.length);
+    return ranking.map((r) => ({
+      ...r,
+      belowAverage: r.count < avgCount * 0.5,
+    }));
+  } catch (err) {
+    console.error('[dashboard] Erro em getAttendantRanking:', err.message);
+    return [];
+  }
+}
+
+module.exports = { getAnalytics, getCampaignResults, getFuelTypes, getAttendantRanking };

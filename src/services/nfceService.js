@@ -231,9 +231,48 @@ function parseHtmlNfceData(html, urlParams) {
     }
   }
 
+  // ── "Informações de interesse do contribuinte" (SP SEFAZ) ─────────────────
+  // Contains attendant name and pump encerrante readings in a single <li> field.
+  // Example: "#CF:B05 EI1456806,050 EF1456839,230 V33,180 - Atendente: 27-JUNIOR - PROCON-SP"
+  const infoMatch = html.match(/<li>(#CF:[^<]+)<\/li>/);
+  const infoText  = infoMatch ? infoMatch[1] : '';
+
+  const attendantMatch = infoText.match(/Atendente:\s*([\w\-]+)/i);
+  const attendant      = attendantMatch ? attendantMatch[1].trim() : null;
+  if (attendant) console.log('[NFCE] Atendente:', attendant);
+
+  const eiMatch  = infoText.match(/EI([\d,]+)/);
+  const efMatch  = infoText.match(/EF([\d,]+)/);
+  const volMatch = infoText.match(/V([\d,]+)/);
+
+  const encInitial = eiMatch  ? parseFloat(eiMatch[1].replace(',', '.'))  : null;
+  const encFinal   = efMatch  ? parseFloat(efMatch[1].replace(',', '.'))  : null;
+  const encVolume  = volMatch ? parseFloat(volMatch[1].replace(',', '.')) : null;
+
+  if (encInitial !== null && encFinal !== null) {
+    const calculatedVolume = parseFloat((encFinal - encInitial).toFixed(3));
+    const litersVal        = data.liters ?? encVolume;
+    if (litersVal !== null) {
+      const diff = Math.abs(calculatedVolume - litersVal);
+      if (diff > 0.1) {
+        console.log('[NFCE] ⚠️ Volume inconsistente:', {
+          cupom:        litersVal,
+          encerrante:   calculatedVolume,
+          diferenca:    diff.toFixed(3),
+        });
+      } else {
+        console.log('[NFCE] ✅ Volume validado pelos encerrantes:', calculatedVolume, 'L');
+      }
+    }
+  }
+
+  data.atendente  = attendant;
+  data.encerrante = { inicial: encInitial, final: encFinal, volume: encVolume };
+
   console.log('[NFCE] parseHtmlNfceData resultado:', {
     cnpj: data.cnpj, vNF: data.vNF, dEmi: data.dEmi, xNome: data.xNome,
     items: data.items, liters: data.liters,
+    atendente: data.atendente, encerrante: data.encerrante,
   });
 
   return data;
@@ -365,6 +404,8 @@ async function parseNfce(qrCodeUrl) {
       tipoCombustivel: fuelItem?.tipoCombustivel ?? null,
       litros:          fuelItem?.litros          ?? null,
       itens:           items,
+      atendente:       htmlData.atendente        ?? null,
+      encerrante:      htmlData.encerrante       ?? null,
       fallback:        true,
     };
   }
@@ -583,18 +624,21 @@ async function validateNfce(qrCodeUrl, customerId, establishmentId) {
   const [transaction] = await prisma.$transaction([
     prisma.transaction.create({
       data: {
-        customerId:      customer.id,
-        operatorId:      operator.id,
+        customerId:       customer.id,
+        operatorId:       operator.id,
         establishmentId,
-        amount:          nfce.valorTotal,
-        cashbackPercent: effectivePercent,
+        amount:           nfce.valorTotal,
+        cashbackPercent:  effectivePercent,
         cashbackValue,
         receiptCode,
-        fuelType:        nfce.tipoCombustivel ?? null,
-        liters:          nfce.litros != null ? parseFloat(nfce.litros.toFixed(3)) : null,
-        nfceKey:         nfce.chaveAcesso,
-        source:          'NFCE_QR',
-        status:          'CONFIRMED',
+        fuelType:         nfce.tipoCombustivel ?? null,
+        liters:           nfce.litros != null ? parseFloat(nfce.litros.toFixed(3)) : null,
+        nfceKey:          nfce.chaveAcesso,
+        source:           'NFCE_QR',
+        status:           'CONFIRMED',
+        attendantName:    nfce.atendente        ?? null,
+        encerranteInicial: nfce.encerrante?.inicial ?? null,
+        encerranteFinal:  nfce.encerrante?.final    ?? null,
       },
     }),
     prisma.customer.update({

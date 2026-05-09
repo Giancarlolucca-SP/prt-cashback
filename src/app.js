@@ -1,6 +1,8 @@
 require('dotenv').config();
 const path    = require('path');
 const express = require('express');
+const cors    = require('cors');
+const helmet  = require('helmet');
 const { apiLimiter } = require('./middlewares/rateLimitMiddleware');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 
@@ -16,9 +18,54 @@ const reportRoutes              = require('./routes/reportRoutes');
 const cashbackSettingsRoutes    = require('./routes/cashbackSettingsRoutes');
 const appRoutes                 = require('./routes/appRoutes');
 const adminPhotoRoutes          = require('./routes/adminPhotoRoutes');
+const stripeRoutes              = require('./routes/stripeRoutes');
+const rankingRoutes             = require('./routes/rankingRoutes');
+const { webhook: stripeWebhook } = require('./controllers/stripeController');
 
 const app = express();
 app.set('trust proxy', 1);
+
+// ── Security headers ──────────────────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'"],
+      styleSrc:   ["'self'", "'unsafe-inline'"],
+      imgSrc:     ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // keep disabled — API consumed by mobile
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  xssFilter: true,
+}));
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
+const isProd = process.env.NODE_ENV === 'production';
+
+const allowedOrigins = [
+  'https://app.postocash.com.br',
+  'https://www.postocash.com.br',
+  process.env.FRONTEND_URL,
+  // Allow localhost only outside production
+  ...(!isProd ? ['http://localhost:5173', 'http://localhost:3000'] : []),
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origem não permitida — ${origin}`));
+  },
+  credentials: true,
+}));
+
+// ── Stripe webhook — raw body MUST come before express.json() ────────────────
+app.post('/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
 // ── Static files ─────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -59,6 +106,8 @@ app.use('/reports',                reportRoutes);
 app.use('/cashback-settings',      cashbackSettingsRoutes);
 app.use('/app',                    appRoutes);
 app.use('/admin/photo-validations', adminPhotoRoutes);
+app.use('/stripe',                 stripeRoutes);
+app.use('/ranking',                rankingRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => {

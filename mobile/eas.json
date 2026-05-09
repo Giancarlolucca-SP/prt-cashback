@@ -28,9 +28,13 @@
       }
     },
     "production": {
+      "distribution": "store",
       "android": {
         "buildType": "app-bundle",
         "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://postocash-api.onrender.com"
       }
     }
   },

@@ -40,4 +40,32 @@ const redemptionLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter, redemptionLimiter };
+/**
+ * NF-e / photo validation — max 10 per hour per IP.
+ * These hit external services (SEFAZ, OCR) and are expensive to abuse.
+ */
+const nfceLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    erro: 'Limite de validações de cupom atingido. Tente novamente em 1 hora.',
+  },
+});
+
+/**
+ * Registration limiter — max 3 registrations per hour per IP.
+ * Prevents mass account creation.
+ */
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    erro: 'Muitos cadastros deste endereço. Tente novamente em 1 hora.',
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, redemptionLimiter, nfceLimiter, registerLimiter };

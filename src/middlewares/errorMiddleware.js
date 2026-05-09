@@ -26,11 +26,10 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Unknown / unexpected errors
+  // Unknown / unexpected errors — never expose internals in production
   return res.status(500).json({
     erro: 'Erro interno do servidor. Tente novamente mais tarde.',
-    detalhe: err.message,
-    stack: isDev ? err.stack : undefined,
+    ...(isDev && { detalhe: err.message, stack: err.stack }),
   });
 }
 

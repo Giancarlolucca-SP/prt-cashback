@@ -11,8 +11,11 @@ router.post('/', establishmentController.create);
 // GET  /establishments — list all establishments (admin only)
 router.get('/', authenticate, requireAdmin, establishmentController.listAll);
 
-// POST /establishments/:id/logo — upload/replace logo (authenticated)
+// POST  /establishments/:id/logo     — upload/replace logo (authenticated)
 router.post('/:id/logo', authenticate, upload.single('logo'), establishmentController.uploadLogo);
+
+// PATCH /establishments/:id/branding — update brand colors (authenticated)
+router.patch('/:id/branding', authenticate, establishmentController.updateBranding);
 
 // GET  /establishments/:id/qrcode — generate QR Code PNG (admin only)
 router.get('/:id/qrcode', authenticate, requireAdmin, establishmentController.getQRCode);

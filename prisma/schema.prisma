@@ -20,6 +20,8 @@ model Establishment {
   latitude        Decimal?         @db.Decimal(10, 7)
   longitude       Decimal?         @db.Decimal(10, 7)
   logoUrl         String?
+  primaryColor    String           @default("#FF6B00")
+  secondaryColor  String           @default("#1e293b")
   createdAt       DateTime         @default(now())
   operators       Operator[]
   customers       Customer[]
@@ -28,7 +30,12 @@ model Establishment {
   campaigns       Campaign[]
   fraudSettings    FraudSettings?
   cashbackSettings CashbackSettings?
-  blacklistedCpfs BlacklistedCpf[]
+  blacklistedCpfs  BlacklistedCpf[]
+  messageQueue     MessageQueue[]
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  subscriptionStatus    String    @default("ACTIVE")
+  subscriptionEndsAt    DateTime?
 }
 
 model Customer {
@@ -85,15 +92,18 @@ model Transaction {
   receiptCode     String        @unique
   fuelType        String?
   liters          Decimal?      @db.Decimal(10, 3)
-  nfceKey         String?       @unique
-  source          String?
-  status          String        @default("CONFIRMED")
-  retryCount      Int           @default(0)
-  validatedAt     DateTime?
-  qrCodeUrl       String?       @db.Text
-  photoUrl        String?       @db.Text
-  metadata        Json?
-  createdAt       DateTime      @default(now())
+  nfceKey           String?       @unique
+  source            String?
+  status            String        @default("CONFIRMED")
+  retryCount        Int           @default(0)
+  validatedAt       DateTime?
+  qrCodeUrl         String?       @db.Text
+  photoUrl          String?       @db.Text
+  metadata          Json?
+  attendantName     String?
+  encerranteInicial Decimal?      @db.Decimal(12, 3)
+  encerranteFinal   Decimal?      @db.Decimal(12, 3)
+  createdAt         DateTime      @default(now())
   customer        Customer      @relation(fields: [customerId], references: [id])
   operator        Operator      @relation(fields: [operatorId], references: [id])
   establishment   Establishment @relation(fields: [establishmentId], references: [id])
@@ -191,6 +201,30 @@ model BlacklistedCpf {
 
   @@unique([cpf, establishmentId])
   @@index([establishmentId])
+}
+
+model MessageQueue {
+  id              String    @id @default(uuid())
+  establishmentId String
+  campaignId      String?
+  customerId      String?
+  customerPhone   String
+  customerName    String
+  message         String
+  status          String    @default("PENDING")
+  priority        Int       @default(0)
+  scheduledAt     DateTime  @default(now())
+  sentAt          DateTime?
+  failedAt        DateTime?
+  retryCount      Int       @default(0)
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([establishmentId, status])
+  @@index([campaignId])
 }
 
 model AuditLog {

@@ -10,6 +10,8 @@ import Constants from 'expo-constants';
 
 import { useAuthStore } from '../../src/store/auth';
 import { useAppConfig } from '../../src/context/AppConfigContext';
+import { useBranding } from '../../src/hooks/useBranding';
+import BrandLogo from '../../src/components/BrandLogo';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -110,6 +112,7 @@ function ActionRow({
 export default function ConfiguracoesScreen() {
   const { user, logout } = useAuthStore();
   const { config } = useAppConfig();
+  const { primaryColor, secondaryColor, postoName } = useBranding();
   const queryClient = useQueryClient();
 
   const [notificacoes, setNotificacoes] = useState(true);
@@ -173,7 +176,7 @@ export default function ConfiguracoesScreen() {
 
       {/* Header */}
       <View style={{
-        backgroundColor: '#1e3a5f',
+        backgroundColor: secondaryColor,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
@@ -183,9 +186,10 @@ export default function ConfiguracoesScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={{ color: 'white', fontSize: 18, fontWeight: '700', flex: 1 }}>
-          Configurações
-        </Text>
+        <View style={{ flex: 1 }}>
+          <BrandLogo size="sm" variant="white" />
+        </View>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Configurações</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -222,8 +226,8 @@ export default function ConfiguracoesScreen() {
             <Switch
               value={notificacoes}
               onValueChange={setNotificacoes}
-              trackColor={{ false: '#e2e8f0', true: '#1e3a5f' }}
-              thumbColor={notificacoes ? '#F59E0B' : '#f4f3f4'}
+              trackColor={{ false: '#e2e8f0', true: primaryColor }}
+              thumbColor={notificacoes ? '#ffffff' : '#f4f3f4'}
             />
           </View>
         </Card>

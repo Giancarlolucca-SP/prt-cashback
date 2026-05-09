@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- Icon centered -->
+  <rect x="55" y="10" width="60" height="75" rx="8" fill="#1e293b"/>
+  <rect x="61" y="4" width="48" height="16" rx="5" fill="#1e293b"/>
+  <rect x="63" y="22" width="44" height="28" rx="3" fill="#fff7ed"/>
+  <rect x="68" y="28" width="22" height="3" rx="1.5" fill="#FF6B00"/>
+  <rect x="68" y="34" width="15" height="3" rx="1.5" fill="#FF6B00" opacity="0.5"/>
+  <rect x="68" y="40" width="18" height="3" rx="1.5" fill="#FF6B00" opacity="0.3"/>
+  <rect x="63" y="57" width="44" height="10" rx="3" fill="#334155"/>
+  <rect x="63" y="78" width="44" height="6" rx="3" fill="#1e293b"/>
+  <path d="M115 20 Q133 20 133 35 Q133 55 125 58" fill="none" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+  <rect x="118" y="55" width="12" height="7" rx="3" fill="#475569"/>
+  <!-- Coin -->
+  <circle cx="133" cy="72" r="26" fill="white" stroke="#e2e8f0" stroke-width="1.5"/>
+  <circle cx="133" cy="72" r="22" fill="#FF6B00"/>
+  <circle cx="133" cy="72" r="17" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+  <text x="133" y="80" text-anchor="middle" fill="white" font-size="18" font-weight="900" font-family="system-ui">$</text>
+  <!-- Wordmark stacked -->
+  <text x="100" y="130" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="32" font-weight="800" letter-spacing="-1" fill="#1e293b">Posto</text>
+  <text x="100" y="165" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="32" font-weight="800" letter-spacing="-1" fill="#FF6B00">Cash</text>
+  <text x="100" y="185" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="500" letter-spacing="2" fill="#94a3b8">FIDELIDADE INTELIGENTE</text>
+</svg>

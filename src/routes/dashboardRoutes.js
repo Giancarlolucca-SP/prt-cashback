@@ -7,5 +7,6 @@ const router = Router();
 router.get('/',                 authenticate, dashboardController.getSummary);
 router.get('/campaign-results', authenticate, dashboardController.getCampaignResults);
 router.get('/fuel-types',       authenticate, dashboardController.getFuelTypes);
+router.get('/attendants',       authenticate, dashboardController.getAttendantRanking);
 
 module.exports = router;

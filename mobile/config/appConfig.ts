@@ -36,8 +36,8 @@ export interface AppConfig {
 
 export const DEFAULT_CONFIG: AppConfig = {
   appName:         'PostoCash',
-  primaryColor:    '#1e3a5f',
-  secondaryColor:  '#D97706',
+  primaryColor:    '#FF6B00',
+  secondaryColor:  '#1e293b',
   logoUrl:         null,
   cashbackPercent: 5,
   minRedemption:   10,

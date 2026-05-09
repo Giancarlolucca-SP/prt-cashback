@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// In production (Vercel) VITE_API_URL points to Render backend.
+// In development the Vite proxy rewrites /api → localhost:3000, so we keep '/api'.
+const API_URL = import.meta.env.VITE_API_URL || null;
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_URL ?? '/api',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -58,15 +62,18 @@ export const dashboardAPI = {
   getAnalytics:       (params = {}) => api.get('/dashboard',                 { params }),
   getCampaignResults: (params = {}) => api.get('/dashboard/campaign-results',{ params }),
   getFuelTypes:       (params = {}) => api.get('/dashboard/fuel-types',      { params }),
+  getAttendants:      (params = {}) => api.get('/dashboard/attendants',      { params }),
 };
 
 // ── Campaigns ─────────────────────────────────────────────────────────────────
 export const campaignsAPI = {
-  preview:      (params) => api.get('/campaigns/preview', { params }),
-  create:       (data)   => api.post('/campaigns', data),
-  list:         (status, page = 1) => api.get('/campaigns', { params: { status, page } }),
-  close:        (id)     => api.patch(`/campaigns/${id}/close`),
-  getReturnees: (id)     => api.get(`/campaigns/${id}/returnees`),
+  preview:          (params) => api.get('/campaigns/preview', { params }),
+  create:           (data)   => api.post('/campaigns', data),
+  list:             (status, page = 1) => api.get('/campaigns', { params: { status, page } }),
+  close:            (id)     => api.patch(`/campaigns/${id}/close`),
+  getReturnees:     (id)     => api.get(`/campaigns/${id}/returnees`),
+  getQueueStatus:   (id)     => api.get(`/campaigns/${id}/queue-status`),
+  getGlobalQueue:   ()       => api.get('/campaigns/queue-status'),
 };
 
 // ── Establishments ────────────────────────────────────────────────────────────
@@ -84,6 +91,7 @@ export const establishmentsAPI = {
         : undefined,
     });
   },
+  updateBranding: (id, data) => api.patch(`/establishments/${id}/branding`, data),
 };
 
 // ── Fraud ─────────────────────────────────────────────────────────────────────
@@ -99,6 +107,17 @@ export const fraudAPI = {
 export const cashbackSettingsAPI = {
   get:    ()     => api.get('/cashback-settings'),
   update: (data) => api.put('/cashback-settings', data),
+};
+
+// ── Stripe / Subscription ─────────────────────────────────────────────────────
+export const subscriptionAPI = {
+  getStatus: () => api.get('/stripe/subscription/my'),
+  cancel:    () => api.post('/stripe/cancel-subscription'),
+};
+
+// ── Ranking ───────────────────────────────────────────────────────────────────
+export const rankingAPI = {
+  get: (params = {}) => api.get('/ranking', { params }),
 };
 
 // ── Reports ───────────────────────────────────────────────────────────────────

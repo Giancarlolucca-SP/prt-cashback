@@ -10,8 +10,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import BalanceCard from '../../src/components/BalanceCard';
 import StatementItem, { StatementEntry } from '../../src/components/StatementItem';
+import BrandLogo from '../../src/components/BrandLogo';
 import { customerApi } from '../../src/api/client';
 import { useAuthStore } from '../../src/store/auth';
+import { useBranding } from '../../src/hooks/useBranding';
 
 const BALANCE_CACHE_KEY = 'postocash_balance_cache';
 
@@ -26,6 +28,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { user, establishmentName, logout } = useAuthStore();
+  const { primaryColor, secondaryColor } = useBranding();
   const [cachedBalance, setCachedBalance] = useState<BalanceCache | null>(null);
 
   // Load cached balance immediately on mount
@@ -97,17 +100,17 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
       >
         {/* Greeting */}
-        <View className="bg-primary-700 px-5 pb-4 pt-3">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text className="text-white/60 text-xs">Bem-vindo de volta</Text>
-              <Text className="text-white text-lg font-bold">
-                {user?.nome?.split(' ')[0] ?? 'Cliente'} 👋
+        <View style={{ backgroundColor: secondaryColor, paddingHorizontal: 20, paddingBottom: 16, paddingTop: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <BrandLogo size="sm" variant="white" />
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4 }}>
+                Olá, {user?.nome?.split(' ')[0] ?? 'Cliente'} 👋
               </Text>
             </View>
             <TouchableOpacity
               onPress={handleLogout}
-              className="w-9 h-9 rounded-full bg-white/10 items-center justify-center"
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
@@ -139,10 +142,10 @@ export default function HomeScreen() {
               onPress={() => router.push('/(tabs)/resgatar')}
               className="flex-1 bg-white rounded-2xl p-4 items-center shadow-sm border border-slate-100"
             >
-              <View className="w-12 h-12 rounded-full bg-accent-50 items-center justify-center mb-2">
-                <Ionicons name="qr-code" size={24} color="#D97706" />
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: primaryColor + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <Ionicons name="qr-code" size={24} color={primaryColor} />
               </View>
-              <Text className="text-accent-600 text-sm font-bold">Resgatar</Text>
+              <Text style={{ color: primaryColor, fontSize: 14, fontWeight: '700' }}>Resgatar</Text>
               <Text className="text-slate-400 text-xs mt-0.5 text-center">Usar seu cashback</Text>
             </TouchableOpacity>
 

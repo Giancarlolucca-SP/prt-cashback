@@ -1,0 +1,349 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog PostoCash | Sistema de Fidelidade e Cashback para Postos</title>
+  <meta name="description" content="Guias e casos de sucesso sobre sistema de fidelidade para postos, cashback para postos de gasolina, antifraude e estratégias para aumentar faturamento." />
+  <meta name="keywords" content="sistema de fidelidade para postos, cashback para postos de gasolina, aumentar faturamento do posto, casos de sucesso postos, gestão de frentistas" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="./blog.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="PostoCash" />
+  <meta property="og:title" content="Blog PostoCash | Fidelidade e Cashback para Postos" />
+  <meta property="og:description" content="Conteúdos para donos de postos aumentarem recorrência, faturamento e controle do programa de cashback." />
+  <meta property="og:image" content="assets/logo-orange-bg.svg" />
+  <meta property="og:url" content="./blog.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'page_view',
+      page_type: 'blog',
+      product: 'PostoCash'
+    });
+  </script>
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            display: ['Space Grotesk', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family:Inter,sans-serif; background:#f4f2ed; color:#1c1917; -webkit-font-smoothing:antialiased; }
+    .mesh {
+      background:
+        radial-gradient(circle at 12% 20%, rgba(255,107,0,.30), transparent 28%),
+        radial-gradient(circle at 82% 12%, rgba(14,165,233,.25), transparent 25%),
+        radial-gradient(circle at 70% 80%, rgba(16,185,129,.22), transparent 28%),
+        #0f172a;
+    }
+    .card { border:1px solid rgba(28,25,23,.10); background:rgba(255,255,255,.78); backdrop-filter:blur(14px); }
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="assets/logo-minimal.svg" alt="Logo PostoCash, blog sobre sistema de fidelidade e cashback para postos" class="h-9 w-auto" fetchpriority="high" decoding="async" />
+      </a>
+      <nav class="hidden items-center gap-7 text-[11px] font-mono uppercase tracking-widest text-stone-500 md:flex">
+        <a href="index.html#produto-dashboard" class="hover:text-stone-900">O Sistema</a>
+        <a href="index.html#produto-campanhas" class="hover:text-stone-900">Recorrência</a>
+        <a href="index.html#produto-app" class="hover:text-stone-900">App Exclusivo</a>
+        <a href="index.html#contato" class="hover:text-stone-900">Contato</a>
+        <a href="#area-do-posto" data-system-login class="hover:text-stone-900">Área do Posto</a>
+      </nav>
+      <a href="#agendar-demonstracao" data-demo-open class="rounded-full bg-stone-900 px-5 py-2.5 text-[11px] font-mono uppercase tracking-widest text-white transition hover:bg-stone-700">Agendar Demonstração</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="mesh px-6 py-24 text-white md:py-32">
+      <div class="mx-auto max-w-7xl">
+        <div class="max-w-3xl">
+          <p class="mb-5 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest text-white/70">Central de crescimento para postos</p>
+          <h1 class="font-display text-4xl font-bold leading-tight tracking-tight md:text-5xl">
+            Fidelização, cashback e gestão de equipes para vender mais combustível.
+          </h1>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-20">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p class="mb-2 text-[11px] font-mono uppercase tracking-widest text-stone-400">Guias para crescer</p>
+            <h2 class="font-display text-4xl font-semibold tracking-tight">Conteúdos para vender mais no posto</h2>
+          </div>
+        </div>
+
+        <div id="posts-grid" class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        </div>
+      </div>
+    </section>
+
+    <section class="border-y border-stone-200 bg-white px-6 py-20">
+      <div class="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[.8fr_1.2fr]">
+        <div>
+          <p class="mb-2 text-[11px] font-mono uppercase tracking-widest text-stone-400">Modelo de estudo de caso</p>
+          <h2 class="font-display text-4xl font-semibold tracking-tight">Histórias que convertem donos de postos</h2>
+          <p class="mt-5 text-stone-500">Use dados fictícios ou reais autorizados para transformar operação em prova comercial. Quanto mais específico, melhor para SEO e conversão.</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="rounded-2xl border border-stone-200 bg-stone-50 p-6">
+            <h3 class="font-display text-xl font-semibold">Posto com 11 funcionários</h3>
+            <p class="mt-3 text-sm leading-relaxed text-stone-600">Como um ranking de frentistas aumentou cadastros no programa de fidelidade e ajudou a premiar a equipe por metas claras.</p>
+          </div>
+          <div class="rounded-2xl border border-stone-200 bg-stone-50 p-6">
+            <h3 class="font-display text-xl font-semibold">Campanha para inativos</h3>
+            <p class="mt-3 text-sm leading-relaxed text-stone-600">Como uma mensagem direta no celular recuperou clientes sem abastecer há 30 dias e elevou o ticket médio da semana.</p>
+          </div>
+          <div class="rounded-2xl border border-stone-200 bg-stone-50 p-6">
+            <h3 class="font-display text-xl font-semibold">Antifraude no resgate</h3>
+            <p class="mt-3 text-sm leading-relaxed text-stone-600">Como validar cupom, CPF e biometria reduz tentativas de abuso sem tornar o atendimento lento para o frentista.</p>
+          </div>
+          <div class="rounded-2xl border border-stone-200 bg-stone-50 p-6">
+            <h3 class="font-display text-xl font-semibold">WhatsApp e app juntos</h3>
+            <p class="mt-3 text-sm leading-relaxed text-stone-600">Como combinar saldo de cashback, campanha segmentada e app personalizado cria um canal direto com o cliente.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-20">
+      <div class="mx-auto max-w-4xl text-center">
+        <p class="mb-3 text-[11px] font-mono uppercase tracking-widest text-stone-400">Próximo passo</p>
+        <h2 class="font-display text-4xl font-semibold tracking-tight">Transforme estes temas em artigos completos.</h2>
+        <p class="mx-auto mt-5 max-w-2xl text-stone-500">Cada artigo deve terminar com uma chamada para demonstração do PostoCash e um exemplo prático de campanha, métrica ou operação antifraude.</p>
+        <a href="#agendar-demonstracao" data-demo-open class="mt-8 inline-flex rounded-full bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-stone-700">Agendar Demonstração</a>
+      </div>
+    </section>
+  </main>
+
+  <a href="https://wa.me/5511985498727?text=Ol%C3%A1%2C%20quero%20saber%20mais%20sobre%20o%20PostoCash."
+     target="_blank" rel="noopener"
+     class="fixed bottom-5 right-5 z-[80] flex items-center gap-3 rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-900/30 transition hover:-translate-y-1 hover:bg-[#1ebe5d]">
+    <iconify-icon icon="ic:baseline-whatsapp" class="text-2xl"></iconify-icon>
+    <span class="hidden sm:inline">Falar no WhatsApp</span>
+  </a>
+
+  <div id="demo-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-stone-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
+    <div data-demo-backdrop class="absolute inset-0"></div>
+    <div class="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div class="flex items-start justify-between gap-6 border-b border-stone-200 px-6 py-5">
+        <div>
+          <p class="mb-1 text-[11px] font-mono uppercase tracking-widest text-orange-600">Demonstração PostoCash</p>
+          <h2 id="demo-modal-title" class="font-display text-2xl font-semibold text-stone-900">Agende uma demonstração</h2>
+          <p class="mt-2 text-sm leading-relaxed text-stone-500">Preencha os dados e envie sua solicitação para tgr.tecno@gmail.com.</p>
+        </div>
+        <button type="button" data-demo-close class="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-100 hover:text-stone-900" aria-label="Fechar formulário">
+          <iconify-icon icon="solar:close-circle-linear" class="text-2xl"></iconify-icon>
+        </button>
+      </div>
+
+      <form id="demo-form" class="space-y-4 px-6 py-6">
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold text-stone-700">Nome</span>
+            <input name="nome" required class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="Seu nome" />
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold text-stone-700">Telefone / WhatsApp</span>
+            <input name="telefone" required class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="(11) 99999-9999" />
+          </label>
+        </div>
+        <label class="block">
+          <span class="mb-1.5 block text-xs font-semibold text-stone-700">Nome do posto</span>
+          <input name="posto" class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900" placeholder="Auto Posto..." />
+        </label>
+        <label class="block">
+          <span class="mb-1.5 block text-xs font-semibold text-stone-700">O que você quer melhorar?</span>
+          <select name="interesse" class="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none transition focus:border-stone-900">
+            <option>Aumentar a recorrência de clientes</option>
+            <option>Criar campanhas por WhatsApp</option>
+            <option>Implantar cashback com antifraude</option>
+            <option>Premiar frentistas por metas</option>
+            <option>Ver a plataforma completa</option>
+          </select>
+        </label>
+        <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-700">
+          Enviar
+          <iconify-icon icon="solar:letter-linear" class="text-xl"></iconify-icon>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <footer class="border-t border-stone-200 bg-stone-900 px-6 py-10 text-stone-400">
+    <div class="mx-auto flex max-w-7xl flex-col justify-between gap-5 md:flex-row md:items-center">
+      <span class="text-sm">PostoCash — sistema de cashback, fidelização e antifraude para postos.</span>
+      <a href="index.html" class="text-[11px] font-mono uppercase tracking-widest text-white">Voltar para a landing</a>
+    </div>
+  </footer>
+  <script>
+    const seedPosts = [
+      {
+        slug: 'sistema-de-fidelizacao-para-postos',
+        status: 'published',
+        category: 'Fidelização',
+        title: 'Sistema de fidelização para postos de combustíveis: o que medir antes de contratar',
+        summary: 'Entenda recorrência, ticket médio, frequência de abastecimento, cashback automático, campanhas e relatórios para tomada de decisão.',
+        content: 'Um bom sistema de fidelização para postos precisa ir além do cadastro de clientes. O gestor deve acompanhar frequência de abastecimento, ticket médio, campanhas enviadas, retorno por frentista e saldo de cashback gerado. Com esses indicadores, o posto deixa de depender apenas de preço e começa a criar relacionamento com quem já abastece na região.'
+      },
+      {
+        slug: 'software-de-cashback-para-postos',
+        status: 'published',
+        category: 'Cashback',
+        title: 'Software de cashback para postos: como transformar saldo em retorno real',
+        summary: 'Como mensagens no celular, app personalizado e resgate simples reduzem esquecimento e trazem o cliente de volta.',
+        content: 'Cashback só gera resultado quando o cliente lembra que tem saldo e entende onde pode usar. Por isso, campanhas por WhatsApp, notificações no app e regras simples de resgate ajudam a transformar o benefício em uma nova visita ao posto.'
+      },
+      {
+        slug: 'como-evitar-fraudes-no-cashback-do-posto',
+        status: 'published',
+        category: 'Antifraude',
+        title: 'Como evitar fraudes no cashback do posto sem travar a operação',
+        summary: 'QR Code, cupom fiscal, biometria facial, limites por CPF, auditoria e logs de resgate no programa de fidelidade.',
+        content: 'O antifraude precisa proteger o caixa sem atrapalhar o atendimento. Uma operação madura combina validação de cupom fiscal, CPF, limites por cliente, registro de resgates, biometria facial em operações sensíveis e relatórios para auditoria.'
+      },
+      {
+        slug: 'como-premiar-frentistas-por-metas-de-fidelidade',
+        status: 'published',
+        category: 'Gestão de equipe',
+        title: 'Como premiar frentistas por metas de fidelidade e melhorar a cultura interna',
+        summary: 'Use rankings de frentistas, metas por turno, clientes cadastrados, abastecimentos validados e bonificação por desempenho.',
+        content: 'Quando a equipe entende a meta, o programa de fidelidade ganha tração. Rankings por frentista, metas por turno e bonificações por clientes cadastrados ajudam a transformar o atendimento em crescimento recorrente.'
+      }
+    ];
+
+    function getStoredPosts() {
+      try {
+        return JSON.parse(localStorage.getItem('postocash_posts') || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function renderPosts() {
+      const grid = document.getElementById('posts-grid');
+      const posts = [...getStoredPosts(), ...seedPosts].filter(post => post.status === 'published');
+
+      if (!posts.length) {
+        grid.innerHTML = '<div class="card rounded-2xl p-6 md:col-span-2 lg:col-span-3"><p class="text-stone-600">Nenhum conteúdo publicado ainda.</p></div>';
+        return;
+      }
+
+      grid.innerHTML = posts.map(post => `
+        <a href="post.html?slug=${encodeURIComponent(post.slug)}" class="card group block rounded-2xl p-6 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-stone-900/10">
+          <span class="text-[10px] font-mono uppercase tracking-widest text-orange-600">${post.category || 'Conteúdo'}</span>
+          <h3 class="mt-4 font-display text-2xl font-semibold transition group-hover:text-orange-600">${post.title}</h3>
+          <p class="mt-4 text-sm leading-relaxed text-stone-600">${post.summary || ''}</p>
+          <span class="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-stone-900">
+            Ler conteúdo completo
+            <iconify-icon icon="solar:arrow-right-linear"></iconify-icon>
+          </span>
+        </a>
+      `).join('');
+    }
+
+    renderPosts();
+
+    const demoModal = document.getElementById('demo-modal');
+    const demoForm = document.getElementById('demo-form');
+    const demoEmail = 'tgr.tecno@gmail.com';
+
+    function trackEvent(eventName, params = {}) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: eventName,
+        ...params
+      });
+    }
+
+    function openDemoModal(event) {
+      if (event) event.preventDefault();
+      trackEvent('lead_form_open', {
+        form_name: 'agendar_demonstracao',
+        trigger_text: event?.currentTarget?.innerText?.trim() || 'unknown'
+      });
+      demoModal.classList.remove('hidden');
+      demoModal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      const firstInput = demoModal.querySelector('input');
+      if (firstInput) setTimeout(() => firstInput.focus(), 80);
+    }
+
+    function closeDemoModal() {
+      demoModal.classList.add('hidden');
+      demoModal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('[data-demo-open]').forEach(link => link.addEventListener('click', openDemoModal));
+    document.querySelectorAll('[data-demo-close], [data-demo-backdrop]').forEach(el => {
+      el.addEventListener('click', () => {
+        trackEvent('lead_form_close', { form_name: 'agendar_demonstracao' });
+        closeDemoModal();
+      });
+    });
+    document.querySelectorAll('[data-system-login]').forEach(link => {
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        trackEvent('system_area_click', { link_text: 'Área do Posto' });
+        alert('A Área do Posto será conectada ao sistema administrativo em breve.');
+      });
+    });
+    document.querySelectorAll('a[href^="https://wa.me/"]').forEach(link => {
+      link.addEventListener('click', () => {
+        trackEvent('whatsapp_click', {
+          link_text: link.innerText.trim() || 'WhatsApp',
+          destination: link.href
+        });
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !demoModal.classList.contains('hidden')) closeDemoModal();
+    });
+
+    if (demoForm) {
+      demoForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(demoForm);
+        const message = [
+          'Olá, quero agendar uma demonstração do PostoCash.',
+          '',
+          `Nome: ${data.get('nome') || ''}`,
+          `Telefone / WhatsApp: ${data.get('telefone') || ''}`,
+          `Posto: ${data.get('posto') || ''}`,
+          `Interesse: ${data.get('interesse') || ''}`
+        ].join('\n');
+        const subject = encodeURIComponent('Agendar demonstração PostoCash');
+        const body = encodeURIComponent(message);
+        trackEvent('lead_form_submit', {
+          form_name: 'agendar_demonstracao',
+          destination: demoEmail,
+          interest: data.get('interesse') || ''
+        });
+        window.location.href = `mailto:${demoEmail}?subject=${subject}&body=${body}`;
+      });
+    }
+  </script>
+</body>
+</html>
+

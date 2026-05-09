@@ -12,6 +12,7 @@ import Clientes from './pages/Clientes.jsx';
 import Relatorios from './pages/Relatorios.jsx';
 import ConfiguracoesCashback from './pages/ConfiguracoesCashback.jsx';
 import ConfiguracoesPosto from './pages/ConfiguracoesPosto.jsx';
+import Ranking from './pages/Ranking.jsx';
 import ToastContainer from './components/ui/Toast.jsx';
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/relatorios"              element={<Relatorios />} />
           <Route path="/configuracoes-cashback"  element={<ConfiguracoesCashback />} />
           <Route path="/configuracoes-posto"     element={<ConfiguracoesPosto />} />
+          <Route path="/ranking"                 element={<Ranking />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

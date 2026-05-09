@@ -1,6 +1,6 @@
 ﻿import '../global.css';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { AppConfigProvider } from '../src/context/AppConfigContext';
 import { NetworkProvider } from '../src/context/NetworkContext';
 import OfflineBanner from '../src/components/OfflineBanner';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
+import DynamicSplash from './splash';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,13 +45,14 @@ async function persistEstablishmentId(id: string | null) {
 
 function AppShell() {
   const hydrate = useAuthStore((s) => s.hydrate);
+  const [splashDone, setSplashDone] = useState(false);
   usePushNotifications();
 
+  // Auth hydration and deep-link capture run in parallel with the splash
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
-  // Capture establishment ID from deep link on cold start and foreground opens
   useEffect(() => {
     Linking.getInitialURL().then((url) => {
       const id = parseEstablishmentId(url);
@@ -65,11 +67,16 @@ function AppShell() {
     return () => subscription.remove();
   }, []);
 
+  if (!splashDone) {
+    return <DynamicSplash onComplete={() => setSplashDone(true)} />;
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <StatusBar style="light" backgroundColor="#1e3a5f" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="splash" />
         <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />

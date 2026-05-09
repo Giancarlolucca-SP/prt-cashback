@@ -34,7 +34,7 @@ async function login(email, password) {
       establishmentId: operator.establishmentId,
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+    { expiresIn: process.env.JWT_OPERATOR_EXPIRES_IN || '8h' }
   );
 
   await audit.log({
@@ -42,7 +42,7 @@ async function login(email, password) {
     entity: 'Operator',
     entityId: operator.id,
     operatorId: operator.id,
-    metadata: { email },
+    metadata: { operatorId: operator.id },
   });
 
   const est = operator.establishment;
@@ -58,13 +58,17 @@ async function login(email, password) {
       cargo:            operator.role,
       estabelecimentoId: operator.establishmentId,
       estabelecimento:  est.name,
-      logoUrl:          est.logoUrl  || null,
+      logoUrl:          est.logoUrl      || null,
+      primaryColor:     est.primaryColor   ?? '#FF6B00',
+      secondaryColor:   est.secondaryColor ?? '#1e293b',
       cashbackPercent:  parseFloat(est.cashbackPercent),
     },
     estabelecimento: {
       id:              est.id,
       nome:            est.name,
-      logoUrl:         est.logoUrl  || null,
+      logoUrl:         est.logoUrl      || null,
+      primaryColor:    est.primaryColor   ?? '#FF6B00',
+      secondaryColor:  est.secondaryColor ?? '#1e293b',
       cashbackPercent: parseFloat(est.cashbackPercent),
     },
   };

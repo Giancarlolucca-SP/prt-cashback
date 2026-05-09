@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import Input from '../../src/components/ui/Input';
 import Button from '../../src/components/ui/Button';
 import { maskCpfInput, isValidCpf, maskPhone } from '../../src/utils/formatters';
 import { useAppConfig } from '../../src/context/AppConfigContext';
+import { useBranding } from '../../src/hooks/useBranding';
 import { api } from '../../src/api/client';
 
 const PRESELECTED_EST_KEY = 'postocash_preselected_establishment';
@@ -38,6 +39,7 @@ function phoneError(phone: string, touched: boolean): string | undefined {
 
 export default function RegisterScreen() {
   const { config } = useAppConfig();
+  const { primaryColor } = useBranding();
 
   const [nome,  setNome]  = useState('');
   const [cpf,   setCpf]   = useState('');
@@ -49,17 +51,15 @@ export default function RegisterScreen() {
   const [preselected,        setPreselected]        = useState<EstablishmentPreview | null>(null);
   const [loadingPreselected, setLoadingPreselected] = useState(true);
 
-  // Check SecureStore for pre-selected establishment from deep link
   useEffect(() => {
     async function checkPreselected() {
       try {
         const id = await SecureStore.getItemAsync(PRESELECTED_EST_KEY);
         if (!id) return;
-
         const { data } = await api.get<EstablishmentPreview>(`/app/establishment/${id}/qrcode-data`);
         setPreselected(data);
       } catch {
-        // No pre-selected establishment or network error — fall back to config.cnpj
+        // No pre-selected establishment or network error
       } finally {
         setLoadingPreselected(false);
       }
@@ -89,7 +89,6 @@ export default function RegisterScreen() {
       return;
     }
 
-    // findEstablishment() on the backend accepts both UUID and CNPJ in the same field
     const cnpj = preselected?.establishmentId ?? config.cnpj ?? '';
 
     router.push({
@@ -105,35 +104,52 @@ export default function RegisterScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          className="px-6 pt-6"
+          style={{ paddingHorizontal: 24, paddingTop: 24 }}
         >
-          <Text className="text-primary-700 text-2xl font-bold mb-1">Criar conta</Text>
-          <Text className="text-slate-500 text-sm mb-6 leading-5">
+          <Text style={{ color: primaryColor, fontSize: 22, fontWeight: '700', marginBottom: 4 }}>Criar conta</Text>
+          <Text style={{ color: '#64748b', fontSize: 14, marginBottom: 24, lineHeight: 20 }}>
             Preencha seus dados para começar a acumular cashback no posto.
           </Text>
 
           {/* Pre-selected establishment card (from QR Code deep link) */}
           {!loadingPreselected && preselected && (
-            <View className="mb-5 bg-blue-50 border border-blue-200 rounded-2xl p-4">
-              <Text className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">
-                Posto selecionado
-              </Text>
-              <Text className="text-base font-bold text-blue-900">{preselected.name}</Text>
-              {preselected.city ? (
-                <Text className="text-sm text-blue-700 mt-0.5">{preselected.city}</Text>
-              ) : null}
-              <Text className="text-sm text-blue-700 mt-1">
-                Cashback:{' '}
-                <Text className="font-bold">{preselected.cashbackPercent}%</Text> por abastecimento
+            <View style={{
+              marginBottom: 20, backgroundColor: '#eff6ff',
+              borderWidth: 1, borderColor: '#bfdbfe',
+              borderRadius: 16, padding: 16,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                {preselected.logoUrl ? (
+                  <Image
+                    source={{ uri: preselected.logoUrl }}
+                    style={{ width: 40, height: 40, borderRadius: 8, resizeMode: 'contain' }}
+                  />
+                ) : (
+                  <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 20 }}>⛽</Text>
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                    Posto selecionado
+                  </Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#1e3a8a' }}>{preselected.name}</Text>
+                  {preselected.city ? (
+                    <Text style={{ fontSize: 13, color: '#1d4ed8', marginTop: 1 }}>{preselected.city}</Text>
+                  ) : null}
+                </View>
+              </View>
+              <Text style={{ fontSize: 13, color: '#1d4ed8' }}>
+                Cashback: <Text style={{ fontWeight: '700' }}>{preselected.cashbackPercent}%</Text> por abastecimento
               </Text>
             </View>
           )}
@@ -179,7 +195,7 @@ export default function RegisterScreen() {
             fullWidth
             disabled={!isFormValid}
             onPress={handleSubmit}
-            style={{ marginTop: 24, marginBottom: 40 }}
+            style={{ marginTop: 24, marginBottom: 40, backgroundColor: isFormValid ? primaryColor : undefined }}
           />
         </ScrollView>
       </KeyboardAvoidingView>

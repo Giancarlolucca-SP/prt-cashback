@@ -39,8 +39,6 @@ function signCustomerToken({ customerId, cpf, name, establishmentId }) {
 
 async function findEstablishment(cnpjOrId) {
   const clean = String(cnpjOrId || '').replace(/\D/g, '');
-  console.log('[REGISTER] Buscando estabelecimento:', { original: cnpjOrId, clean });
-
   const establishment = await prisma.establishment.findFirst({
     where: {
       OR: [
@@ -50,13 +48,7 @@ async function findEstablishment(cnpjOrId) {
     },
   });
 
-  console.log('[REGISTER] Encontrado:', establishment?.name ?? 'NÃO ENCONTRADO');
-
   if (!establishment) {
-    const all = await prisma.establishment.findMany({
-      select: { id: true, name: true, cnpj: true },
-    });
-    console.log('[REGISTER] Todos estabelecimentos:', JSON.stringify(all));
     throw createError('Estabelecimento não encontrado.', 404);
   }
 
@@ -299,49 +291,61 @@ async function validateRedemption({ code, latitude, longitude }) {
     throw createError('Este código já foi utilizado. Tentativa de uso duplicado registrada.', 400);
   }
 
+  // Remove from pending map immediately (single-threaded Node.js guard against
+  // concurrent requests carrying the same code to both pass the pending.get check)
   const entry = pending.get(code);
   if (!entry) throw createError('Código inválido ou expirado.', 400);
+  pending.del(code);
+  pending.markUsed(code);
 
   const { customerId, cpf, name, establishmentId, amount } = entry;
 
-  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
-  if (!customer) throw createError('Cliente não encontrado.', 404);
-
-  const balance = parseFloat(customer.balance);
-  if (amount > balance) {
-    pending.del(code);
-    throw createError(`Saldo insuficiente no momento da validação.`, 400);
-  }
-
   const operator = await findSystemOperator(establishmentId);
 
-  // Process redemption
-  const [redemption] = await prisma.$transaction([
-    prisma.redemption.create({
-      data: {
-        customerId,
-        operatorId:     operator.id,
-        establishmentId,
-        amountUsed:     amount,
-        receiptCode:    generateReceiptCode('RDM'),
-      },
-    }),
-    prisma.customer.update({
-      where: { id: customerId },
-      data:  { balance: { decrement: amount } },
-    }),
-  ]);
+  // Atomic redemption: SELECT FOR UPDATE locks the customer row so concurrent
+  // validations cannot both pass the balance check before either commits.
+  let redemption;
+  try {
+    redemption = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw`
+        SELECT balance FROM "Customer" WHERE id = ${customerId} FOR UPDATE
+      `;
+      if (!locked.length) throw createError('Cliente não encontrado.', 404);
+
+      const balance = parseFloat(locked[0].balance);
+      if (amount > balance) {
+        throw createError('Saldo insuficiente no momento da validação.', 400);
+      }
+
+      const rdm = await tx.redemption.create({
+        data: {
+          customerId,
+          operatorId:     operator.id,
+          establishmentId,
+          amountUsed:     amount,
+          receiptCode:    generateReceiptCode('RDM'),
+        },
+      });
+
+      await tx.customer.update({
+        where: { id: customerId },
+        data:  { balance: { decrement: amount } },
+      });
+
+      return rdm;
+    });
+  } catch (err) {
+    // Re-throw operational errors (insufficient balance, etc.) as-is
+    throw err;
+  }
 
   await audit.log({
     action:    'CASHBACK_REDEEMED_MOBILE',
     entity:    'Redemption',
     entityId:  redemption.id,
     operatorId: operator.id,
-    metadata:  { customerId, cpf, amount, code, establishmentId },
+    metadata:  { customerId, amount, code, establishmentId },
   });
-
-  pending.del(code);
-  pending.markUsed(code);
 
   // Fire push notification (non-blocking)
   notify.notifyRedemptionConfirmed(customerId, { amount }).catch(() => {});
@@ -523,7 +527,7 @@ async function getConfig(customerPayload) {
   if (!establishmentId) {
     // For single-establishment deployments, return the first establishment's public data
     const est = await prisma.establishment.findFirst({
-      select: { cnpj: true, name: true, cashbackPercent: true, minRedemption: true, phone: true },
+      select: { cnpj: true, name: true, cashbackPercent: true, minRedemption: true, phone: true, logoUrl: true, primaryColor: true, secondaryColor: true },
     });
     if (!est) return defaults;
     return {
@@ -533,13 +537,16 @@ async function getConfig(customerPayload) {
       minRedemption:   est.minRedemption ? parseFloat(est.minRedemption) : defaults.minRedemption,
       supportWhatsApp: est.phone ?? '',
       cnpj:            est.cnpj,
+      logoUrl:         est.logoUrl ?? null,
+      primaryColor:    est.primaryColor ?? defaults.primaryColor,
+      secondaryColor:  est.secondaryColor ?? defaults.secondaryColor,
     };
   }
 
   const [establishment, settings] = await Promise.all([
     prisma.establishment.findUnique({
       where:  { id: establishmentId },
-      select: { cnpj: true, name: true, phone: true, cashbackPercent: true, minRedemption: true },
+      select: { cnpj: true, name: true, phone: true, cashbackPercent: true, minRedemption: true, logoUrl: true, primaryColor: true, secondaryColor: true },
     }),
     prisma.cashbackSettings.findUnique({
       where:  { establishmentId },
@@ -560,6 +567,9 @@ async function getConfig(customerPayload) {
       : defaults.minRedemption,
     supportWhatsApp: establishment.phone ?? '',
     cnpj:            establishment.cnpj,
+    logoUrl:         establishment.logoUrl ?? null,
+    primaryColor:    establishment.primaryColor ?? defaults.primaryColor,
+    secondaryColor:  establishment.secondaryColor ?? defaults.secondaryColor,
   };
 }
 
@@ -671,7 +681,7 @@ async function recoveryComplete({ cpf, establishmentCnpj, deviceId, selfieBase64
     action:   'ACCOUNT_RECOVERED',
     entity:   'Customer',
     entityId: customer.id,
-    metadata: { deviceId, cpf: strippedCpf },
+    metadata: { deviceId },
   });
 
   return {

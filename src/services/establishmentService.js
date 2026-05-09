@@ -184,4 +184,95 @@ async function generateQRCodeBuffer(establishmentId) {
   return { buffer, name: est.name, url };
 }
 
-module.exports = { create, listAll, uploadLogo, getPublicData, generateQRCodeBuffer };
+const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
+
+async function updateBranding(establishmentId, { primaryColor, secondaryColor }, operatorId) {
+  const est = await prisma.establishment.findUnique({ where: { id: establishmentId } });
+  if (!est) throw createError('Estabelecimento não encontrado.', 404);
+
+  if (primaryColor   && !HEX_COLOR.test(primaryColor))   throw createError('Cor primária inválida. Use formato #RRGGBB.', 400);
+  if (secondaryColor && !HEX_COLOR.test(secondaryColor)) throw createError('Cor secundária inválida. Use formato #RRGGBB.', 400);
+
+  const data = {};
+  if (primaryColor)   data.primaryColor   = primaryColor;
+  if (secondaryColor) data.secondaryColor = secondaryColor;
+
+  const updated = await prisma.establishment.update({ where: { id: establishmentId }, data });
+
+  await audit.log({
+    action:    'BRANDING_UPDATED',
+    entity:    'Establishment',
+    entityId:  establishmentId,
+    operatorId,
+    metadata:  data,
+  });
+
+  return {
+    mensagem:      'Identidade visual atualizada com sucesso.',
+    primaryColor:  updated.primaryColor,
+    secondaryColor: updated.secondaryColor,
+  };
+}
+
+async function createFromStripe({
+  nome, cnpj, telefone,
+  operatorName, operatorEmail, operatorPassword,
+  stripeCustomerId, stripeSubscriptionId,
+}) {
+  if (!nome?.trim())         throw createError('Nome do estabelecimento é obrigatório.', 400);
+  if (!operatorEmail?.trim()) throw createError('E-mail do operador é obrigatório.', 400);
+
+  const cleanCnpj  = String(cnpj).replace(/\D/g, '');
+  if (cleanCnpj.length !== 14) throw createError('CNPJ inválido.', 400);
+
+  const cleanEmail = operatorEmail.trim().toLowerCase();
+
+  const [existingEst, existingOp] = await Promise.all([
+    prisma.establishment.findUnique({ where: { cnpj: cleanCnpj } }),
+    prisma.operator.findUnique({ where: { email: cleanEmail } }),
+  ]);
+
+  if (existingEst) throw createError('CNPJ já cadastrado.', 409);
+  if (existingOp)  throw createError('E-mail do operador já cadastrado.', 409);
+
+  const hashedPassword = await bcrypt.hash(operatorPassword, 10);
+
+  const { est, op } = await prisma.$transaction(async (tx) => {
+    const est = await tx.establishment.create({
+      data: {
+        name:                 nome.trim(),
+        cnpj:                 cleanCnpj,
+        cashbackPercent:      5,
+        phone:                telefone?.trim() || null,
+        stripeCustomerId,
+        stripeSubscriptionId,
+        subscriptionStatus:   'ACTIVE',
+      },
+    });
+
+    const op = await tx.operator.create({
+      data: {
+        name:            (operatorName || nome).trim(),
+        email:           cleanEmail,
+        password:        hashedPassword,
+        role:            'ADMIN',
+        establishmentId: est.id,
+      },
+    });
+
+    await tx.fraudSettings.create({ data: { establishmentId: est.id } });
+
+    return { est, op };
+  });
+
+  await audit.log({
+    action:   'ESTABLISHMENT_CREATED_STRIPE',
+    entity:   'Establishment',
+    entityId: est.id,
+    metadata: { cnpj: cleanCnpj, operatorEmail: cleanEmail, stripeSubscriptionId },
+  });
+
+  return { est, op };
+}
+
+module.exports = { create, createFromStripe, listAll, uploadLogo, updateBranding, getPublicData, generateQRCodeBuffer };

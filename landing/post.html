@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conteúdo PostoCash</title>
+  <meta name="description" content="Artigo completo da central de conteúdos PostoCash sobre fidelização, cashback, antifraude e gestão para postos." />
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            display: ['Space Grotesk', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#f4f2ed] font-sans text-stone-900">
+  <header class="border-b border-stone-200 bg-white/85 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+      <a href="blog.html"><img src="assets/logo-minimal.svg" alt="Logo PostoCash do blog de fidelidade e cashback para postos" class="h-9 w-auto" decoding="async" /></a>
+      <a href="login.html" class="text-[11px] font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900">Área do Posto</a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-6 py-14">
+    <a href="blog.html" class="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-stone-500 transition hover:text-stone-900">
+      <iconify-icon icon="solar:arrow-left-linear"></iconify-icon>
+      Voltar para conteúdos
+    </a>
+
+    <article id="post-container" class="rounded-3xl border border-stone-200 bg-white p-8 shadow-xl shadow-stone-200/60 md:p-12"></article>
+  </main>
+
+  <a href="https://wa.me/5511985498727?text=Ol%C3%A1%2C%20li%20um%20conte%C3%BAdo%20do%20PostoCash%20e%20quero%20agendar%20uma%20demonstra%C3%A7%C3%A3o."
+     target="_blank" rel="noopener"
+     class="fixed bottom-5 right-5 z-[80] flex items-center gap-3 rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white shadow-2xl shadow-emerald-900/30 transition hover:-translate-y-1 hover:bg-[#1ebe5d]">
+    <iconify-icon icon="ic:baseline-whatsapp" class="text-2xl"></iconify-icon>
+    <span class="hidden sm:inline">Falar no WhatsApp</span>
+  </a>
+
+  <script>
+    const seedPosts = [
+      {
+        slug: 'sistema-de-fidelizacao-para-postos',
+        status: 'published',
+        category: 'Fidelização',
+        title: 'Sistema de fidelização para postos de combustíveis: o que medir antes de contratar',
+        summary: 'Entenda recorrência, ticket médio, frequência de abastecimento, cashback automático, campanhas e relatórios para tomada de decisão.',
+        content: 'Um bom sistema de fidelização para postos precisa ir além do cadastro de clientes. O gestor deve acompanhar frequência de abastecimento, ticket médio, campanhas enviadas, retorno por frentista e saldo de cashback gerado.\n\nCom esses indicadores, o posto deixa de depender apenas de preço e começa a criar relacionamento com quem já abastece na região.\n\nAntes de contratar uma solução, avalie se ela permite campanhas no celular, relatórios de retorno, antifraude e acompanhamento de metas por equipe.'
+      },
+      {
+        slug: 'software-de-cashback-para-postos',
+        status: 'published',
+        category: 'Cashback',
+        title: 'Software de cashback para postos: como transformar saldo em retorno real',
+        summary: 'Como mensagens no celular, app personalizado e resgate simples reduzem esquecimento e trazem o cliente de volta.',
+        content: 'Cashback só gera resultado quando o cliente lembra que tem saldo e entende onde pode usar.\n\nPor isso, campanhas por WhatsApp, notificações no app e regras simples de resgate ajudam a transformar o benefício em uma nova visita ao posto.\n\nO objetivo não é apenas distribuir desconto, mas criar um motivo concreto para o cliente voltar.'
+      },
+      {
+        slug: 'como-evitar-fraudes-no-cashback-do-posto',
+        status: 'published',
+        category: 'Antifraude',
+        title: 'Como evitar fraudes no cashback do posto sem travar a operação',
+        summary: 'QR Code, cupom fiscal, biometria facial, limites por CPF, auditoria e logs de resgate no programa de fidelidade.',
+        content: 'O antifraude precisa proteger o caixa sem atrapalhar o atendimento.\n\nUma operação madura combina validação de cupom fiscal, CPF, limites por cliente, registro de resgates, biometria facial em operações sensíveis e relatórios para auditoria.\n\nAssim, o posto mantém a experiência rápida e reduz tentativas de abuso no cashback.'
+      },
+      {
+        slug: 'como-premiar-frentistas-por-metas-de-fidelidade',
+        status: 'published',
+        category: 'Gestão de equipe',
+        title: 'Como premiar frentistas por metas de fidelidade e melhorar a cultura interna',
+        summary: 'Use rankings de frentistas, metas por turno, clientes cadastrados, abastecimentos validados e bonificação por desempenho.',
+        content: 'Quando a equipe entende a meta, o programa de fidelidade ganha tração.\n\nRankings por frentista, metas por turno e bonificações por clientes cadastrados ajudam a transformar o atendimento em crescimento recorrente.\n\nO dono do posto passa a enxergar quem está ativando clientes e qual turno precisa de apoio.'
+      }
+    ];
+
+    function getStoredPosts() {
+      try {
+        return JSON.parse(localStorage.getItem('postocash_posts') || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    const slug = new URLSearchParams(window.location.search).get('slug');
+    const post = [...getStoredPosts(), ...seedPosts].find(item => item.slug === slug && item.status === 'published');
+    const container = document.getElementById('post-container');
+
+    if (!post) {
+      document.title = 'Conteúdo não encontrado — PostoCash';
+      container.innerHTML = `
+        <p class="mb-3 text-[11px] font-mono uppercase tracking-widest text-red-600">Conteúdo não encontrado</p>
+        <h1 class="font-display text-4xl font-semibold tracking-tight">Este artigo não está disponível.</h1>
+        <p class="mt-4 text-stone-500">Ele pode estar como rascunho ou ter sido removido da central.</p>
+      `;
+    } else {
+      document.title = `${post.title} — PostoCash`;
+      const paragraphs = String(post.content || '')
+        .split(/\n{2,}/)
+        .map(paragraph => `<p class="mt-6 text-lg leading-relaxed text-stone-600">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+        .join('');
+
+      container.innerHTML = `
+        <span class="rounded-full bg-orange-50 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-orange-700">${escapeHtml(post.category || 'Conteúdo')}</span>
+        <h1 class="mt-6 font-display text-4xl font-semibold leading-tight tracking-tight md:text-6xl">${escapeHtml(post.title)}</h1>
+        <p class="mt-6 max-w-3xl text-xl leading-relaxed text-stone-500">${escapeHtml(post.summary || '')}</p>
+        <div class="my-10 h-px bg-stone-200"></div>
+        <div>${paragraphs}</div>
+        <div class="mt-12 rounded-2xl bg-stone-900 p-6 text-white">
+          <h2 class="font-display text-2xl font-semibold">Quer aplicar isso no seu posto?</h2>
+          <p class="mt-3 text-sm leading-relaxed text-white/65">O PostoCash combina cashback, campanhas no celular, gestão de frentistas e antifraude para aumentar recorrência.</p>
+          <a href="https://wa.me/5511985498727?text=${encodeURIComponent(`Olá, li o artigo "${post.title}" e quero agendar uma demonstração do PostoCash.`)}" target="_blank" rel="noopener" class="mt-5 inline-flex rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white">Agendar pelo WhatsApp</a>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

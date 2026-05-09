@@ -16,6 +16,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { customerApi, isTokenExpired } from '../../src/api/client';
 import { useAuthStore } from '../../src/store/auth';
 import Button from '../../src/components/ui/Button';
+import { useBranding } from '../../src/hooks/useBranding';
 
 // ── Result types ───────────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export default function ValidarScreen() {
 
   const queryClient = useQueryClient();
   const logout      = useAuthStore((s) => s.logout);
+  const { primaryColor, secondaryColor } = useBranding();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning,        setScanning]       = useState(false);
@@ -398,7 +400,7 @@ function handleSendPhoto() {
               onPress={() => setPhotoStep('capture')}
               activeOpacity={0.85}
               style={{
-                backgroundColor: '#1e3a5f', borderRadius: 16,
+                backgroundColor: secondaryColor, borderRadius: 16,
                 padding: 16, alignItems: 'center',
                 flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 12,
               }}
@@ -509,7 +511,7 @@ function handleSendPhoto() {
             onPress={handleSendPhoto}
             activeOpacity={0.85}
             style={{
-              backgroundColor: '#1e3a5f', borderRadius: 16,
+              backgroundColor: secondaryColor, borderRadius: 16,
               padding: 16, alignItems: 'center',
               flexDirection: 'row', justifyContent: 'center', gap: 10,
             }}
@@ -687,8 +689,8 @@ function handleSendPhoto() {
       >
         {/* Header */}
         <View style={{ alignItems: 'center', marginBottom: 36 }}>
-          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#1e3a5f', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-            <Ionicons name="receipt-outline" size={36} color="#F59E0B" />
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: secondaryColor, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="receipt-outline" size={36} color={primaryColor} />
           </View>
           <Text style={{ color: '#1e293b', fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: 6 }}>
             Validar Cupom Fiscal
@@ -703,7 +705,7 @@ function handleSendPhoto() {
           onPress={() => setScanning(true)}
           activeOpacity={0.85}
           style={{
-            backgroundColor: '#1e3a5f',
+            backgroundColor: secondaryColor,
             borderRadius: 20, padding: 24, marginBottom: 14,
             flexDirection: 'row', alignItems: 'center', gap: 18,
           }}

@@ -4,7 +4,7 @@ const { formatDateBR } = require('../utils/dateFormatter');
 const { formatCpf, maskCpf, maskName } = require('../utils/cpfValidator');
 const { createError } = require('../middlewares/errorMiddleware');
 const audit = require('./auditService');
-const whatsappService = require('./whatsappService');
+const messageQueueService = require('./messageQueueService');
 
 const prisma = new PrismaClient();
 
@@ -172,7 +172,6 @@ async function create({ name, filterType, filterPeriod, rewardType, rewardValue,
         operatorId,
         metadata: {
           customerId: c.id,
-          cpf: c.cpf,
           rewardType,
           rewardValue: parsedValue,
           campaignId: campaign.id,
@@ -182,27 +181,25 @@ async function create({ name, filterType, filterPeriod, rewardType, rewardValue,
     )
   );
 
-  // Envia mensagens WhatsApp — não bloqueia em caso de falha total
-  console.log('[CAMPANHA] Enviando mensagens WhatsApp...');
-  const whatsappResults = await whatsappService.sendCampaignMessages(
-    customers,
-    {
-      establishmentName: establishment?.name ?? '',
-      message:           message.trim(),
-      rewardType,
-      rewardValue:       parsedValue,
-    }
-  );
+  // Enqueue WhatsApp messages — controlled delivery at 3–6 s intervals
+  const queueMessages = customers.map((c) => ({
+    establishmentId,
+    campaignId:   campaign.id,
+    customerId:   c.id,
+    phone:        c.phone,
+    name:         c.name,
+    message:      message.trim(),
+    priority:     0,
+  }));
 
-  const whatsappEnviados = whatsappResults.filter((r) => r.success).length;
-  const whatsappFalhas   = whatsappResults.filter((r) => !r.success).length;
-  console.log(`[CAMPANHA] WhatsApp: ${whatsappEnviados} enviados, ${whatsappFalhas} falhas`);
+  const queueResult = await messageQueueService.addToQueue(queueMessages);
+  console.log(`[CAMPANHA] ${queueResult.queued} mensagens adicionadas à fila. Previsão: ${queueResult.previsao}`);
 
   return {
-    mensagem: 'Campanha enviada com sucesso!',
+    mensagem: 'Campanha criada! As mensagens serão enviadas em breve.',
     clientesAtingidos: customers.length,
-    whatsappEnviados,
-    whatsappFalhas,
+    mensagensNaFila:   queueResult.queued,
+    previsaoEnvio:     queueResult.previsao,
     campanha: {
       id: campaign.id,
       totalClientes: customers.length,

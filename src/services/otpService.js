@@ -31,8 +31,8 @@ function send(phone, establishmentId) {
   store.set(storeKey(phone, establishmentId), { code, expiresAt });
 
   // In production: call SMS provider here
-  // For now just log so devs can test
-  console.log(`[OTP] ${phone} @ ${establishmentId} → ${code}  (valid 5 min)`);
+  const maskedPhone = phone ? `${phone.slice(0, 2)}****${phone.slice(-2)}` : '?';
+  console.log(`[OTP] Código gerado para ${maskedPhone} @ ${establishmentId} (válido 5 min)`);
 
   return code; // returned so the API can include it in dev response
 }
