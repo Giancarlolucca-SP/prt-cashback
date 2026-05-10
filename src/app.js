@@ -49,6 +49,8 @@ const isProd = process.env.NODE_ENV === 'production';
 const allowedOrigins = [
   'https://app.postocash.com.br',
   'https://www.postocash.com.br',
+  'https://www.sistemapostocash.app',
+  'https://sistemapostocash.app',
   process.env.FRONTEND_URL,
   // Allow localhost only outside production
   ...(!isProd ? ['http://localhost:5173', 'http://localhost:3000'] : []),

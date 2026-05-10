@@ -2,7 +2,7 @@ services:
   - type: web
     name: postocash-api
     env: node
-    buildCommand: npm install && npx prisma generate
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy
     startCommand: node src/server.js
     envVars:
       - key: NODE_ENV
@@ -26,4 +26,18 @@ services:
       - key: STATION_NAME
         value: PostoCash
       - key: FRONTEND_URL
+        sync: false
+      - key: EVOLUTION_API_URL
+        sync: false
+      - key: EVOLUTION_API_KEY
+        sync: false
+      - key: EVOLUTION_INSTANCE
+        sync: false
+      - key: WHATSAPP_PROVIDER
+        value: evolution
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
         sync: false
