@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-// In production (Vercel) VITE_API_URL points to Render backend.
-// In development the Vite proxy rewrites /api → localhost:3000, so we keep '/api'.
-const API_URL = import.meta.env.VITE_API_URL || null;
+// In production VITE_API_URL points to Render backend.
+// In development the Vite proxy rewrites /api → localhost:3000.
+const API_URL = import.meta.env.VITE_API_URL || 'https://postocash-api.onrender.com';
 
 const api = axios.create({
-  baseURL: API_URL ?? '/api',
+  baseURL: API_URL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
