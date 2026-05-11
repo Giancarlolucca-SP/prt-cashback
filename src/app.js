@@ -47,13 +47,15 @@ app.use(helmet({
 const isProd = process.env.NODE_ENV === 'production';
 
 const allowedOrigins = [
-  'https://app.postocash.com.br',
-  'https://www.postocash.com.br',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://app.sistemapostocash.app',
   'https://www.sistemapostocash.app',
   'https://sistemapostocash.app',
+  'https://app.postocash.com.br',
+  'https://www.postocash.com.br',
+  'https://prt-cashback.vercel.app',
   process.env.FRONTEND_URL,
-  // Allow localhost only outside production
-  ...(!isProd ? ['http://localhost:5173', 'http://localhost:3000'] : []),
 ].filter(Boolean);
 
 app.use(cors({
