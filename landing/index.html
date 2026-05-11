@@ -650,7 +650,7 @@
                 <iconify-icon icon="solar:arrow-right-linear" class="text-base group-hover:translate-x-1 transition-transform"></iconify-icon>
               </span>
             </a>
-            <button type="button" onclick="handleCheckout(event)" class="group relative px-7 py-4 bg-[#FF6B00] text-white overflow-hidden rounded-sm transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0">
+            <button type="button" onclick="openRegisterModal(event)" class="group relative px-7 py-4 bg-[#FF6B00] text-white overflow-hidden rounded-sm transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0">
               <div class="absolute inset-0 w-full h-full bg-[#e76000] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
               <span class="relative z-10 font-mono text-[11px] uppercase tracking-widest flex items-center gap-2">
                 Assinar — R$ 200/mês
@@ -1314,7 +1314,7 @@
               <div class="flex items-center gap-2"><iconify-icon icon="solar:check-circle-bold" class="text-lg text-emerald-500"></iconify-icon> Antifraude operacional</div>
             </div>
 
-            <button type="button" onclick="handleCheckout(event)" class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#FF6B00] px-5 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-950/20 transition hover:-translate-y-0.5 hover:bg-[#e76000] disabled:cursor-not-allowed disabled:opacity-70">
+            <button type="button" onclick="openRegisterModal(event)" class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#FF6B00] px-5 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-950/20 transition hover:-translate-y-0.5 hover:bg-[#e76000] disabled:cursor-not-allowed disabled:opacity-70">
               Assinar e Começar Agora
               <iconify-icon icon="solar:card-transfer-linear" class="text-lg"></iconify-icon>
             </button>
@@ -1878,6 +1878,16 @@
       const el = document.getElementById(`register-step-${step}`);
       if (el) el.classList.remove('hidden');
       setStepDots(step);
+
+      // Reset pay button state when navigating away from payment step
+      const payBtn = document.getElementById('pay-btn');
+      if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.innerHTML = '<iconify-icon icon="solar:lock-password-linear" class="text-lg"></iconify-icon> Ativar minha conta — R$ 200/mês';
+      }
+      const cardErr = document.getElementById('card-error');
+      if (cardErr) { cardErr.textContent = ''; cardErr.classList.add('hidden'); }
+
       if (step === 2) {
         const nameEl = document.getElementById('preview-posto-name');
         if (nameEl && registerFormData.nome) nameEl.textContent = registerFormData.nome;
