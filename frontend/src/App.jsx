@@ -13,6 +13,7 @@ import Relatorios from './pages/Relatorios.jsx';
 import ConfiguracoesCashback from './pages/ConfiguracoesCashback.jsx';
 import ConfiguracoesPosto from './pages/ConfiguracoesPosto.jsx';
 import Ranking from './pages/Ranking.jsx';
+import LogoutPage from './pages/Logout.jsx';
 import ToastContainer from './components/ui/Toast.jsx';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
       <ToastContainer />
       <Routes>
         <Route path="/login"    element={<Login />} />
+        <Route path="/logout"   element={<LogoutPage />} />
         <Route path="/register" element={<NovoEstabelecimento />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/"          element={<Navigate to="/dashboard" replace />} />
