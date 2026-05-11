@@ -569,8 +569,8 @@
           <a href="#produto-app" class="hover:text-stone-900 transition-colors">App Exclusivo</a>
           <a href="#assinar" class="hover:text-stone-900 transition-colors">Preço</a>
           <a href="blog.html" class="hover:text-stone-900 transition-colors">Blog / Sucesso</a>
-          <a href="#area-do-posto" data-system-login class="hover:text-stone-900 transition-colors">Área do Posto</a>
-          <a href="#contato" class="hover:text-stone-900 transition-colors">Contato</a>
+          <a href="https://app.sistemapostocash.app" data-system-login class="hover:text-stone-900 transition-colors">Área do Posto</a>
+          <a href="https://wa.me/5511985498727?text=Ol%C3%A1%21%20Gostaria%20de%20saber%20mais%20sobre%20o%20PostoCash" target="_blank" rel="noopener" class="hover:text-stone-900 transition-colors">Contato</a>
         </nav>
         <a href="#agendar-demonstracao" data-demo-open class="btn-beam px-1 py-1 rounded-full group">
           <div class="btn-beam-content px-5 py-2.5 rounded-full text-[11px] font-mono uppercase tracking-widest transition-colors">
@@ -1753,10 +1753,8 @@
     });
 
     document.querySelectorAll('[data-system-login]').forEach(link => {
-      link.addEventListener('click', event => {
-        event.preventDefault();
+      link.addEventListener('click', () => {
         trackEvent('system_area_click', { link_text: 'Área do Posto' });
-        alert('A Área do Posto será conectada ao sistema administrativo em breve.');
       });
     });
 
