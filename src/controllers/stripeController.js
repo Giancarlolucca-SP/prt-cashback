@@ -10,6 +10,28 @@ function generatePassword() {
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+// POST /stripe/create-checkout-session — PUBLIC
+async function createCheckoutSession(req, res, next) {
+  try {
+    const { priceInCents, successUrl, cancelUrl, metadata, utms } = req.body;
+
+    if (!successUrl?.trim()) throw createError('successUrl é obrigatório.', 400);
+    if (!cancelUrl?.trim())  throw createError('cancelUrl é obrigatório.', 400);
+
+    const result = await stripeService.createCheckoutSession({
+      priceInCents: priceInCents || 20000,
+      successUrl,
+      cancelUrl,
+      metadata,
+      utms,
+    });
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // POST /stripe/create-setup-intent — PUBLIC
 async function createSetupIntent(req, res, next) {
   try {
@@ -70,7 +92,7 @@ async function confirmSubscription(req, res, next) {
         credentials: {
           email:    email.trim(),
           password,
-          adminUrl: process.env.FRONTEND_URL || 'https://app.postocash.com.br',
+          adminUrl: process.env.FRONTEND_URL || 'https://app.sistemapostocash.app',
         },
       });
     }
@@ -127,7 +149,7 @@ async function activateAfterPayment(req, res, next) {
       credentials: {
         email,
         password,
-        adminUrl: process.env.FRONTEND_URL || 'https://app.postocash.com.br',
+        adminUrl: process.env.FRONTEND_URL || 'https://app.sistemapostocash.app',
       },
     });
   } catch (err) {
@@ -268,6 +290,7 @@ async function cancelMySubscription(req, res, next) {
 }
 
 module.exports = {
+  createCheckoutSession,
   createSetupIntent,
   confirmSubscription,
   activateAfterPayment,

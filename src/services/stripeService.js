@@ -70,6 +70,30 @@ async function createSubscription(customerId, priceId, paymentMethodId) {
   };
 }
 
+async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, metadata, utms }) {
+  const session = await getStripe().checkout.sessions.create({
+    payment_method_types: ['card'],
+    mode: 'subscription',
+    line_items: [{
+      price_data: {
+        currency: 'brl',
+        product_data: {
+          name: 'PostoCash Essencial',
+          description: 'Sistema de cashback para postos de combustível',
+        },
+        unit_amount: priceInCents,
+        recurring: { interval: 'month' },
+      },
+      quantity: 1,
+    }],
+    success_url: successUrl,
+    cancel_url:  cancelUrl,
+    metadata:    metadata || {},
+  });
+
+  return { sessionId: session.id };
+}
+
 async function cancelSubscription(subscriptionId) {
   const subscription = await getStripe().subscriptions.update(subscriptionId, {
     cancel_at_period_end: true,
@@ -113,6 +137,7 @@ module.exports = {
   ensurePrice,
   createCustomer,
   createSetupIntent,
+  createCheckoutSession,
   createSubscription,
   cancelSubscription,
   getSubscriptionStatus,

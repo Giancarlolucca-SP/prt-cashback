@@ -2,6 +2,7 @@ const express    = require('express');
 const router     = express.Router();
 const { authenticate } = require('../middlewares/authMiddleware');
 const {
+  createCheckoutSession,
   createSetupIntent,
   confirmSubscription,
   activateAfterPayment,
@@ -10,7 +11,8 @@ const {
 } = require('../controllers/stripeController');
 
 // Public
-router.post('/create-setup-intent',  createSetupIntent);
+router.post('/create-checkout-session', createCheckoutSession);
+router.post('/create-setup-intent',     createSetupIntent);
 router.post('/confirm-subscription', confirmSubscription);
 router.post('/activate',             activateAfterPayment);
 
