@@ -12,7 +12,6 @@ export default function Login() {
   const [error, setError]           = useState('');
   const [loading, setLoading]       = useState(false);
 
-
   useEffect(() => {
     const name = localStorage.getItem('postocash_last_name');
     document.title = name ? `Login — ${name} | PostoCash` : 'Login | PostoCash';
@@ -81,7 +80,7 @@ export default function Login() {
             suffix={
               <button
                 type="button"
-                onClick={togglePassword}
+                onClick={() => setShowPassword((v) => !v)}
                 className="text-gray-400 hover:text-gray-600 focus:outline-none"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
