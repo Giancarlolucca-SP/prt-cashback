@@ -7,7 +7,7 @@ const axios = require('axios');
 const PROVIDER = (process.env.WHATSAPP_PROVIDER || 'z-api').toLowerCase();
 
 // ── Evolution API config ──────────────────────────────────────────────────────
-const EVOLUTION_URL      = process.env.EVOLUTION_API_URL || 'https://postocash-evolution.onrender.com';
+const EVOLUTION_URL      = process.env.EVOLUTION_API_URL || 'https://postocash-evo-api.onrender.com';
 const EVOLUTION_API_KEY  = process.env.EVOLUTION_API_KEY || 'postocash-evo-2026';
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'postocash';
 
