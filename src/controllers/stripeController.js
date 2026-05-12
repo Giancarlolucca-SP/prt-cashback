@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const stripeService = require('../services/stripeService');
 const establishmentService = require('../services/establishmentService');
+const emailService = require('../services/emailService');
 const { createError } = require('../middlewares/errorMiddleware');
 
 const prisma = new PrismaClient();
@@ -87,6 +88,13 @@ async function confirmSubscription(req, res, next) {
 
       console.log(`[STRIPE] Novo estabelecimento criado: ${nome} (${email}) | ${subscriptionId}`);
 
+      emailService.sendWelcomeEmail({
+        name:              (operatorName || nome).trim(),
+        email:             email.trim(),
+        password,
+        establishmentName: nome.trim(),
+      }).catch((err) => console.error('[EMAIL] Falha ao enviar boas-vindas:', err.message));
+
       return res.json({
         success: true,
         credentials: {
@@ -143,6 +151,13 @@ async function activateAfterPayment(req, res, next) {
       stripeCustomerId:    customerId,
       stripeSubscriptionId: subscriptionId,
     });
+
+    emailService.sendWelcomeEmail({
+      name:              (operatorName || nome).trim(),
+      email:             email.trim(),
+      password,
+      establishmentName: nome?.trim() || email.trim(),
+    }).catch((err) => console.error('[EMAIL] Falha ao enviar boas-vindas:', err.message));
 
     return res.json({
       success: true,
