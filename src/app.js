@@ -20,6 +20,7 @@ const appRoutes                 = require('./routes/appRoutes');
 const adminPhotoRoutes          = require('./routes/adminPhotoRoutes');
 const stripeRoutes              = require('./routes/stripeRoutes');
 const rankingRoutes             = require('./routes/rankingRoutes');
+const adminRoutes               = require('./routes/adminRoutes');
 const { webhook: stripeWebhook } = require('./controllers/stripeController');
 
 const app = express();
@@ -110,6 +111,7 @@ app.use('/reports',                reportRoutes);
 app.use('/cashback-settings',      cashbackSettingsRoutes);
 app.use('/app',                    appRoutes);
 app.use('/admin/photo-validations', adminPhotoRoutes);
+app.use('/admin',                  adminRoutes);
 app.use('/stripe',                 stripeRoutes);
 app.use('/ranking',                rankingRoutes);
 
