@@ -1,16 +1,10 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendWelcomeEmail({ name, email, password, establishmentName }) {
-  await transporter.sendMail({
-    from: `"PostoCash" <${process.env.EMAIL_USER}>`,
+  const { error } = await resend.emails.send({
+    from: 'PostoCash <onboarding@resend.dev>',
     to: email,
     subject: '🎉 Bem-vindo ao PostoCash! Sua conta está ativa',
     html: `
@@ -68,6 +62,8 @@ async function sendWelcomeEmail({ name, email, password, establishmentName }) {
       </div>
     `,
   });
+
+  if (error) throw new Error(error.message);
 
   console.log('[EMAIL] Boas-vindas enviado para:', email);
 }
