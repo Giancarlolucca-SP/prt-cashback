@@ -1,19 +1,19 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { ChartBar, CurrencyDollar, User, Megaphone, Lock, Users, ClipboardList, Trophy, Gear, Storefront } from '@phosphor-icons/react';
+import { SquaresFour, ArrowCounterClockwise, UserPlus, Megaphone, ShieldCheck, Users, ChartBar, Trophy, Percent, Gear, Storefront } from '@phosphor-icons/react';
 
 // ── Nav items ─────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Painel',    icon: <ChartBar size={16} weight="duotone" />, highlight: true },
-  { to: '/resgatar',  label: 'Resgatar',  icon: <CurrencyDollar size={16} weight="duotone" /> },
-  { to: '/cadastrar', label: 'Cadastrar', icon: <User size={16} weight="duotone" /> },
-  { to: '/campanhas', label: 'Campanhas', icon: <Megaphone size={16} weight="duotone" /> },
-  { to: '/antifraude',label: 'Antifraude',icon: <Lock size={16} weight="duotone" /> },
-  { to: '/clientes',  label: 'Clientes',  icon: <Users size={16} weight="duotone" /> },
-  { to: '/relatorios',label: 'Relatórios',icon: <ClipboardList size={16} weight="duotone" /> },
-  { to: '/ranking',   label: 'Ranking',   icon: <Trophy size={16} weight="duotone" /> },
-  { to: '/configuracoes-cashback', label: 'Cashback', icon: <Gear size={16} weight="duotone" /> },
+  { to: '/dashboard', label: 'Painel',    icon: <SquaresFour size={20} weight="duotone" />, highlight: true },
+  { to: '/resgatar',  label: 'Resgatar',  icon: <ArrowCounterClockwise size={20} weight="duotone" /> },
+  { to: '/cadastrar', label: 'Cadastrar', icon: <UserPlus size={20} weight="duotone" /> },
+  { to: '/campanhas', label: 'Campanhas', icon: <Megaphone size={20} weight="duotone" /> },
+  { to: '/antifraude',label: 'Antifraude',icon: <ShieldCheck size={20} weight="duotone" /> },
+  { to: '/clientes',  label: 'Clientes',  icon: <Users size={20} weight="duotone" /> },
+  { to: '/relatorios',label: 'Relatórios',icon: <ChartBar size={20} weight="duotone" /> },
+  { to: '/ranking',   label: 'Ranking',   icon: <Trophy size={20} weight="duotone" /> },
+  { to: '/configuracoes-cashback', label: 'Cashback', icon: <Percent size={20} weight="duotone" /> },
 ];
 
 // ── Link component ────────────────────────────────────────────────────────────
