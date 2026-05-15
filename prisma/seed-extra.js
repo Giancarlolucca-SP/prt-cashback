@@ -18,14 +18,14 @@ function daysAgo(n) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('🌱 Iniciando seed extra...\n');
+  console.log('[SEED] Iniciando seed extra...\n');
 
   // ── Buscar estabelecimentos e operadores existentes ────────────────────────
   const alpha = await prisma.establishment.findUnique({ where: { cnpj: '11111111000101' } });
   const beta  = await prisma.establishment.findUnique({ where: { cnpj: '22222222000102' } });
 
   if (!alpha || !beta) {
-    console.error('❌ Estabelecimentos não encontrados. Execute prisma/seed.js primeiro.');
+    console.error('[ERROR] Estabelecimentos não encontrados. Execute prisma/seed.js primeiro.');
     process.exit(1);
   }
 
@@ -33,14 +33,14 @@ async function main() {
   const operOp  = await prisma.operator.findUnique({ where: { email: 'operador@posto.com' } });
 
   if (!adminOp || !operOp) {
-    console.error('❌ Operadores não encontrados. Execute prisma/seed.js primeiro.');
+    console.error('[ERROR] Operadores não encontrados. Execute prisma/seed.js primeiro.');
     process.exit(1);
   }
 
-  console.log(`✅ Dados base carregados: ${alpha.name}, ${beta.name}\n`);
+  console.log(`[OK] Dados base carregados: ${alpha.name}, ${beta.name}\n`);
 
   // ── 1. Configurações de cashback ───────────────────────────────────────────
-  console.log('⚙️  Criando configurações de cashback...');
+  console.log('Criando configurações de cashback...');
 
   await prisma.cashbackSettings.upsert({
     where: { establishmentId: alpha.id },
@@ -60,7 +60,7 @@ async function main() {
       rushHourPercent:           8,
     },
   });
-  console.log(`   ✅ CashbackSettings → ${alpha.name} (5% padrão, bônus hora do rush 8%)`);
+  console.log(`   [OK] CashbackSettings → ${alpha.name} (5% padrão, bônus hora do rush 8%)`);
 
   await prisma.cashbackSettings.upsert({
     where: { establishmentId: beta.id },
@@ -80,10 +80,10 @@ async function main() {
       rushHourPercent:           5,
     },
   });
-  console.log(`   ✅ CashbackSettings → ${beta.name} (3% padrão)\n`);
+  console.log(`   [OK] CashbackSettings → ${beta.name} (3% padrão)\n`);
 
   // ── 2. Configurações antifraude ────────────────────────────────────────────
-  console.log('🛡️  Criando configurações antifraude...');
+  console.log('Criando configurações antifraude...');
 
   await prisma.fraudSettings.upsert({
     where: { establishmentId: alpha.id },
@@ -99,7 +99,7 @@ async function main() {
       alertOnSuspiciousHour: true,
     },
   });
-  console.log(`   ✅ FraudSettings → ${alpha.name}`);
+  console.log(`   [OK] FraudSettings → ${alpha.name}`);
 
   await prisma.fraudSettings.upsert({
     where: { establishmentId: beta.id },
@@ -115,10 +115,10 @@ async function main() {
       alertOnSuspiciousHour: false,
     },
   });
-  console.log(`   ✅ FraudSettings → ${beta.name}\n`);
+  console.log(`   [OK] FraudSettings → ${beta.name}\n`);
 
   // ── 3. Clientes adicionais ─────────────────────────────────────────────────
-  console.log('👤 Criando clientes adicionais...');
+  console.log('Criando clientes adicionais...');
 
   const clientesAlpha = [
     { nome: 'Carlos Pereira',   cpf: '04965581060', phone: '11999990010', balance: 45.50 },
@@ -139,7 +139,7 @@ async function main() {
       create: { name: c.nome, cpf: c.cpf, phone: c.phone, balance: c.balance, establishmentId: alpha.id },
     });
     custAlpha[c.cpf] = cust;
-    console.log(`   ✅ ${c.nome} → ${alpha.name} (saldo: R$ ${c.balance.toFixed(2)})`);
+    console.log(`   [OK] ${c.nome} → ${alpha.name} (saldo: R$ ${c.balance.toFixed(2)})`);
   }
 
   const clientesBeta = [
@@ -156,12 +156,12 @@ async function main() {
       create: { name: c.nome, cpf: c.cpf, phone: c.phone, balance: c.balance, establishmentId: beta.id },
     });
     custBeta[c.cpf] = cust;
-    console.log(`   ✅ ${c.nome} → ${beta.name} (saldo: R$ ${c.balance.toFixed(2)})`);
+    console.log(`   [OK] ${c.nome} → ${beta.name} (saldo: R$ ${c.balance.toFixed(2)})`);
   }
   console.log();
 
   // ── 4. Transações históricas ───────────────────────────────────────────────
-  console.log('⛽ Criando transações históricas...');
+  console.log('Criando transações históricas...');
 
   const txns = [
     // Carlos Pereira — Alpha
@@ -217,10 +217,10 @@ async function main() {
     });
     txnCount++;
   }
-  console.log(`   ✅ ${txnCount} transações inseridas\n`);
+  console.log(`   [OK] ${txnCount} transações inseridas\n`);
 
   // ── 5. Resgates ────────────────────────────────────────────────────────────
-  console.log('💰 Criando resgates...');
+  console.log('Criando resgates...');
 
   const resgates = [
     // Roberto Alves — Alpha (resgatou tudo, saldo zerado)
@@ -251,10 +251,10 @@ async function main() {
     });
     redCount++;
   }
-  console.log(`   ✅ ${redCount} resgates inseridos\n`);
+  console.log(`   [OK] ${redCount} resgates inseridos\n`);
 
   // ── 6. CPFs bloqueados ─────────────────────────────────────────────────────
-  console.log('🚫 Criando CPFs bloqueados...');
+  console.log('Criando CPFs bloqueados...');
 
   const blacklist = [
     { cpf: '12345678901', reason: 'Tentativa de fraude: múltiplos cadastros com mesmo CPF em dispositivos diferentes' },
@@ -283,15 +283,15 @@ async function main() {
         },
       });
       blCount++;
-      console.log(`   🚫 CPF ${b.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')} bloqueado`);
+      console.log(`   CPF ${b.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')} bloqueado`);
     } catch (e) {
-      console.log(`   ⚠️  CPF ${b.cpf} já bloqueado, ignorado`);
+      console.log(`   [WARN] CPF ${b.cpf} já bloqueado, ignorado`);
     }
   }
-  console.log(`   ✅ ${blCount} CPFs bloqueados inseridos\n`);
+  console.log(`   [OK] ${blCount} CPFs bloqueados inseridos\n`);
 
   // ── 7. Alertas de fraude ───────────────────────────────────────────────────
-  console.log('⚠️  Criando alertas de fraude...');
+  console.log('[WARN] Criando alertas de fraude...');
 
   const alertas = [
     { cust: custAlpha['04965581060'], estab: alpha, type: 'VELOCITY_ANOMALY',      resolved: true,  dias: 28 },
@@ -315,12 +315,12 @@ async function main() {
       },
     });
     alertCount++;
-    console.log(`   ⚠️  ${a.type} → ${a.cust.name} (${a.resolved ? 'resolvido' : 'pendente'})`);
+    console.log(`   [WARN] ${a.type} → ${a.cust.name} (${a.resolved ? 'resolvido' : 'pendente'})`);
   }
-  console.log(`   ✅ ${alertCount} alertas inseridos\n`);
+  console.log(`   [OK] ${alertCount} alertas inseridos\n`);
 
   // ── 8. Campanhas ───────────────────────────────────────────────────────────
-  console.log('📣 Criando campanhas...');
+  console.log('Criando campanhas...');
 
   const campanhas = [
     {
@@ -379,24 +379,24 @@ async function main() {
       },
     });
     campCount++;
-    console.log(`   📣 ${c.estab.name} → "${c.message.slice(0, 50)}..." [${c.status}]`);
+    console.log(`   ${c.estab.name} → "${c.message.slice(0, 50)}..." [${c.status}]`);
   }
-  console.log(`   ✅ ${campCount} campanhas inseridas\n`);
+  console.log(`   [OK] ${campCount} campanhas inseridas\n`);
 
   // ── Resumo final ───────────────────────────────────────────────────────────
   console.log('═'.repeat(55));
-  console.log('🎉 Seed extra concluído com sucesso!');
+  console.log('Seed extra concluído com sucesso!');
   console.log('═'.repeat(55));
-  console.log('\n📊 Resumo do que foi inserido:');
-  console.log(`   ⚙️  Configurações de cashback : 2 estabelecimentos`);
-  console.log(`   🛡️  Configurações antifraude  : 2 estabelecimentos`);
-  console.log(`   👤 Clientes novos            : ${clientesAlpha.length + clientesBeta.length}`);
-  console.log(`   ⛽ Transações                : ${txnCount}`);
-  console.log(`   💰 Resgates                  : ${redCount}`);
-  console.log(`   🚫 CPFs bloqueados           : ${blCount}`);
-  console.log(`   ⚠️  Alertas de fraude         : ${alertCount}`);
-  console.log(`   📣 Campanhas                 : ${campCount}`);
-  console.log('\n👤 Clientes com mais saldo:');
+  console.log('\nResumo do que foi inserido:');
+  console.log(`   Configurações de cashback : 2 estabelecimentos`);
+  console.log(`   Configurações antifraude  : 2 estabelecimentos`);
+  console.log(`   Clientes novos            : ${clientesAlpha.length + clientesBeta.length}`);
+  console.log(`   Transações                : ${txnCount}`);
+  console.log(`   Resgates                  : ${redCount}`);
+  console.log(`   CPFs bloqueados           : ${blCount}`);
+  console.log(`   Alertas de fraude         : ${alertCount}`);
+  console.log(`   Campanhas                 : ${campCount}`);
+  console.log('\nClientes com mais saldo:');
   console.log('   Lucas Rodrigues  → R$ 120,00 (Posto Alpha)');
   console.log('   Fernanda Costa   → R$  87,25 (Posto Alpha)');
   console.log('   Carlos Pereira   → R$  45,50 (Posto Alpha) | R$ 18,50 (Posto Beta)');
@@ -405,7 +405,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('❌ Erro no seed extra:', e.message);
+    console.error('[ERROR] Erro no seed extra:', e.message);
     process.exit(1);
   })
   .finally(async () => {

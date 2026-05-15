@@ -51,7 +51,7 @@ async function notifyCashbackEarned(customerId, { amount, newBalance }) {
   const token = await getToken(customerId);
   await sendPush({
     to:    token,
-    title: 'Cashback creditado! 💰',
+    title: 'Cashback creditado!',
     body:  `R$ ${amount.toFixed(2).replace('.', ',')} de cashback foram adicionados ao seu saldo.`,
     data:  { type: 'CASHBACK_EARNED', amount, newBalance },
   });
@@ -61,7 +61,7 @@ async function notifyRedemptionConfirmed(customerId, { amount }) {
   const token = await getToken(customerId);
   await sendPush({
     to:    token,
-    title: 'Resgate confirmado! ✅',
+    title: 'Resgate confirmado!',
     body:  `Seu resgate de R$ ${amount.toFixed(2).replace('.', ',')} foi processado com sucesso.`,
     data:  { type: 'REDEMPTION_CONFIRMED', amount },
   });
@@ -71,7 +71,7 @@ async function notifyBalanceReminder(customerId, { balance }) {
   const token = await getToken(customerId);
   await sendPush({
     to:    token,
-    title: 'Você tem cashback esperando! 🎁',
+    title: 'Você tem cashback esperando!',
     body:  `R$ ${balance.toFixed(2).replace('.', ',')} de saldo disponível para resgatar no posto.`,
     data:  { type: 'BALANCE_REMINDER', balance },
   });
@@ -81,7 +81,7 @@ async function notifyCampaign(customerId, { message }) {
   const token = await getToken(customerId);
   await sendPush({
     to:    token,
-    title: 'Promoção especial para você! 🔥',
+    title: 'Promoção especial para você!',
     body:  message,
     data:  { type: 'CAMPAIGN' },
   });
@@ -91,7 +91,7 @@ async function notifyCashbackExpiring(customerId, { balance, daysLeft }) {
   const token = await getToken(customerId);
   await sendPush({
     to:    token,
-    title: `Seu cashback vence em ${daysLeft} dias ⚠️`,
+    title: `Seu cashback vence em ${daysLeft} dias`,
     body:  `Você tem R$ ${balance.toFixed(2).replace('.', ',')} prestes a expirar. Resgate agora!`,
     data:  { type: 'CASHBACK_EXPIRING', balance, daysLeft },
   });

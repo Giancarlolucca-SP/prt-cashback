@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
+import { User, GasPump, Receipt, Warning, CheckCircle } from '@phosphor-icons/react';
 
 const FUEL_OPTIONS = [
   { value: '',                   label: 'Selecione o combustível (opcional)' },
@@ -85,7 +86,7 @@ function CpfStep({ initialCpf, onFound }) {
 
   return (
     <Card>
-      <CardHeader title="Buscar Cliente" icon="👤" />
+      <CardHeader title="Buscar Cliente" icon={<User size={20} weight="duotone" />} />
       <form onSubmit={handleSearch} className="space-y-4">
         <Input
           label="CPF do cliente"
@@ -98,7 +99,7 @@ function CpfStep({ initialCpf, onFound }) {
         />
         <Button type="submit" fullWidth size="lg" loading={loading}
           loadingText="Buscando cliente...">
-          🔍 Buscar Cliente
+          Buscar Cliente
         </Button>
       </form>
     </Card>
@@ -166,7 +167,7 @@ function FormStep({ customer, cpfDigits, onResult, onBack }) {
       </div>
 
       <Card>
-        <CardHeader title="Dados do Abastecimento" icon="⛽" />
+        <CardHeader title="Dados do Abastecimento" icon={<GasPump size={20} weight="duotone" />} />
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Valor do abastecimento"
@@ -227,7 +228,7 @@ function FormStep({ customer, cpfDigits, onResult, onBack }) {
 
           <Button type="submit" fullWidth size="lg" loading={loading}
             loadingText="Registrando abastecimento...">
-            ✅ Confirmar Abastecimento
+            Confirmar Abastecimento
           </Button>
 
           <button
@@ -254,7 +255,7 @@ function ResultStep({ result, onNew }) {
       {isPending ? (
         <>
           <div className="flex flex-col items-center text-center py-4 gap-3">
-            <div className="w-14 h-14 rounded-full bg-yellow-100 flex items-center justify-center text-2xl">⚠️</div>
+            <div className="w-14 h-14 rounded-full bg-yellow-100 flex items-center justify-center"><Warning size={28} weight="duotone" className="text-yellow-500" /></div>
             <div>
               <p className="text-lg font-bold text-yellow-800">Salvo para validação posterior</p>
               <p className="text-sm text-yellow-700 mt-1">
@@ -273,11 +274,11 @@ function ResultStep({ result, onNew }) {
       ) : (
         <>
           <div className="flex flex-col items-center text-center py-2 gap-2 mb-4">
-            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-2xl">✅</div>
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center"><CheckCircle size={28} weight="duotone" className="text-green-500" /></div>
             <p className="text-lg font-bold text-green-800">Cashback gerado com sucesso!</p>
           </div>
 
-          <CardHeader title="Comprovante" icon="🧾" />
+          <CardHeader title="Comprovante" icon={<Receipt size={20} weight="duotone" />} />
           <div className="space-y-2 text-sm mb-4">
             <InfoRow label="Código"         value={result.transacao.codigoCupom} mono />
             <InfoRow label="Abastecimento"  value={result.transacao.valorAbastecimento} />

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { reportsAPI } from '../services/api.js';
 import { useToast } from '../context/ToastContext.jsx';
 import Button from '../components/ui/Button.jsx';
+import { GasPump, CurrencyDollar, Users, ChartBar } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -9,25 +10,25 @@ const REPORT_TYPES = [
   {
     value: 'TRANSACTIONS',
     label: 'Transações',
-    icon: '⛽',
+    icon: <GasPump size={20} weight="duotone" />,
     desc: 'Todos os abastecimentos com cashback gerado',
   },
   {
     value: 'REDEMPTIONS',
     label: 'Resgates',
-    icon: '💸',
+    icon: <CurrencyDollar size={20} weight="duotone" />,
     desc: 'Resgates de cashback realizados',
   },
   {
     value: 'CUSTOMERS',
     label: 'Clientes',
-    icon: '👥',
+    icon: <Users size={20} weight="duotone" />,
     desc: 'Base completa de clientes e consumo',
   },
   {
     value: 'SUMMARY',
     label: 'Resumo',
-    icon: '📊',
+    icon: <ChartBar size={20} weight="duotone" />,
     desc: 'Visão geral do período com indicadores',
   },
 ];
@@ -458,7 +459,7 @@ export default function Relatorios() {
             disabled={loading}
             className="flex-1"
           >
-            📄 Exportar PDF
+            Exportar PDF
           </Button>
           <Button
             variant="secondary"
@@ -467,7 +468,7 @@ export default function Relatorios() {
             disabled={loading}
             className="flex-1"
           >
-            📊 Exportar Excel
+            Exportar Excel
           </Button>
         </div>
       </div>
@@ -501,7 +502,7 @@ export default function Relatorios() {
               >
                 {exportingPdf
                   ? <span className="w-3 h-3 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin" />
-                  : '📄'
+                  : null
                 }
                 PDF
               </button>
@@ -512,7 +513,7 @@ export default function Relatorios() {
               >
                 {exportingXlsx
                   ? <span className="w-3 h-3 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin" />
-                  : '📊'
+                  : null
                 }
                 Excel
               </button>

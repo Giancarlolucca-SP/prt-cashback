@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { establishmentsAPI } from '../services/api.js';
+import { Warning } from '@phosphor-icons/react';
 
 const DEEP_LINK_BASE = 'https://postocash.app/register';
 
@@ -85,7 +86,7 @@ export default function EstablishmentQRCode({ establishmentId }) {
           </div>
         ) : error ? (
           <div className="w-48 h-48 flex flex-col items-center justify-center gap-2 bg-red-50 rounded-xl border border-red-100 text-red-400 text-sm text-center p-4">
-            <span className="text-2xl">⚠️</span>
+            <Warning size={32} weight="duotone" className="text-yellow-500" />
             Erro ao gerar QR Code
           </div>
         ) : (

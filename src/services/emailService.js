@@ -6,20 +6,20 @@ async function sendWelcomeEmail({ name, email, password, establishmentName }) {
   const { error } = await resend.emails.send({
     from: 'PostoCash <onboarding@resend.dev>',
     to: email,
-    subject: '🎉 Bem-vindo ao PostoCash! Sua conta está ativa',
+    subject: 'Bem-vindo ao PostoCash! Sua conta está ativa',
     html: `
       <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;">
         <img src="https://sistemapostocash.app/assets/logo-horizontal.svg" alt="PostoCash" style="height:40px;margin-bottom:32px;" />
 
         <h1 style="color:#1e293b;font-size:28px;margin-bottom:8px;">
-          Bem-vindo ao PostoCash! 🎉
+          Bem-vindo ao PostoCash!
         </h1>
         <p style="color:#64748b;font-size:16px;margin-bottom:32px;">
           Sua conta foi criada com sucesso. Aqui estão suas credenciais de acesso:
         </p>
 
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:32px;">
-          <h2 style="color:#1e293b;font-size:16px;margin-bottom:16px;">📋 Suas credenciais</h2>
+          <h2 style="color:#1e293b;font-size:16px;margin-bottom:16px;">Suas credenciais</h2>
           <table style="width:100%;border-collapse:collapse;">
             <tr>
               <td style="padding:8px 0;color:#64748b;font-size:14px;">Estabelecimento</td>
@@ -43,11 +43,11 @@ async function sendWelcomeEmail({ name, email, password, establishmentName }) {
 
         <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin-bottom:32px;">
           <p style="color:#9a3412;font-size:13px;margin:0;">
-            ⚠️ Guarde sua senha em local seguro. Você poderá alterá-la após o primeiro acesso.
+            Guarde sua senha em local seguro. Você poderá alterá-la após o primeiro acesso.
           </p>
         </div>
 
-        <h3 style="color:#1e293b;font-size:16px;margin-bottom:12px;">📱 Próximos passos:</h3>
+        <h3 style="color:#1e293b;font-size:16px;margin-bottom:12px;">Próximos passos:</h3>
         <ol style="color:#64748b;font-size:14px;line-height:2;">
           <li>Acesse o painel e configure seu cashback</li>
           <li>Imprima o QR Code e cole nas bombas</li>

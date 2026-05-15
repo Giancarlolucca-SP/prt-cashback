@@ -255,13 +255,13 @@ function parseHtmlNfceData(html, urlParams) {
     if (litersVal !== null) {
       const diff = Math.abs(calculatedVolume - litersVal);
       if (diff > 0.1) {
-        console.log('[NFCE] ⚠️ Volume inconsistente:', {
+        console.log('[NFCE] Volume inconsistente:', {
           cupom:        litersVal,
           encerrante:   calculatedVolume,
           diferenca:    diff.toFixed(3),
         });
       } else {
-        console.log('[NFCE] ✅ Volume validado pelos encerrantes:', calculatedVolume, 'L');
+        console.log('[NFCE] Volume validado pelos encerrantes:', calculatedVolume, 'L');
       }
     }
   }

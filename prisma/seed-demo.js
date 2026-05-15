@@ -22,25 +22,25 @@ function daysAgo(n, hourOffset = 0) {
 }
 
 async function main() {
-  console.log('🌱 Iniciando seed de demonstração...\n');
+  console.log('[SEED] Iniciando seed de demonstração...\n');
 
   // ── Buscar base existente ─────────────────────────────────────────────────
   const estab = await prisma.establishment.findFirst();
   if (!estab) {
-    console.error('❌ Nenhum estabelecimento encontrado no banco.');
+    console.error('[ERROR] Nenhum estabelecimento encontrado no banco.');
     process.exit(1);
   }
 
   const op = await prisma.operator.findFirst();
   if (!op) {
-    console.error('❌ Nenhum operador encontrado no banco.');
+    console.error('[ERROR] Nenhum operador encontrado no banco.');
     process.exit(1);
   }
 
-  console.log(`✅ Usando: ${estab.name} / ${op.email}\n`);
+  console.log(`[OK] Usando: ${estab.name} / ${op.email}\n`);
 
   // ── 1. Configurações de cashback ──────────────────────────────────────────
-  console.log('⚙️  Configurações de cashback...');
+  console.log('Configurações de cashback...');
 
   await prisma.cashbackSettings.upsert({
     where:  { establishmentId: estab.id },
@@ -60,10 +60,10 @@ async function main() {
       rushHourPercent:           8,
     },
   });
-  console.log(`   ✅ ${estab.name} — 5% padrão, bônus hora do rush 8%\n`);
+  console.log(`   [OK] ${estab.name} — 5% padrão, bônus hora do rush 8%\n`);
 
   // ── 2. Configurações antifraude ───────────────────────────────────────────
-  console.log('🛡️  Configurações antifraude...');
+  console.log('Configurações antifraude...');
 
   await prisma.fraudSettings.upsert({
     where:  { establishmentId: estab.id },
@@ -79,10 +79,10 @@ async function main() {
       alertOnSuspiciousHour: true,
     },
   });
-  console.log(`   ✅ ${estab.name}\n`);
+  console.log(`   [OK] ${estab.name}\n`);
 
   // ── 3. Clientes ───────────────────────────────────────────────────────────
-  console.log('👤 Criando/atualizando clientes...');
+  console.log('Criando/atualizando clientes...');
 
   const clientes = [
     { nome: 'Carlos Pereira',   cpf: '04965581060', phone: '11999990010', balance: 45.50 },
@@ -105,12 +105,12 @@ async function main() {
       create: { name: c.nome, cpf: c.cpf, phone: c.phone, balance: c.balance, establishmentId: estab.id },
     });
     custs[c.cpf] = cust;
-    console.log(`   ✅ ${c.nome} (saldo: R$ ${c.balance.toFixed(2)})`);
+    console.log(`   [OK] ${c.nome} (saldo: R$ ${c.balance.toFixed(2)})`);
   }
   console.log();
 
   // ── 4. Transações históricas ──────────────────────────────────────────────
-  console.log('⛽ Criando transações históricas...');
+  console.log('Criando transações históricas...');
 
   const txns = [
     { cpf: '04965581060', amount: 150.00, pct: 5, fuel: 'gasolina', liters: 30.0,  dias: 45 },
@@ -155,10 +155,10 @@ async function main() {
     });
     txnCount++;
   }
-  console.log(`   ✅ ${txnCount} transações inseridas\n`);
+  console.log(`   [OK] ${txnCount} transações inseridas\n`);
 
   // ── 5. Resgates ───────────────────────────────────────────────────────────
-  console.log('💰 Criando resgates...');
+  console.log('Criando resgates...');
 
   const resgates = [
     { cpf: '06731508050', amount: 6.00,  dias: 55 },
@@ -184,10 +184,10 @@ async function main() {
     });
     redCount++;
   }
-  console.log(`   ✅ ${redCount} resgates inseridos\n`);
+  console.log(`   [OK] ${redCount} resgates inseridos\n`);
 
   // ── 6. CPFs bloqueados ────────────────────────────────────────────────────
-  console.log('🚫 CPFs bloqueados...');
+  console.log('CPFs bloqueados...');
 
   const blacklist = [
     { cpf: '12345678901', reason: 'Tentativa de fraude: múltiplos cadastros com mesmo CPF em dispositivos diferentes' },
@@ -213,10 +213,10 @@ async function main() {
       blCount++;
     } catch { /* já existe */ }
   }
-  console.log(`   ✅ ${blCount} CPFs bloqueados\n`);
+  console.log(`   [OK] ${blCount} CPFs bloqueados\n`);
 
   // ── 7. Alertas de fraude ──────────────────────────────────────────────────
-  console.log('⚠️  Alertas de fraude...');
+  console.log('[WARN] Alertas de fraude...');
 
   const alertas = [
     { cpf: '04965581060', type: 'VELOCITY_ANOMALY',     resolved: true,  dias: 28 },
@@ -241,10 +241,10 @@ async function main() {
     });
     alertCount++;
   }
-  console.log(`   ✅ ${alertCount} alertas inseridos\n`);
+  console.log(`   [OK] ${alertCount} alertas inseridos\n`);
 
   // ── 8. Campanhas ──────────────────────────────────────────────────────────
-  console.log('📣 Campanhas...');
+  console.log('Campanhas...');
 
   const campanhas = [
     {
@@ -304,9 +304,9 @@ async function main() {
       },
     });
     campCount++;
-    console.log(`   📣 ${c.name} [${c.status}]`);
+    console.log(`   ${c.name} [${c.status}]`);
   }
-  console.log(`   ✅ ${campCount} campanhas inseridas\n`);
+  console.log(`   [OK] ${campCount} campanhas inseridas\n`);
 
   // ── Contagem final ────────────────────────────────────────────────────────
   const [
@@ -323,22 +323,22 @@ async function main() {
   ]);
 
   console.log('═'.repeat(48));
-  console.log('✅ Seed de demonstração concluído!');
+  console.log('[OK] Seed de demonstração concluído!');
   console.log('═'.repeat(48));
-  console.log('\n📊 Totais no banco após seed:');
-  console.log(`   🏪 Estabelecimentos : ${estabCount}`);
-  console.log(`   👤 Operadores       : ${opCount}`);
-  console.log(`   🙍 Clientes         : ${custCount}`);
-  console.log(`   ⛽ Transações       : ${txCount2}`);
-  console.log(`   💰 Resgates         : ${redCount2}`);
-  console.log(`   📣 Campanhas        : ${campCount2}`);
-  console.log(`   📋 Audit logs       : ${auditCount}`);
-  console.log(`\n🔑 Acesso: ${op.email} → ${estab.name}`);
+  console.log('\nTotais no banco após seed:');
+  console.log(`   Estabelecimentos : ${estabCount}`);
+  console.log(`   Operadores       : ${opCount}`);
+  console.log(`   Clientes         : ${custCount}`);
+  console.log(`   Transações       : ${txCount2}`);
+  console.log(`   Resgates         : ${redCount2}`);
+  console.log(`   Campanhas        : ${campCount2}`);
+  console.log(`   Audit logs       : ${auditCount}`);
+  console.log(`\nAcesso: ${op.email} → ${estab.name}`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Erro no seed:', e.message);
+    console.error('[ERROR] Erro no seed:', e.message);
     process.exit(1);
   })
   .finally(async () => {

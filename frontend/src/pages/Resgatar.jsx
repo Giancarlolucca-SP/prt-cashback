@@ -7,6 +7,7 @@ import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import { User, CheckCircle } from '@phosphor-icons/react';
 
 export default function Resgatar() {
   const location = useLocation();
@@ -117,7 +118,7 @@ export default function Resgatar() {
             autoFocus={!cpf}
           />
           <Button type="submit" fullWidth loading={loadingSearch}>
-            🔍 Consultar saldo
+            Consultar saldo
           </Button>
         </form>
       </Card>
@@ -125,7 +126,7 @@ export default function Resgatar() {
       {/* Step 2: Balance + amount */}
       {customer && (
         <Card>
-          <CardHeader title={customer.nome} icon="👤" />
+          <CardHeader title={customer.nome} icon={<User size={20} weight="duotone" />} />
 
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center mb-5">
             <p className="text-xs font-medium text-green-700 mb-1">Saldo disponível</p>
@@ -167,7 +168,7 @@ export default function Resgatar() {
               )}
 
               <Button type="submit" variant="success" fullWidth size="lg">
-                💸 Resgatar
+                Resgatar
               </Button>
             </form>
           )}
@@ -177,7 +178,7 @@ export default function Resgatar() {
       {/* Step 3: Result */}
       {result && (
         <Card>
-          <CardHeader title="Comprovante de Resgate" icon="✅" />
+          <CardHeader title="Comprovante de Resgate" icon={<CheckCircle size={20} weight="duotone" className="text-green-500" />} />
           <div className="space-y-2 text-sm mb-4">
             <InfoRow label="Código" value={result.resgate.codigoCupom} mono />
             <InfoRow label="Valor resgatado" value={result.resgate.valorResgatado} highlight />

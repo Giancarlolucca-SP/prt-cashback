@@ -55,29 +55,29 @@ const FUELS = ['GASOLINA','ETANOL','DIESEL','GASOLINA_ADITIVADA'];
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('🌱 Seed comercial PostoCash\n');
+  console.log('[SEED] Seed comercial PostoCash\n');
 
   // ── Establishment & operator ───────────────────────────────────────────────
   const est = await prisma.establishment.findUnique({ where: { cnpj: '11111111000101' } });
   if (!est) throw new Error('Run seed.js first to create Posto Alpha.');
-  console.log(`✅ Estabelecimento: ${est.name} (${est.id})`);
+  console.log(`[OK] Estabelecimento: ${est.name} (${est.id})`);
 
   const op = await prisma.operator.findUnique({ where: { email: 'admin@posto.com' } });
   if (!op) throw new Error('Run seed.js first to create admin operator.');
-  console.log(`✅ Operador: ${op.name}\n`);
+  console.log(`[OK] Operador: ${op.name}\n`);
 
   // ── Clean previous comercial seed data ────────────────────────────────────
-  console.log('🧹 Removendo dados anteriores do seed comercial...');
+  console.log('Removendo dados anteriores do seed comercial...');
   await prisma.redemption.deleteMany({ where: { establishmentId: est.id, receiptCode: { startsWith: 'RD-SEED-' } } });
   await prisma.transaction.deleteMany({ where: { establishmentId: est.id, receiptCode: { startsWith: 'RC-SEED-' } } });
   await prisma.campaign.deleteMany({ where: { establishmentId: est.id, name: { in: [
     'Black Friday Combustível','Fidelidade VIP — Clientes Top',
     'Reativação Clientes Inativos','Promoção Fim de Mês','Campanha Aniversário do Posto',
   ]}}});
-  console.log('✅ Limpeza concluída\n');
+  console.log('[OK] Limpeza concluída\n');
 
   // ── 1. Customers (672) ────────────────────────────────────────────────────
-  console.log('👥 Criando 672 clientes...');
+  console.log('Criando 672 clientes...');
   const CUSTOMER_COUNT = 672;
   const customerData = [];
   for (let i = 0; i < CUSTOMER_COUNT; i++) {
@@ -101,11 +101,11 @@ async function main() {
     where: { establishmentId: est.id },
     select: { id: true },
   });
-  console.log(`✅ ${customers.length} clientes no total\n`);
+  console.log(`[OK] ${customers.length} clientes no total\n`);
 
   // ── 2. Transactions (1247) ────────────────────────────────────────────────
   // Targets: R$285.000 total · R$12.739 cashback · 24.807 litros
-  console.log('⛽ Criando 1.247 transações...');
+  console.log('Criando 1.247 transações...');
   const TX_COUNT = 1247;
   const txData = [];
   let runTotal = 0, runCashback = 0, runLiters = 0;
@@ -145,13 +145,13 @@ async function main() {
     await prisma.transaction.createMany({ data: txData.slice(i, i + 200), skipDuplicates: true });
     process.stdout.write(`  ${Math.min(i + 200, txData.length)}/${TX_COUNT}\r`);
   }
-  console.log(`\n✅ ${TX_COUNT} transações criadas`);
-  console.log(`   💰 Volume: R$ ${runTotal.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`);
-  console.log(`   🎁 Cashback: R$ ${runCashback.toFixed(2)}`);
-  console.log(`   ⛽ Litros: ${runLiters.toFixed(0)}\n`);
+  console.log(`\n[OK] ${TX_COUNT} transações criadas`);
+  console.log(`   Volume: R$ ${runTotal.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`);
+  console.log(`   Cashback: R$ ${runCashback.toFixed(2)}`);
+  console.log(`   Litros: ${runLiters.toFixed(0)}\n`);
 
   // ── 3. Campaigns (5) ──────────────────────────────────────────────────────
-  console.log('📢 Criando 5 campanhas...');
+  console.log('Criando 5 campanhas...');
   const campaignDefs = [
     {
       name: 'Black Friday Combustível',
@@ -161,7 +161,7 @@ async function main() {
       filterType: 'ACTIVE',
       filterPeriod: 'ONE_MONTH',
       rewardType: 'FIXED',
-      message: '🔥 BLACK FRIDAY no Posto Alpha! Abasteça hoje e ganhe R$20 de cashback. Oferta por tempo limitado — só hoje!',
+      message: 'BLACK FRIDAY no Posto Alpha! Abasteça hoje e ganhe R$20 de cashback. Oferta por tempo limitado — só hoje!',
       createdAt: daysAgo(180),
     },
     {
@@ -172,7 +172,7 @@ async function main() {
       filterType: 'ACTIVE',
       filterPeriod: 'TWO_MONTHS',
       rewardType: 'FIXED',
-      message: '⭐ Você é um cliente VIP! Como agradecimento pela sua fidelidade, ganhe R$30 de cashback no próximo abastecimento.',
+      message: 'Você é um cliente VIP! Como agradecimento pela sua fidelidade, ganhe R$30 de cashback no próximo abastecimento.',
       createdAt: daysAgo(150),
     },
     {
@@ -183,7 +183,7 @@ async function main() {
       filterType: 'INACTIVE',
       filterPeriod: 'TWO_MONTHS',
       rewardType: 'FIXED',
-      message: '🙌 Sentimos sua falta! Volte a abastecer no Posto Alpha e ganhe R$15 de cashback. Esperamos você!',
+      message: 'Sentimos sua falta! Volte a abastecer no Posto Alpha e ganhe R$15 de cashback. Esperamos você!',
       createdAt: daysAgo(90),
     },
     {
@@ -194,7 +194,7 @@ async function main() {
       filterType: 'ACTIVE',
       filterPeriod: 'ONE_MONTH',
       rewardType: 'FIXED',
-      message: '📅 Fim de mês com mais cashback! Abasteça até sexta-feira e ganhe R$20 de volta direto na sua conta PostoCash.',
+      message: 'Fim de mês com mais cashback! Abasteça até sexta-feira e ganhe R$20 de volta direto na sua conta PostoCash.',
       createdAt: daysAgo(60),
     },
     {
@@ -205,7 +205,7 @@ async function main() {
       filterType: 'ACTIVE',
       filterPeriod: 'THREE_MONTHS',
       rewardType: 'FIXED',
-      message: '🎂 Estamos em festa! No aniversário do Posto Alpha você ganha R$30 de cashback. Venha comemorar conosco!',
+      message: 'Estamos em festa! No aniversário do Posto Alpha você ganha R$30 de cashback. Venha comemorar conosco!',
       createdAt: daysAgo(30),
     },
   ];
@@ -215,12 +215,12 @@ async function main() {
       data: { ...def, establishmentId: est.id, operatorId: op.id, status: 'SENT', createdAt },
     });
     const retRate = { 450: '86%', 120: '82%', 380: '63%', 210: '80%', 95: '80%' }[c.customerCount];
-    console.log(`  ✅ ${c.name} — ${c.customerCount} clientes · R$${Number(c.totalCost).toFixed(2)} · ${retRate} retorno`);
+    console.log(`  [OK] ${c.name} — ${c.customerCount} clientes · R$${Number(c.totalCost).toFixed(2)} · ${retRate} retorno`);
   }
   console.log();
 
   // ── 4. Redemptions (200) ──────────────────────────────────────────────────
-  console.log('💸 Criando 200 resgates...');
+  console.log('Criando 200 resgates...');
   const rdData = [];
   for (let i = 0; i < 200; i++) {
     rdData.push({
@@ -234,23 +234,23 @@ async function main() {
     });
   }
   await prisma.redemption.createMany({ data: rdData, skipDuplicates: true });
-  console.log('✅ 200 resgates criados\n');
+  console.log('[OK] 200 resgates criados\n');
 
   // ── Summary ────────────────────────────────────────────────────────────────
   const totalCashbackCampaigns = campaignDefs.reduce((s, c) => s + c.totalCost, 0);
   console.log('━'.repeat(52));
-  console.log('  📊  RESUMO SEED COMERCIAL — PostoCash');
+  console.log('  RESUMO SEED COMERCIAL — PostoCash');
   console.log('━'.repeat(52));
-  console.log(`  👥  Clientes ativos          ${CUSTOMER_COUNT}`);
-  console.log(`  ⛽  Abastecimentos           ${TX_COUNT.toLocaleString('pt-BR')}`);
-  console.log(`  💰  Volume em vendas         R$ 285.000,00`);
-  console.log(`  🎁  Cashback gerado          R$ 12.739,00`);
-  console.log(`  🎯  Ticket médio             R$ 228,00`);
-  console.log(`  📢  Campanhas                5`);
-  console.log(`  📬  Cashback distribuído     R$ ${totalCashbackCampaigns.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
-  console.log(`  💸  Resgates                 200`);
+  console.log(`  Clientes ativos          ${CUSTOMER_COUNT}`);
+  console.log(`  Abastecimentos           ${TX_COUNT.toLocaleString('pt-BR')}`);
+  console.log(`  Volume em vendas         R$ 285.000,00`);
+  console.log(`  Cashback gerado          R$ 12.739,00`);
+  console.log(`  Ticket médio             R$ 228,00`);
+  console.log(`  Campanhas                5`);
+  console.log(`  Cashback distribuído     R$ ${totalCashbackCampaigns.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+  console.log(`  Resgates                 200`);
   console.log('━'.repeat(52));
-  console.log('\n✅ Seed comercial concluído com sucesso!\n');
+  console.log('\n[OK] Seed comercial concluído com sucesso!\n');
 }
 
 main()

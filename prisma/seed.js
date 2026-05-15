@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seed do banco de dados...');
+  console.log('[SEED] Iniciando seed do banco de dados...');
 
   // --- Establishments ---
   const alpha = await prisma.establishment.upsert({
@@ -17,7 +17,7 @@ async function main() {
       cashbackPercent: 5,
     },
   });
-  console.log(`✅ Estabelecimento criado: ${alpha.name}`);
+  console.log(`[OK] Estabelecimento criado: ${alpha.name}`);
 
   const beta = await prisma.establishment.upsert({
     where: { cnpj: '22222222000102' },
@@ -28,7 +28,7 @@ async function main() {
       cashbackPercent: 3,
     },
   });
-  console.log(`✅ Estabelecimento criado: ${beta.name}`);
+  console.log(`[OK] Estabelecimento criado: ${beta.name}`);
 
   // --- Operators ---
   const adminPassword = await bcrypt.hash('admin123', 10);
@@ -43,7 +43,7 @@ async function main() {
       establishmentId: alpha.id,
     },
   });
-  console.log(`✅ Operador admin criado: ${admin.email} → ${alpha.name}`);
+  console.log(`[OK] Operador admin criado: ${admin.email} → ${alpha.name}`);
 
   const operatorPassword = await bcrypt.hash('operador123', 10);
   const operator = await prisma.operator.upsert({
@@ -57,7 +57,7 @@ async function main() {
       establishmentId: beta.id,
     },
   });
-  console.log(`✅ Operador comum criado: ${operator.email} → ${beta.name}`);
+  console.log(`[OK] Operador comum criado: ${operator.email} → ${beta.name}`);
 
   // --- Customers (Posto Alpha) ---
   const customer1 = await prisma.customer.upsert({
@@ -71,7 +71,7 @@ async function main() {
       establishmentId: alpha.id,
     },
   });
-  console.log(`✅ Cliente criado: ${customer1.name} (${alpha.name})`);
+  console.log(`[OK] Cliente criado: ${customer1.name} (${alpha.name})`);
 
   const customer2 = await prisma.customer.upsert({
     where: { cpf_establishmentId: { cpf: '87748248800', establishmentId: alpha.id } },
@@ -84,7 +84,7 @@ async function main() {
       establishmentId: alpha.id,
     },
   });
-  console.log(`✅ Cliente criado: ${customer2.name} (${alpha.name})`);
+  console.log(`[OK] Cliente criado: ${customer2.name} (${alpha.name})`);
 
   // --- Customers (Posto Beta) ---
   const customer3 = await prisma.customer.upsert({
@@ -98,23 +98,23 @@ async function main() {
       establishmentId: beta.id,
     },
   });
-  console.log(`✅ Cliente criado: ${customer3.name} (${beta.name})`);
+  console.log(`[OK] Cliente criado: ${customer3.name} (${beta.name})`);
 
-  console.log('\n🎉 Seed concluído com sucesso!');
-  console.log('\n📋 Credenciais de acesso:');
+  console.log('[SEED] Seed concluído com sucesso!');
+  console.log('\nCredenciais de acesso:');
   console.log(`   Admin     → admin@posto.com     / admin123    (${alpha.name})`);
   console.log(`   Operador  → operador@posto.com  / operador123 (${beta.name})`);
-  console.log('\n🏪 Estabelecimentos:');
+  console.log('\nEstabelecimentos:');
   console.log(`   ${alpha.name} → CNPJ: 11.111.111/0001-01 | Cashback: 5%`);
   console.log(`   ${beta.name}  → CNPJ: 22.222.222/0001-02 | Cashback: 3%`);
-  console.log('\n👤 Clientes de teste:');
+  console.log('\nClientes de teste:');
   console.log(`   João Silva  → CPF: 529.982.247-25  (Alpha: R$ 25,00 | Beta: R$ 10,00)`);
   console.log(`   Maria Souza → CPF: 877.482.488-00  (Alpha: R$ 0,00)`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Erro no seed:', e);
+    console.error('[ERROR] Erro no seed:', e);
     process.exit(1);
   })
   .finally(async () => {

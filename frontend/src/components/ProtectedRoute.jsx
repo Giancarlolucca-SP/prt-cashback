@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Navbar from './Navbar.jsx';
+import { House, Users, Megaphone, ChartBar, Gear } from '@phosphor-icons/react';
 
 const PAGE_TITLES = {
   '/dashboard':              'Painel',
@@ -20,11 +21,11 @@ const PAGE_TITLES = {
 // ── Bottom tab items (mobile only) ────────────────────────────────────────────
 
 const BOTTOM_TABS = [
-  { to: '/dashboard',              label: 'Painel',       icon: '🏠' },
-  { to: '/clientes',               label: 'Clientes',     icon: '👥' },
-  { to: '/campanhas',              label: 'Campanhas',    icon: '📣' },
-  { to: '/relatorios',             label: 'Relatórios',   icon: '📊' },
-  { to: '/configuracoes-cashback', label: 'Configurações',icon: '⚙️' },
+  { to: '/dashboard',              label: 'Painel',       icon: <House size={16} weight="duotone" /> },
+  { to: '/clientes',               label: 'Clientes',     icon: <Users size={16} weight="duotone" /> },
+  { to: '/campanhas',              label: 'Campanhas',    icon: <Megaphone size={16} weight="duotone" /> },
+  { to: '/relatorios',             label: 'Relatórios',   icon: <ChartBar size={16} weight="duotone" /> },
+  { to: '/configuracoes-cashback', label: 'Configurações',icon: <Gear size={16} weight="duotone" /> },
 ];
 
 export default function ProtectedRoute() {

@@ -38,7 +38,7 @@ async function ensureStripePrice() {
 }
 
 app.listen(PORT, async () => {
-  console.log(`\n🚀 PostoCash rodando na porta ${PORT}`);
+  console.log(`[SERVER] PostoCash rodando na porta ${PORT}`);
   console.log(`   Ambiente : ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Health   : http://localhost:${PORT}/health\n`);
 

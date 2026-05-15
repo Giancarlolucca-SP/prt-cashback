@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { applyCpfMask, stripCpf } from '../utils/cpfMask.js';
 import Button from '../components/ui/Button.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import { GasPump, CurrencyDollar, Bell, Prohibit, CheckCircle } from '@phosphor-icons/react';
 
 // ── Section wrapper ───────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ export default function Antifraude() {
       </div>
 
       {/* ── Section 1: Fuel limits ── */}
-      <Section title="Limites de Abastecimento" icon="⛽">
+      <Section title="Limites de Abastecimento" icon={<GasPump size={20} weight="duotone" />}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <NumericField
             label="Máximo de abastecimentos por dia por CPF"
@@ -250,7 +251,7 @@ export default function Antifraude() {
       </Section>
 
       {/* ── Section 2: Redemption limits ── */}
-      <Section title="Limites de Resgate" icon="💸">
+      <Section title="Limites de Resgate" icon={<CurrencyDollar size={20} weight="duotone" />}>
         <div className="max-w-xs">
           <NumericField
             label="Máximo de resgates por semana por CPF"
@@ -263,7 +264,7 @@ export default function Antifraude() {
       </Section>
 
       {/* ── Section 3: Alerts ── */}
-      <Section title="Alertas" icon="🔔">
+      <Section title="Alertas" icon={<Bell size={20} weight="duotone" />}>
         <div className="space-y-4">
           <Toggle
             label="Alertar quando cashback exceder o limite diário"
@@ -282,7 +283,7 @@ export default function Antifraude() {
       </Section>
 
       {/* ── Section 4: Blacklist ── */}
-      <Section title="Blacklist de CPFs" icon="🚫">
+      <Section title="Blacklist de CPFs" icon={<Prohibit size={20} weight="duotone" />}>
 
         {/* Add to blacklist form */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -315,7 +316,7 @@ export default function Antifraude() {
         {/* Blacklist table */}
         {blacklist.length === 0 ? (
           <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl">
-            <p className="text-2xl mb-1">✅</p>
+            <CheckCircle size={32} weight="duotone" className="text-green-500 mx-auto mb-1" />
             <p className="text-sm font-medium">Nenhum CPF bloqueado</p>
           </div>
         ) : (

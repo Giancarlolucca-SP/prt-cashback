@@ -1,18 +1,19 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { ChartBar, CurrencyDollar, User, Megaphone, Lock, Users, ClipboardList, Trophy, Gear, Storefront } from '@phosphor-icons/react';
 
 // ── Nav items ─────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Painel',    icon: '📊', highlight: true },
-  { to: '/resgatar',  label: 'Resgatar',  icon: '💸' },
-  { to: '/cadastrar', label: 'Cadastrar', icon: '👤' },
-  { to: '/campanhas', label: 'Campanhas', icon: '📣' },
-  { to: '/antifraude',label: 'Antifraude',icon: '🔒' },
-  { to: '/clientes',  label: 'Clientes',  icon: '👥' },
-  { to: '/relatorios',label: 'Relatórios',icon: '📋' },
-  { to: '/ranking',   label: 'Ranking',   icon: '🏆' },
-  { to: '/configuracoes-cashback', label: 'Cashback', icon: '⚙️' },
+  { to: '/dashboard', label: 'Painel',    icon: <ChartBar size={16} weight="duotone" />, highlight: true },
+  { to: '/resgatar',  label: 'Resgatar',  icon: <CurrencyDollar size={16} weight="duotone" /> },
+  { to: '/cadastrar', label: 'Cadastrar', icon: <User size={16} weight="duotone" /> },
+  { to: '/campanhas', label: 'Campanhas', icon: <Megaphone size={16} weight="duotone" /> },
+  { to: '/antifraude',label: 'Antifraude',icon: <Lock size={16} weight="duotone" /> },
+  { to: '/clientes',  label: 'Clientes',  icon: <Users size={16} weight="duotone" /> },
+  { to: '/relatorios',label: 'Relatórios',icon: <ClipboardList size={16} weight="duotone" /> },
+  { to: '/ranking',   label: 'Ranking',   icon: <Trophy size={16} weight="duotone" /> },
+  { to: '/configuracoes-cashback', label: 'Cashback', icon: <Gear size={16} weight="duotone" /> },
 ];
 
 // ── Link component ────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ export default function Navbar({ open, onClose }) {
               : 'border-white/15 text-white/40 hover:border-white/30 hover:text-white/70',
           ].join(' ')}
         >
-          <span className="text-[11px] leading-none">⚙️</span>
+          <Gear size={14} weight="duotone" />
           Configurações do Posto
         </NavLink>
 
@@ -141,7 +142,7 @@ export default function Navbar({ open, onClose }) {
                 : 'border-white/15 text-white/40 hover:border-white/30 hover:text-white/70',
             ].join(' ')}
           >
-            <span className="text-[11px] leading-none">🏪</span>
+            <Storefront size={14} weight="duotone" />
             Novo Estabelecimento
           </NavLink>
         )}

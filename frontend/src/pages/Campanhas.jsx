@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { campaignsAPI } from '../services/api.js';
 import { useToast } from '../context/ToastContext.jsx';
+import { GasPump, CurrencyDollar, Users, Target, ArrowClockwise, Moon, MagnifyingGlass, Mailbox } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -251,16 +252,16 @@ function CampaignCard({ c, onClose }) {
 
       {/* Métricas principais */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricBox label="Litros abastecidos" value={c.totalLiters}          icon="⛽" />
-        <MetricBox label="Cashback creditado" value={c.totalCashbackUsed}    icon="💰" />
-        <MetricBox label="Clientes alcançados" value={String(c.uniqueCustomers)} icon="👥" />
-        <MetricBox label="Taxa de resgate"    value={c.redemptionRate}       icon="🎯" />
+        <MetricBox label="Litros abastecidos" value={c.totalLiters}          icon={<GasPump size={20} weight="duotone" />} />
+        <MetricBox label="Cashback creditado" value={c.totalCashbackUsed}    icon={<CurrencyDollar size={20} weight="duotone" />} />
+        <MetricBox label="Clientes alcançados" value={String(c.uniqueCustomers)} icon={<Users size={20} weight="duotone" />} />
+        <MetricBox label="Taxa de resgate"    value={c.redemptionRate}       icon={<Target size={20} weight="duotone" />} />
       </div>
 
       {/* Métrica de retorno */}
       <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${returnColor}`}>
         <div className="flex items-center gap-2">
-          <span className="text-base">🔄</span>
+          <ArrowClockwise size={18} weight="bold" />
           <div>
             <p className="text-xs font-semibold">Retornaram após a campanha</p>
             {avgText && <p className="text-xs opacity-70 mt-0.5">{avgText}</p>}
@@ -513,7 +514,7 @@ export default function Campanhas() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { val: 'ACTIVE',   label: 'Melhores clientes', desc: 'Quem mais comprou no período', icon: '⭐' },
-                  { val: 'INACTIVE', label: 'Clientes inativos',  desc: 'Sem compras no período',      icon: '😴' },
+                  { val: 'INACTIVE', label: 'Clientes inativos',  desc: 'Sem compras no período',      icon: <Moon size={16} weight="duotone" /> },
                 ].map(({ val, label, desc, icon }) => (
                   <button
                     key={val}
@@ -579,7 +580,7 @@ export default function Campanhas() {
 
           {previewData.totalClientes === 0 ? (
             <div className="text-center py-10 text-gray-400">
-              <div className="text-4xl mb-2">🔍</div>
+              <MagnifyingGlass size={40} weight="duotone" className="text-stone-300 mb-2 mx-auto" />
               <p className="font-medium">Nenhum cliente encontrado</p>
               <p className="text-sm mt-1">Tente ajustar o filtro ou período.</p>
             </div>
@@ -632,14 +633,14 @@ export default function Campanhas() {
                 val:   'FIXED',
                 label: 'Cashback em R$',
                 desc:  'Valor fixo creditado diretamente no saldo',
-                icon:  '💰',
+                icon:  <CurrencyDollar size={16} weight="duotone" />,
                 hint:  'ex: R$ 10,00 de cashback',
               },
               {
                 val:   'PER_LITER',
                 label: 'Cashback por litro',
                 desc:  'Valor por litro abastecido',
-                icon:  '⛽',
+                icon:  <GasPump size={16} weight="duotone" />,
                 hint:  'ex: R$ 0,05 por litro',
               },
             ].map(({ val, label, desc, icon, hint }) => (
@@ -855,7 +856,7 @@ export default function Campanhas() {
             >
               {sending
                 ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Enviando...</>
-                : '✓ Confirmar e enviar'
+                : 'Confirmar e enviar'
               }
             </button>
           </div>
@@ -900,7 +901,7 @@ export default function Campanhas() {
             </>
           ) : !historyData || historyData.campaigns.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-100">
-              <div className="text-4xl mb-2">📭</div>
+              <Mailbox size={40} weight="duotone" className="text-stone-300 mb-2 mx-auto" />
               <p className="font-medium">Nenhuma campanha encontrada</p>
               <p className="text-sm mt-1">Crie sua primeira campanha acima.</p>
             </div>

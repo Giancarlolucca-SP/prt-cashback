@@ -107,7 +107,7 @@ async function retryPendingValidations() {
         await notificationService.sendPush({
           to:    tx.customer.pushToken,
           title: 'Abastecimento validado!',
-          body:  `✅ Seu abastecimento foi validado! Cashback de R$ ${valorFormatado} creditado.`,
+          body:  `Seu abastecimento foi validado! Cashback de R$ ${valorFormatado} creditado.`,
           data:  { type: 'NFCE_VALIDATED', transactionId: tx.id },
         });
       }

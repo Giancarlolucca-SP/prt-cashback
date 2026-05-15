@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { establishmentsAPI, subscriptionAPI } from '../services/api.js';
 import { useToast } from '../context/ToastContext.jsx';
 import EstablishmentQRCode from '../components/EstablishmentQRCode.jsx';
+import { CreditCard, Camera, Warning } from '@phosphor-icons/react';
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
@@ -22,7 +23,7 @@ function EstablishmentLogo({ src, name, size = 'lg' }) {
   if (!src || failed) {
     return (
       <div className={`${dim} rounded-2xl bg-amber-100 flex items-center justify-center ${txt} border-2 border-amber-200`}>
-        ⛽
+        {name?.charAt(0)?.toUpperCase() || '?'}
       </div>
     );
   }
@@ -123,8 +124,7 @@ const STATUS_LABEL = {
 };
 
 function CardBrandIcon({ brand }) {
-  const icons = { visa: '💳', mastercard: '💳', amex: '💳', elo: '💳' };
-  return <span>{icons[brand] ?? '💳'}</span>;
+  return <CreditCard size={16} weight="duotone" />;
 }
 
 function SubscriptionSection() {
@@ -332,7 +332,7 @@ export default function ConfiguracoesPosto() {
       setPendingFile(null);
       setPendingPreview(null);
       if (inputRef.current) inputRef.current.value = '';
-      showToast('Logo atualizado com sucesso! 🎉', 'success');
+      showToast('Logo atualizado com sucesso!', 'success');
     } catch {
       showToast('Erro ao enviar logo. Tente novamente.', 'error');
     } finally {
@@ -474,7 +474,7 @@ export default function ConfiguracoesPosto() {
                   : 'border-gray-200 hover:border-amber-300 hover:bg-gray-50',
               ].join(' ')}
             >
-              <span className="text-3xl">📷</span>
+              <Camera size={32} weight="duotone" className="text-stone-400 mx-auto" />
               <p className="text-sm font-medium text-gray-700">
                 {currentLogo ? 'Alterar logo' : 'Adicionar logo'}
               </p>
@@ -490,7 +490,7 @@ export default function ConfiguracoesPosto() {
 
             {fileError && (
               <p className="text-sm text-red-500 flex items-center gap-1.5">
-                <span>⚠️</span> {fileError}
+                <Warning size={16} weight="bold" className="text-yellow-500 shrink-0" /> {fileError}
               </p>
             )}
 

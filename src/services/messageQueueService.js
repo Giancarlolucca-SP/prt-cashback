@@ -94,7 +94,7 @@ async function processNextMessage() {
       where: { id: msg.id },
       data:  { status: 'SENT', sentAt: new Date(), errorMessage: null },
     });
-    console.log(`[FILA] ✅ Enviado para ${msg.customerName}`);
+    console.log(`[FILA] Enviado para ${msg.customerName}`);
     return { sent: true, id: msg.id };
   }
 
@@ -111,7 +111,7 @@ async function processNextMessage() {
         errorMessage: result.error ?? 'Falha ao enviar',
       },
     });
-    console.warn(`[FILA] ❌ Falha definitiva para ${msg.customerName} (${newRetryCount} tentativas)`);
+    console.warn(`[FILA] Falha definitiva para ${msg.customerName} (${newRetryCount} tentativas)`);
     return { failed: true, id: msg.id };
   }
 
@@ -125,7 +125,7 @@ async function processNextMessage() {
       scheduledAt:  new Date(Date.now() + 60_000 * newRetryCount), // backoff
     },
   });
-  console.warn(`[FILA] ⚠️ Tentativa ${newRetryCount}/${MAX_RETRIES} falhou para ${msg.customerName}`);
+  console.warn(`[FILA] Tentativa ${newRetryCount}/${MAX_RETRIES} falhou para ${msg.customerName}`);
   return { retry: true, id: msg.id, attempt: newRetryCount };
 }
 

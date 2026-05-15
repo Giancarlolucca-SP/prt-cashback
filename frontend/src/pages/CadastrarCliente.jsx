@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
+import { CheckCircle, Info } from '@phosphor-icons/react';
 
 const INITIAL = { name: '', cpf: '', phone: '' };
 
@@ -105,7 +106,7 @@ export default function CadastrarCliente() {
           />
 
           <Button type="submit" fullWidth size="lg" loading={loading}>
-            👤 Cadastrar Cliente
+            Cadastrar Cliente
           </Button>
         </form>
       </Card>
@@ -117,7 +118,7 @@ export default function CadastrarCliente() {
               ? 'bg-green-50 text-green-700 border border-green-200'
               : 'bg-blue-50 text-blue-700 border border-blue-200'
           }`}>
-            <span>{result.mensagem.includes('cadastrado') ? '✅' : 'ℹ️'}</span>
+            {result.mensagem.includes('cadastrado') ? <CheckCircle size={20} weight="duotone" className="text-green-500" /> : <Info size={20} weight="duotone" className="text-blue-500" />}
             {result.mensagem}
           </div>
 

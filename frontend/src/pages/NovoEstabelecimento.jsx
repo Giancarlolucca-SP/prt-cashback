@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
 import EstablishmentQRCode from '../components/EstablishmentQRCode.jsx';
+import { Camera, Warning, CheckCircle, Confetti, ClipboardList, ArrowClockwise, CreditCard, FileText, Info } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ function LogoUploadStep({ logoFile, logoPreview, onFile, onRemove, onSkip, onBac
                 : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50',
             ].join(' ')}
           >
-            <span className="text-4xl">📷</span>
+            <Camera size={40} weight="duotone" className="text-stone-400 mx-auto" />
             <div className="text-center">
               <p className="text-sm font-medium text-gray-700">
                 Clique para adicionar
@@ -178,7 +179,7 @@ function LogoUploadStep({ logoFile, logoPreview, onFile, onRemove, onSkip, onBac
 
           {fileError && (
             <p className="text-sm text-red-500 flex items-center gap-1.5">
-              <span>⚠️</span> {fileError}
+              <Warning size={16} weight="bold" className="text-yellow-500 shrink-0" /> {fileError}
             </p>
           )}
 
@@ -190,7 +191,7 @@ function LogoUploadStep({ logoFile, logoPreview, onFile, onRemove, onSkip, onBac
         /* Preview */
         <div className="border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2 text-green-600">
-            <span className="text-lg">✅</span>
+            <CheckCircle size={20} weight="duotone" className="text-green-500 shrink-0" />
             <span className="text-sm font-semibold">Logo adicionado!</span>
           </div>
 
@@ -375,7 +376,7 @@ export default function NovoEstabelecimento() {
             logoFile,
             (pct) => setUploadProgress(pct),
           );
-          showToast('Logo adicionado com sucesso! 🎉', 'success');
+          showToast('Logo adicionado com sucesso!', 'success');
         } catch {
           showToast('Erro ao enviar logo. Tente novamente.', 'error');
         } finally {
@@ -398,7 +399,7 @@ export default function NovoEstabelecimento() {
       <div className="max-w-lg mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
           <div className="text-center">
-            <div className="text-5xl mb-3">🎉</div>
+            <Confetti size={48} weight="duotone" className="text-orange-500 mb-3 mx-auto" />
             <h2 className="text-xl font-bold text-gray-800">{result.mensagem}</h2>
           </div>
 
@@ -574,7 +575,7 @@ export default function NovoEstabelecimento() {
                 title="Copiar senha"
                 className="px-3 py-2.5 rounded-lg border border-gray-300 text-sm hover:bg-gray-50 transition-colors"
               >
-                {copied ? '✓' : '📋'}
+                {copied ? <CheckCircle size={16} weight="duotone" /> : <ClipboardList size={16} weight="duotone" />}
               </button>
               <button
                 type="button"
@@ -582,7 +583,7 @@ export default function NovoEstabelecimento() {
                 title="Gerar nova senha"
                 className="px-3 py-2.5 rounded-lg border border-gray-300 text-sm hover:bg-gray-50 transition-colors"
               >
-                🔄
+                <ArrowClockwise size={16} weight="bold" />
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-1">Gerada automaticamente. Anote antes de continuar.</p>
@@ -593,8 +594,8 @@ export default function NovoEstabelecimento() {
             <p className="text-sm font-medium text-gray-700 mb-2">Forma de pagamento</p>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { val: 'cartao', label: 'Cartão de crédito', icon: '💳' },
-                { val: 'boleto', label: 'Boleto bancário',   icon: '📄' },
+                { val: 'cartao', label: 'Cartão de crédito', icon: <CreditCard size={16} weight="duotone" /> },
+                { val: 'boleto', label: 'Boleto bancário',   icon: <FileText size={16} weight="duotone" /> },
               ].map(({ val, label, icon }) => (
                 <button
                   key={val}
@@ -655,7 +656,7 @@ export default function NovoEstabelecimento() {
           {/* Boleto message */}
           {op.pagamento === 'boleto' && (
             <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-              <span className="text-lg">ℹ️</span>
+              <Info size={20} weight="duotone" className="text-blue-500 shrink-0" />
               <p>O boleto será gerado e enviado para o e-mail cadastrado após a confirmação.</p>
             </div>
           )}

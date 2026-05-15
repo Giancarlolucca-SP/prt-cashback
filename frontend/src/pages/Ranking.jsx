@@ -10,6 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import { rankingAPI } from '../services/api.js';
+import { GasPump, Trophy, ChartBar, TrendingUp, Warning, Mailbox } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ const LINE_COLORS = [
   '#EC4899', '#14B8A6',
 ];
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDALS = ['1°', '2°', '3°'];
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -288,7 +289,7 @@ function MetricCards({ attendants }) {
       label: 'Total de Abastecimentos',
       value: fmtInt(total),
       sub:   'no período',
-      icon:  '⛽',
+      icon:  <GasPump size={16} weight="duotone" />,
       bg:    'bg-amber-50 border-amber-100',
       val:   'text-amber-700',
     },
@@ -296,7 +297,7 @@ function MetricCards({ attendants }) {
       label: 'Atendente Mais Ativo',
       value: topAtt?.name || '—',
       sub:   topAtt ? `${fmtInt(topAtt.totalTransactions)} abastec.` : '',
-      icon:  '🏆',
+      icon:  <Trophy size={16} weight="duotone" />,
       bg:    'bg-blue-50 border-blue-100',
       val:   'text-blue-700',
     },
@@ -304,7 +305,7 @@ function MetricCards({ attendants }) {
       label: 'Média por Atendente',
       value: fmtInt(avg),
       sub:   'abastecimentos',
-      icon:  '📊',
+      icon:  <ChartBar size={16} weight="duotone" />,
       bg:    'bg-green-50 border-green-100',
       val:   'text-green-700',
     },
@@ -312,7 +313,7 @@ function MetricCards({ attendants }) {
       label: 'Maior Crescimento',
       value: growing?.name || '—',
       sub:   growing ? '↑ tendência crescente' : 'sem dados de crescimento',
-      icon:  '📈',
+      icon:  <TrendingUp size={16} weight="duotone" />,
       bg:    'bg-purple-50 border-purple-100',
       val:   'text-purple-700',
     },
@@ -337,9 +338,9 @@ function MetricCards({ attendants }) {
 // ── Podium ────────────────────────────────────────────────────────────────────
 
 const PODIUM_CFG = [
-  { medal: '🥇', stepH: 'h-16', stepColor: 'bg-amber-400', cardBorder: 'border-amber-200', cardBg: 'bg-amber-50', color: '#F59E0B' },
-  { medal: '🥈', stepH: 'h-10', stepColor: 'bg-slate-300', cardBorder: 'border-slate-200', cardBg: 'bg-slate-50',  color: '#94A3B8' },
-  { medal: '🥉', stepH: 'h-7',  stepColor: 'bg-orange-300', cardBorder: 'border-orange-200', cardBg: 'bg-orange-50', color: '#F97316' },
+  { medal: '1°', stepH: 'h-16', stepColor: 'bg-amber-400', cardBorder: 'border-amber-200', cardBg: 'bg-amber-50', color: '#F59E0B' },
+  { medal: '2°', stepH: 'h-10', stepColor: 'bg-slate-300', cardBorder: 'border-slate-200', cardBg: 'bg-slate-50',  color: '#94A3B8' },
+  { medal: '3°', stepH: 'h-7',  stepColor: 'bg-orange-300', cardBorder: 'border-orange-200', cardBg: 'bg-orange-50', color: '#F97316' },
 ];
 
 function PodiumCard({ attendant, posIdx }) {
@@ -458,9 +459,7 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
                             <span className="text-[10px] text-gray-400 shrink-0">#{att.code}</span>
                           )}
                           {isWarning && (
-                            <span className="text-amber-500 text-xs shrink-0" title="Abaixo da média do período">
-                              ⚠️
-                            </span>
+                            <Warning size={16} weight="bold" className="text-yellow-500 shrink-0 inline" title="Abaixo da média do período" />
                           )}
                         </div>
                       </div>
@@ -514,8 +513,8 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
       {/* Legend */}
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-400">
         <span>Clique em uma linha para destacar no gráfico</span>
-        <span>⚠️ Abaixo de 50% da média</span>
-        <span>🥇🥈🥉 Top 3</span>
+        <span>Abaixo de 50% da média</span>
+        <span>Top 3</span>
         <span className="ml-auto flex items-center gap-3">
           <span className="flex items-center gap-1"><span className="text-green-500 font-bold">↑</span> crescimento</span>
           <span className="flex items-center gap-1"><span className="text-red-500 font-bold">↓</span> queda</span>
@@ -597,7 +596,7 @@ function AttendantChart({ charts, attendantNames, selectedAttendant, chartMetric
 
       {!hasData ? (
         <div className="flex flex-col items-center justify-center py-14 text-gray-400">
-          <span className="text-4xl mb-3">📊</span>
+          <ChartBar size={40} weight="duotone" className="text-stone-300 mb-3 mx-auto" />
           <p className="text-sm">Nenhum dado para o período selecionado</p>
         </div>
       ) : (
@@ -720,7 +719,7 @@ export default function Ranking() {
 
       {/* ── Header ────────────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">🏆 Ranking de Atendentes</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Ranking de Atendentes</h1>
         <p className="text-sm text-gray-500 mt-1">Performance por período</p>
       </div>
 
@@ -786,7 +785,7 @@ export default function Ranking() {
       {/* ── Empty state ───────────────────────────────────────────────────────── */}
       {isEmpty && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center">
-          <p className="text-5xl mb-4">📭</p>
+          <Mailbox size={48} weight="duotone" className="text-stone-300 mb-4 mx-auto" />
           <p className="text-lg font-semibold text-gray-700">Nenhum dado encontrado</p>
           <p className="text-sm text-gray-400 mt-1">
             Nenhum dado encontrado para o período selecionado

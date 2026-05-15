@@ -14,6 +14,7 @@ import {
 import { dashboardAPI, campaignsAPI, establishmentsAPI } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { Mailbox, Envelope, CheckCircle, Megaphone, Tag, Warning, Eye, CreditCard } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -384,7 +385,7 @@ function EmptyChart({ title, message }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center text-gray-400">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-6">{title}</p>
-      <p className="text-3xl mb-2">📭</p>
+      <Mailbox size={48} weight="duotone" className="text-stone-300 mb-2 mx-auto" />
       <p className="text-sm">{message}</p>
     </div>
   );
@@ -414,7 +415,7 @@ function CampaignTooltip({ active, payload }) {
           <span className="font-bold">{fmtBRL(d.totalCashbackUsed)}</span>
         </p>
         <p className="text-gray-400 mt-1">
-          {d.status === 'SENT' ? '🟢 Ativa' : '⚫ Encerrada'}
+          {d.status === 'SENT' ? 'Ativa' : 'Encerrada'}
         </p>
       </div>
     </div>
@@ -921,7 +922,7 @@ function QueueMonitorWidget({ isAdmin }) {
     <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-base">📨</span>
+          <Envelope size={18} weight="duotone" />
           <p className="text-sm font-semibold text-blue-800">Fila de Mensagens WhatsApp</p>
           {data.dentroHorario ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
@@ -993,7 +994,7 @@ function CampaignQueueProgress({ campaignId }) {
   if (completo) {
     return (
       <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 rounded-lg px-3 py-2">
-        <span>✅</span>
+        <CheckCircle size={20} weight="duotone" className="text-green-500 shrink-0" />
         <span>Todas as mensagens foram enviadas!</span>
       </div>
     );
@@ -1271,7 +1272,7 @@ function CampaignSection() {
 
       {!loading && !error && data?.campaigns?.length === 0 && (
         <div className="bg-white rounded-xl border border-[#e2e8f0] p-10 text-center text-[#64748b]">
-          <p className="text-3xl mb-2">📣</p>
+          <Megaphone size={48} weight="duotone" className="text-stone-300 mb-2 mx-auto" />
           <p className="font-medium text-[#1e293b]">Nenhuma campanha encontrada</p>
           <p className="text-sm mt-1">
             {statusFilter === 'ativas'
@@ -1301,7 +1302,7 @@ function CampaignSection() {
 
 // ── Attendant Ranking ─────────────────────────────────────────────────────────
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDALS = ['1°', '2°', '3°'];
 
 function AttendantRankingWidget({ params }) {
   const [data,    setData]    = useState(null);
@@ -1340,7 +1341,7 @@ function AttendantRankingWidget({ params }) {
   if (!data?.length) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center">
-        <p className="text-2xl mb-2">🏷️</p>
+        <Tag size={32} weight="duotone" className="text-stone-300 mb-2 mx-auto" />
         <p className="text-sm font-medium text-gray-700">Sem dados de atendentes</p>
         <p className="text-xs text-gray-400 mt-1">
           Os atendentes aparecem aqui após cupons NF-e serem validados pelo app.
@@ -1408,12 +1409,7 @@ function AttendantRankingWidget({ params }) {
                         {att.name}
                       </span>
                       {isWarning && (
-                        <span
-                          className="text-amber-500 text-xs"
-                          title="Abaixo da média do período"
-                        >
-                          ⚠️
-                        </span>
+                        <Warning size={16} weight="bold" className="text-yellow-500 shrink-0 inline" title="Abaixo da média do período" />
                       )}
                     </div>
                   </td>
@@ -1457,8 +1453,8 @@ function AttendantRankingWidget({ params }) {
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
-        <span className="flex items-center gap-1">⚠️ Abaixo de 50% da média do grupo</span>
-        <span className="flex items-center gap-1 ml-auto">🥇🥈🥉 Top 3</span>
+        <span className="flex items-center gap-1">Abaixo de 50% da média do grupo</span>
+        <span className="flex items-center gap-1 ml-auto">Top 3</span>
       </div>
     </div>
   );
@@ -1602,7 +1598,7 @@ export default function Dashboard() {
         const est = establishments.find((e) => e.id === selectedEstId);
         return (
           <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-            <span className="text-lg shrink-0">👁️</span>
+            <Eye size={18} weight="duotone" className="shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-blue-600">Visualizando dados de outro estabelecimento</p>
               <p className="text-sm font-bold text-blue-900 truncate">{est?.nome}</p>
@@ -1651,8 +1647,8 @@ export default function Dashboard() {
 
       {/* ── Cashback a Resgatar ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 bg-purple-50 border border-purple-200 rounded-xl px-5 py-4">
-        <div className="shrink-0 w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-xl">
-          💳
+        <div className="shrink-0 w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+          <CreditCard size={16} weight="duotone" className="inline" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-purple-600 mb-0.5">Cashback a Resgatar</p>

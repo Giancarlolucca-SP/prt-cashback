@@ -84,7 +84,7 @@ function progressBar(count, max, width = 20) {
 
 async function main() {
   console.log('\n╔════════════════════════════════════════════════╗');
-  console.log('║  🌱 PostoCash — Seed de Atendentes (Ranking)  ║');
+  console.log('║  [SEED] PostoCash — Seed de Atendentes (Ranking)  ║');
   console.log('╚════════════════════════════════════════════════╝\n');
 
   // ── Busca estabelecimento ─────────────────────────────────────────────────
@@ -92,11 +92,11 @@ async function main() {
     orderBy: { createdAt: 'asc' },
   });
   if (!establishment) {
-    console.error('❌ Nenhum estabelecimento encontrado no banco.');
+    console.error('[ERROR] Nenhum estabelecimento encontrado no banco.');
     console.error('   Execute o cadastro de estabelecimento antes de rodar este seed.');
     process.exit(1);
   }
-  console.log(`🏪 Estabelecimento : ${establishment.name}`);
+  console.log(`Estabelecimento : ${establishment.name}`);
   console.log(`   ID              : ${establishment.id}`);
 
   // ── Busca operador ────────────────────────────────────────────────────────
@@ -105,10 +105,10 @@ async function main() {
     orderBy: { createdAt: 'asc' },
   });
   if (!operator) {
-    console.error(`\n❌ Nenhum operador encontrado para o estabelecimento "${establishment.name}".`);
+    console.error(`\n[ERROR] Nenhum operador encontrado para o estabelecimento "${establishment.name}".`);
     process.exit(1);
   }
-  console.log(`👤 Operador        : ${operator.name} (${operator.role})`);
+  console.log(`Operador        : ${operator.name} (${operator.role})`);
 
   // ── Busca clientes ────────────────────────────────────────────────────────
   const customers = await prisma.customer.findMany({
@@ -117,18 +117,18 @@ async function main() {
     orderBy: { createdAt: 'asc' },
   });
   if (!customers.length) {
-    console.error('\n❌ Nenhum cliente encontrado para este estabelecimento.');
+    console.error('\n[ERROR] Nenhum cliente encontrado para este estabelecimento.');
     console.error('   Cadastre ao menos um cliente antes de rodar este seed.');
     process.exit(1);
   }
-  console.log(`👥 Clientes        : ${customers.length} disponíveis para distribuição`);
+  console.log(`Clientes        : ${customers.length} disponíveis para distribuição`);
 
   // ── Verifica dados de seed existentes ─────────────────────────────────────
   const existing = await prisma.transaction.count({
     where: { source: 'SEED', establishmentId: establishment.id },
   });
   if (existing > 0) {
-    console.log(`\n⚠️  Atenção: já existem ${existing} transações de seed neste estabelecimento.`);
+    console.log(`\n[WARN] Atenção: já existem ${existing} transações de seed neste estabelecimento.`);
     console.log('   Continuando irá adicionar mais dados sobre os existentes.\n');
   } else {
     console.log('');
@@ -140,7 +140,7 @@ async function main() {
   const now           = new Date();
   const start90       = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-  console.log('📊 Gerando transações:\n');
+  console.log('Gerando transações:\n');
 
   let totalCreated = 0;
   const summary    = [];
@@ -189,7 +189,7 @@ async function main() {
 
   // ── Relatório final ───────────────────────────────────────────────────────
   console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║               📦 RESUMO FINAL               ║');
+  console.log('║               RESUMO FINAL               ║');
   console.log('╠══════════════════════════════════════════════╣');
   console.log(`║  Total de transações criadas : ${String(totalCreated).padStart(4)}          ║`);
   console.log(`║  Período coberto             : 90 dias      ║`);
@@ -203,13 +203,13 @@ async function main() {
     console.log(line.padEnd(46) + '  ║');
   }
   console.log('╚══════════════════════════════════════════════╝');
-  console.log('\n✨ Seed de atendentes concluído com sucesso!\n');
-  console.log('💡 Acesse /ranking no painel para visualizar os dados.\n');
+  console.log('\n[OK] Seed de atendentes concluído com sucesso!\n');
+  console.log('Acesse /ranking no painel para visualizar os dados.\n');
 }
 
 main()
   .catch((err) => {
-    console.error('\n❌ Erro durante o seed:', err.message);
+    console.error('\n[ERROR] Erro durante o seed:', err.message);
     if (err.code === 'P2002') {
       console.error('   Código de recibo duplicado — tente rodar novamente.');
     }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { cashbackSettingsAPI } from '../services/api.js';
 import { useToast } from '../context/ToastContext.jsx';
 import Button from '../components/ui/Button.jsx';
+import { Gear, GasPump, Lock, Fire, Drop, ShoppingCart } from '@phosphor-icons/react';
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -72,12 +73,12 @@ function formatBRL(v) {
 }
 
 const FUEL_LABELS = {
-  gasoline:         { label: 'Gasolina',              icon: '🟡' },
-  ethanol:          { label: 'Etanol',                icon: '🟢' },
-  diesel:           { label: 'Diesel',                icon: '🔵' },
-  gnv:              { label: 'GNV',                   icon: '⚪' },
-  carWash:          { label: 'Lavagem',               icon: '🚿' },
-  convenienceStore: { label: 'Loja de Conveniência',  icon: '🛒' },
+  gasoline:         { label: 'Gasolina',              icon: <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" /> },
+  ethanol:          { label: 'Etanol',                icon: <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" /> },
+  diesel:           { label: 'Diesel',                icon: <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" /> },
+  gnv:              { label: 'GNV',                   icon: <span className="inline-block w-2.5 h-2.5 rounded-full bg-stone-300" /> },
+  carWash:          { label: 'Lavagem',               icon: <Drop size={16} weight="duotone" /> },
+  convenienceStore: { label: 'Loja de Conveniência',  icon: <ShoppingCart size={16} weight="duotone" /> },
 };
 
 // Types that use fixedValue instead of centsPerLiter
@@ -290,7 +291,7 @@ export default function ConfiguracoesCashback() {
       </div>
 
       {/* ── Section 1: Mode ── */}
-      <Section title="Modo de Cashback" icon="⚙️">
+      <Section title="Modo de Cashback" icon={<Gear size={20} weight="duotone" />}>
         <div className="space-y-3">
           {[
             {
@@ -303,7 +304,7 @@ export default function ConfiguracoesCashback() {
               value: 'CENTS_PER_LITER',
               label: 'Centavos por litro',
               desc:  'ex: R$ 0,05 por litro abastecido',
-              icon:  '⛽',
+              icon:  <GasPump size={20} weight="duotone" />,
             },
           ].map((opt) => (
             <label
@@ -353,7 +354,7 @@ export default function ConfiguracoesCashback() {
       </Section>
 
       {/* ── Section 2: Fuel types ── */}
-      <Section title="Configuração por Combustível" icon="⛽">
+      <Section title="Configuração por Combustível" icon={<GasPump size={20} weight="duotone" />}>
         <p className="text-xs text-gray-400 mb-4">
           Quando "Ativo", a taxa específica substitui a taxa padrão para aquele combustível.
         </p>
@@ -462,7 +463,7 @@ export default function ConfiguracoesCashback() {
       </Section>
 
       {/* ── Section 3: Limits ── */}
-      <Section title="Limites" icon="🔒">
+      <Section title="Limites" icon={<Lock size={20} weight="duotone" />}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field
             label="Valor mínimo para gerar cashback (R$)"
@@ -482,7 +483,7 @@ export default function ConfiguracoesCashback() {
       </Section>
 
       {/* ── Section 4: Double bonus ── */}
-      <Section title="Promoção Cashback Dobrado" icon="🔥">
+      <Section title="Promoção Cashback Dobrado" icon={<Fire size={20} weight="duotone" />}>
         <Toggle
           label="Ativar cashback dobrado"
           description="Dobra o cashback gerado para todos os clientes no período definido"
@@ -494,7 +495,7 @@ export default function ConfiguracoesCashback() {
           <div className="mt-4 space-y-4">
             {bonusActive && (
               <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                🔥 Promoção ativa agora
+                Promoção ativa agora
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

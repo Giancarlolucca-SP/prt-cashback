@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { customersAPI } from '../services/api.js';
+import { Users } from '@phosphor-icons/react';
 
 const LIMIT = 20;
 
@@ -149,7 +150,7 @@ export default function Clientes() {
 
         /* Empty state */
         <div className="text-center py-16 text-gray-400 border border-dashed border-gray-200 rounded-xl">
-          <p className="text-3xl mb-2">👥</p>
+          <Users size={48} weight="duotone" className="text-stone-300 mb-2 mx-auto" />
           <p className="text-sm font-medium">
             {activeSearch
               ? 'Nenhum cliente encontrado para essa busca'

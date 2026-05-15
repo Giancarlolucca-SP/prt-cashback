@@ -5,6 +5,7 @@ import { applyCpfMask, stripCpf } from '../utils/cpfMask.js';
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
+import { User } from '@phosphor-icons/react';
 
 export default function ConsultarCliente() {
   const [cpf, setCpf]         = useState('');
@@ -64,14 +65,14 @@ export default function ConsultarCliente() {
             error={error}
           />
           <Button type="submit" fullWidth loading={loading}>
-            🔍 Consultar
+            Consultar
           </Button>
         </form>
       </Card>
 
       {customer && (
         <Card>
-          <CardHeader title={customer.nome} icon="👤" />
+          <CardHeader title={customer.nome} icon={<User size={20} weight="duotone" />} />
 
           <div className="space-y-3 text-sm">
             <Row label="CPF" value={customer.cpf} mono />
@@ -92,7 +93,7 @@ export default function ConsultarCliente() {
               fullWidth
               onClick={() => goTo('/abastecer')}
             >
-              ⛽ Abastecer
+              Abastecer
             </Button>
             <Button
               variant={customer.saldoNumerico > 0 ? 'success' : 'secondary'}
@@ -100,7 +101,7 @@ export default function ConsultarCliente() {
               onClick={() => goTo('/resgatar')}
               disabled={customer.saldoNumerico <= 0}
             >
-              💸 Resgatar
+              Resgatar
             </Button>
           </div>
           {customer.saldoNumerico <= 0 && (

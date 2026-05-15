@@ -44,7 +44,7 @@ function generateRedeemReceipt({ customerName, cpf, amountUsed, newBalance, rece
     `Data: ${formatDateBR(date)}`,
     `Código: ${receiptCode}`,
     DASH,
-    `💰 DESCONTO: ${formatBRL(amountUsed)}`,
+    `DESCONTO: ${formatBRL(amountUsed)}`,
     `Saldo restante: ${formatBRL(newBalance)}`,
     'Apresente ao operador',
     LINE,
