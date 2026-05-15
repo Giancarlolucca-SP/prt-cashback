@@ -1321,13 +1321,23 @@
     </section>
 
     <footer id="contato" class="border-t border-stone-200 bg-stone-950 px-6 py-8 text-stone-300 md:px-14">
-      <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 text-center md:flex-row md:text-left">
-        <img src="assets/logo-dark-bg.svg" alt="Logo PostoCash" class="h-9 w-auto object-contain" loading="lazy" decoding="async" />
-        <div class="flex flex-col items-center gap-2 text-sm md:flex-row md:gap-6">
-          <a href="mailto:tgr.tecno@gmail.com" class="transition hover:text-white">tgr.tecno@gmail.com</a>
-          <a href="https://wa.me/5511985498727?text=Ol%C3%A1%2C%20quero%20falar%20com%20o%20PostoCash." target="_blank" rel="noopener" class="transition hover:text-white">
-            (11) 98549-8727
-          </a>
+      <div class="mx-auto max-w-7xl flex flex-col gap-6">
+        <div class="flex flex-col items-center justify-between gap-6 text-center md:flex-row md:text-left">
+          <img src="assets/logo-dark-bg.svg" alt="Logo PostoCash" class="h-9 w-auto object-contain" loading="lazy" decoding="async" />
+          <div class="flex flex-col items-center gap-2 text-sm md:flex-row md:gap-6">
+            <a href="mailto:tgr.tecno@gmail.com" class="transition hover:text-white">tgr.tecno@gmail.com</a>
+            <a href="https://wa.me/5511985498727?text=Ol%C3%A1%2C%20quero%20falar%20com%20o%20PostoCash." target="_blank" rel="noopener" class="transition hover:text-white">
+              (11) 98549-8727
+            </a>
+          </div>
+        </div>
+        <div class="border-t border-stone-800 pt-4 flex flex-col items-center justify-between gap-3 text-xs text-stone-500 md:flex-row">
+          <p>© 2026 TGR Tech / PostoCash · LGPD</p>
+          <div class="flex flex-wrap justify-center gap-5">
+            <a href="privacidade.html" class="hover:text-stone-300 transition">Política de Privacidade</a>
+            <a href="cookies.html" class="hover:text-stone-300 transition">Política de Cookies</a>
+            <a href="termos.html" class="hover:text-stone-300 transition">Termos de Uso</a>
+          </div>
         </div>
       </div>
     </footer>
@@ -2195,7 +2205,53 @@
         window.location.href = `mailto:${demoEmail}?subject=${subject}&body=${body}`;
       });
     }
+    // ── COOKIE CONSENT ────────────────────────────
+    function showCookieBanner() {
+      const b = document.getElementById('cookie-banner');
+      if (b) { b.classList.remove('hidden'); }
+    }
+
+    function acceptCookies() {
+      localStorage.setItem('postocash_consent', JSON.stringify({ accepted: true, analytics: true, date: new Date().toISOString() }));
+      document.getElementById('cookie-banner').classList.add('hidden');
+      if (typeof gtag === 'function') gtag('event', 'cookie_consent', { accepted: true, analytics: true });
+    }
+
+    function declineCookies() {
+      localStorage.setItem('postocash_consent', JSON.stringify({ accepted: true, analytics: false, date: new Date().toISOString() }));
+      document.getElementById('cookie-banner').classList.add('hidden');
+    }
+
+    (function initCookieConsent() {
+      try {
+        const consent = localStorage.getItem('postocash_consent');
+        if (!consent) setTimeout(showCookieBanner, 1500);
+      } catch (e) { /* private browsing */ }
+    })();
   </script>
+
+  <!-- ══════════════════════════════════════════════
+       COOKIE CONSENT BANNER
+  ══════════════════════════════════════════════ -->
+  <div id="cookie-banner" class="hidden fixed bottom-0 left-0 right-0 z-[110] bg-stone-950/97 backdrop-blur-sm border-t border-stone-800 px-6 py-4 shadow-2xl">
+    <div class="mx-auto max-w-7xl flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-xs text-stone-400 leading-relaxed max-w-2xl">
+        Usamos cookies essenciais para o funcionamento do sistema e cookies analíticos (Google Analytics) para melhorar sua experiência. Ao continuar, você concorda com nossa
+        <a href="cookies.html" class="text-orange-400 hover:text-orange-300 underline underline-offset-2 transition">Política de Cookies</a>
+        e
+        <a href="privacidade.html" class="text-orange-400 hover:text-orange-300 underline underline-offset-2 transition">Política de Privacidade</a>.
+      </p>
+      <div class="flex items-center gap-3 shrink-0">
+        <button onclick="declineCookies()" class="px-4 py-2 border border-stone-600 hover:border-stone-400 text-stone-400 hover:text-stone-200 text-xs font-medium rounded-lg transition whitespace-nowrap">
+          Somente essenciais
+        </button>
+        <button onclick="acceptCookies()" class="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition whitespace-nowrap">
+          Aceitar todos
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
 
