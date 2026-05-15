@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
 import EstablishmentQRCode from '../components/EstablishmentQRCode.jsx';
-import { Camera, Warning, CheckCircle, Confetti, ClipboardList, ArrowClockwise, CreditCard, FileText, Info } from '@phosphor-icons/react';
+import { Camera, Warning, CheckCircle, Confetti, ClipboardText, ArrowClockwise, CreditCard, FileText, Info } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -575,7 +575,7 @@ export default function NovoEstabelecimento() {
                 title="Copiar senha"
                 className="px-3 py-2.5 rounded-lg border border-gray-300 text-sm hover:bg-gray-50 transition-colors"
               >
-                {copied ? <CheckCircle size={16} weight="duotone" /> : <ClipboardList size={16} weight="duotone" />}
+                {copied ? <CheckCircle size={16} weight="duotone" /> : <ClipboardText size={16} weight="duotone" />}
               </button>
               <button
                 type="button"

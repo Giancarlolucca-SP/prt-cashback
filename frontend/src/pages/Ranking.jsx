@@ -10,7 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import { rankingAPI } from '../services/api.js';
-import { GasPump, Trophy, ChartBar, TrendingUp, Warning, Mailbox } from '@phosphor-icons/react';
+import { GasPump, Trophy, ChartBar, TrendUp, Warning, Mailbox } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -313,7 +313,7 @@ function MetricCards({ attendants }) {
       label: 'Maior Crescimento',
       value: growing?.name || '—',
       sub:   growing ? '↑ tendência crescente' : 'sem dados de crescimento',
-      icon:  <TrendingUp size={16} weight="duotone" />,
+      icon:  <TrendUp size={16} weight="duotone" />,
       bg:    'bg-purple-50 border-purple-100',
       val:   'text-purple-700',
     },
