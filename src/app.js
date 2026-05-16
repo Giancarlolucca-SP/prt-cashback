@@ -21,7 +21,7 @@ const adminPhotoRoutes          = require('./routes/adminPhotoRoutes');
 const stripeRoutes              = require('./routes/stripeRoutes');
 const rankingRoutes             = require('./routes/rankingRoutes');
 const adminRoutes               = require('./routes/adminRoutes');
-const { webhook: stripeWebhook } = require('./controllers/stripeController');
+const { handleWebhook: stripeWebhook } = require('./controllers/stripeController');
 
 const app = express();
 app.set('trust proxy', 1);

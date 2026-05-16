@@ -1,4 +1,9 @@
 const Stripe = require('stripe');
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const emailService = require('./emailService');
+
+const prisma = new PrismaClient();
 
 let _stripe = null;
 
@@ -124,6 +129,58 @@ async function getSubscriptionStatus(subscriptionId) {
   };
 }
 
+async function handleCheckoutComplete(session) {
+  const { customer_email, customer, subscription, metadata } = session;
+
+  if (!customer_email) {
+    console.warn('[STRIPE] checkout.session.completed sem customer_email — ignorado');
+    return;
+  }
+
+  const existing = await prisma.operator.findFirst({ where: { email: customer_email } });
+  if (existing) {
+    console.log('[STRIPE] Estabelecimento já existe:', customer_email);
+    return;
+  }
+
+  const name  = metadata?.nome  || customer_email.split('@')[0];
+  const cnpj  = metadata?.cnpj  || '00000000000100';
+
+  const establishment = await prisma.establishment.create({
+    data: {
+      name,
+      cnpj,
+      cashbackPercent: 5,
+      stripeCustomerId:     customer,
+      stripeSubscriptionId: subscription,
+      subscriptionStatus:   'ACTIVE',
+    },
+  });
+
+  const chars    = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const password = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const hashed   = await bcrypt.hash(password, 10);
+
+  await prisma.operator.create({
+    data: {
+      name:            (metadata?.operatorName || name).trim(),
+      email:           customer_email,
+      password:        hashed,
+      role:            'ADMIN',
+      establishmentId: establishment.id,
+    },
+  });
+
+  await emailService.sendWelcomeEmail({
+    name:              (metadata?.operatorName || name).trim(),
+    email:             customer_email,
+    password,
+    establishmentName: name,
+  }).catch((err) => console.error('[EMAIL] Falha ao enviar boas-vindas:', err.message));
+
+  console.log('[STRIPE] Estabelecimento criado com sucesso:', name);
+}
+
 function constructWebhookEvent(payload, signature) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
@@ -142,4 +199,5 @@ module.exports = {
   cancelSubscription,
   getSubscriptionStatus,
   constructWebhookEvent,
+  handleCheckoutComplete,
 };

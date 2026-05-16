@@ -173,7 +173,7 @@ async function activateAfterPayment(req, res, next) {
 }
 
 // POST /stripe/webhook — PUBLIC, needs raw body
-async function webhook(req, res) {
+async function handleWebhook(req, res) {
   let event;
   try {
     event = stripeService.constructWebhookEvent(
@@ -187,6 +187,12 @@ async function webhook(req, res) {
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        console.log('[STRIPE] Checkout completo:', session.customer_email);
+        await stripeService.handleCheckoutComplete(session);
+        break;
+      }
       case 'invoice.paid': {
         const inv = event.data.object;
         console.log(`[STRIPE WEBHOOK] Fatura paga: ${inv.id} (cliente: ${inv.customer})`);
@@ -309,7 +315,7 @@ module.exports = {
   createSetupIntent,
   confirmSubscription,
   activateAfterPayment,
-  webhook,
+  handleWebhook,
   getMySubscription,
   cancelMySubscription,
 };
