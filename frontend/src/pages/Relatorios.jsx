@@ -121,7 +121,7 @@ function TransactionsPreview({ data }) {
               <tr key={i} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3 text-[14px] text-slate-500 whitespace-nowrap tabular-nums">{fmtDateTime(r.date)}</td>
                 <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{r.customerName}</td>
-                <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{r.cpf}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-500">{r.cpf}</td>
                 <td className="px-4 py-3 text-[14px] font-semibold text-slate-800 text-right tabular-nums">{formatBRL(r.amount)}</td>
                 <td className="px-4 py-3 text-[14px] text-slate-500 text-right tabular-nums">{r.cashbackPercent}%</td>
                 <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(r.cashbackValue)}</td>
@@ -171,7 +171,7 @@ function RedemptionsPreview({ data }) {
               <tr key={i} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3 text-[14px] text-slate-500 whitespace-nowrap tabular-nums">{fmtDateTime(r.date)}</td>
                 <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{r.customerName}</td>
-                <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{r.cpf}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-500">{r.cpf}</td>
                 <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(r.amountRedeemed)}</td>
                 <td className="px-4 py-3 text-[14px] text-slate-500">{r.operator}</td>
               </tr>
@@ -219,7 +219,7 @@ function CustomersPreview({ data }) {
             {rows.slice(0, 100).map((r, i) => (
               <tr key={i} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{r.name}</td>
-                <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{r.cpf}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-500">{r.cpf}</td>
                 <td className="px-4 py-3 text-[14px] text-slate-600">{r.phone}</td>
                 <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(r.balance)}</td>
                 <td className="px-4 py-3 text-[14px] font-semibold text-slate-800 text-right tabular-nums">{formatBRL(r.totalSpent)}</td>
@@ -280,7 +280,7 @@ function SummaryPreview({ data }) {
                   <tr key={i} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 text-[14px] text-slate-400 font-medium tabular-nums">{c.rank}</td>
                     <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{c.name}</td>
-                    <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{c.cpf}</td>
+                    <td className="px-4 py-3 text-[14px] text-slate-500">{c.cpf}</td>
                     <td className="px-4 py-3 text-[14px] font-semibold text-slate-800 text-right tabular-nums">{formatBRL(c.totalSpent)}</td>
                     <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(c.totalCashback)}</td>
                     <td className="px-4 py-3 text-[14px] text-slate-600 text-center tabular-nums">{c.visits}</td>
