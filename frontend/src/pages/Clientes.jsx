@@ -160,29 +160,29 @@ export default function Clientes() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-100">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="px-4 py-3 text-left">Cliente</th>
-                  <th className="px-4 py-3 text-left">Telefone</th>
-                  <th className="px-4 py-3 text-right">Consumo últimos 30 dias</th>
-                  <th className="px-4 py-3 text-left">Último abastecimento</th>
-                  <th className="px-4 py-3 text-center">Ações</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Cliente</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Telefone</th>
+                  <th className="px-4 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Consumo últimos 30 dias</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Último abastecimento</th>
+                  <th className="px-4 py-3 text-center text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em]">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{c.name}</p>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">{maskCpf(c.cpf)}</p>
+                      <p className="text-[14px] font-semibold text-slate-900">{c.name}</p>
+                      <p className="font-mono text-[13px] text-slate-400 mt-0.5">{maskCpf(c.cpf)}</p>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{formatPhone(c.phone)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-green-700">
+                    <td className="px-4 py-3 text-[14px] text-slate-600">{formatPhone(c.phone)}</td>
+                    <td className="px-4 py-3 text-right text-[14px] font-bold text-green-600 tabular-nums">
                       {formatBRL(c.totalLast30Days)}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{formatDate(c.lastFuelDate)}</td>
+                    <td className="px-4 py-3 text-[14px] text-slate-500">{formatDate(c.lastFuelDate)}</td>
                     <td className="px-4 py-3 text-center">
                       <WhatsAppButton phone={c.phone} />
                     </td>

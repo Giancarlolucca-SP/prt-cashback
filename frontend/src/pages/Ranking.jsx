@@ -407,21 +407,21 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[680px]">
-          <thead>
-            <tr className="text-xs text-gray-400 bg-gray-50 border-b border-gray-100">
-              <th className="text-left py-3 px-4 font-medium w-10">#</th>
-              <th className="text-left py-3 px-3 font-medium">Atendente</th>
-              <th className="text-right py-3 px-3 font-medium">Abastecimentos</th>
-              <th className="text-right py-3 px-3 font-medium">Litros</th>
-              <th className="text-right py-3 px-3 font-medium">Valor Total</th>
-              <th className="text-right py-3 px-3 font-medium">Cashback</th>
-              <th className="text-right py-3 px-3 font-medium">Ticket Médio</th>
-              <th className="text-right py-3 px-3 font-medium">Última Atividade</th>
-              <th className="text-center py-3 px-4 font-medium">Tendência</th>
+        <table className="w-full min-w-[680px]">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap w-10">#</th>
+              <th className="px-3 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Atendente</th>
+              <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Abastecimentos</th>
+              <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Litros</th>
+              <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Valor Total</th>
+              <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Cashback</th>
+              <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Ticket Médio</th>
+              <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Última Atividade</th>
+              <th className="px-4 py-3 text-center text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Tendência</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {attendants.map((att, idx) => {
               const isSelected = selectedAttendant === att.name;
               const isWarning  = att.belowAverage;
@@ -431,16 +431,16 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
                   onClick={() => onSelect(att.name)}
                   title={isWarning ? 'Abaixo da média do período' : undefined}
                   className={[
-                    'border-b border-gray-50 last:border-0 cursor-pointer transition-colors',
+                    'cursor-pointer transition-colors',
                     isSelected
                       ? 'bg-amber-50 ring-1 ring-inset ring-amber-200'
                       : isWarning
                       ? 'bg-red-50 hover:bg-red-100'
-                      : 'hover:bg-gray-50',
+                      : 'hover:bg-slate-50',
                   ].join(' ')}
                 >
                   {/* Rank */}
-                  <td className="py-3 px-4 text-xs text-gray-400 font-medium">
+                  <td className="py-3 px-4 text-[14px] text-slate-400 font-medium tabular-nums">
                     {idx < 3 ? MEDALS[idx] : att.rank}
                   </td>
 
@@ -454,9 +454,9 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-gray-900 truncate">{att.name}</span>
+                          <span className="text-[14px] font-semibold text-slate-900 truncate">{att.name}</span>
                           {att.code && (
-                            <span className="text-[10px] text-gray-400 shrink-0">#{att.code}</span>
+                            <span className="text-[10px] text-slate-400 shrink-0">#{att.code}</span>
                           )}
                           {isWarning && (
                             <Warning size={16} weight="bold" className="text-yellow-500 shrink-0 inline" title="Abaixo da média do período" />
@@ -468,34 +468,34 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
 
                   {/* Transactions */}
                   <td className={[
-                    'py-3 px-3 text-right font-bold tabular-nums',
-                    idx < 3 ? 'text-amber-600' : 'text-gray-700',
+                    'py-3 px-3 text-right text-[14px] font-bold tabular-nums',
+                    idx < 3 ? 'text-amber-600' : 'text-slate-700',
                   ].join(' ')}>
                     {fmtInt(att.totalTransactions)}
                   </td>
 
                   {/* Liters */}
-                  <td className="py-3 px-3 text-right text-gray-600 tabular-nums">
+                  <td className="py-3 px-3 text-right text-[14px] text-slate-600 tabular-nums">
                     {att.totalLiters > 0 ? fmtLiters(att.totalLiters) : '—'}
                   </td>
 
                   {/* Value */}
-                  <td className="py-3 px-3 text-right font-medium text-gray-700 tabular-nums">
+                  <td className="py-3 px-3 text-right text-[14px] font-semibold text-slate-700 tabular-nums">
                     {fmtBRL(att.totalValue)}
                   </td>
 
                   {/* Cashback */}
-                  <td className="py-3 px-3 text-right text-green-600 font-semibold tabular-nums">
+                  <td className="py-3 px-3 text-right text-[14px] text-green-600 font-semibold tabular-nums">
                     {fmtBRL(att.totalCashback)}
                   </td>
 
                   {/* Avg ticket */}
-                  <td className="py-3 px-3 text-right text-gray-600 tabular-nums">
+                  <td className="py-3 px-3 text-right text-[14px] text-slate-600 tabular-nums">
                     {fmtBRL(att.avgTicket)}
                   </td>
 
                   {/* Last activity */}
-                  <td className="py-3 px-3 text-right text-xs text-gray-400 tabular-nums">
+                  <td className="py-3 px-3 text-right text-[13px] text-slate-400 tabular-nums">
                     {fmtDate(att.lastTransaction)}
                   </td>
 

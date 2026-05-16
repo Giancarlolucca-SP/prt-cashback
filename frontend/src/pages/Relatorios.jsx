@@ -107,34 +107,34 @@ function TransactionsPreview({ data }) {
         <StatBox label="Cashback gerado" value={formatBRL(totals.totalCashback)} accent />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-100">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-700 text-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-100">
+        <table className="w-full">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               {['Data/Hora', 'Cliente', 'CPF', 'Valor Abast.', 'CB%', 'Cashback'].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-100">
             {rows.slice(0, 100).map((r, i) => (
-              <tr key={i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500">{fmtDateTime(r.date)}</td>
-                <td className="px-3 py-2 font-medium text-gray-900">{r.customerName}</td>
-                <td className="px-3 py-2 font-mono text-gray-500">{r.cpf}</td>
-                <td className="px-3 py-2 text-right font-semibold text-gray-800">{formatBRL(r.amount)}</td>
-                <td className="px-3 py-2 text-right text-gray-500">{r.cashbackPercent}%</td>
-                <td className="px-3 py-2 text-right font-semibold text-green-700">{formatBRL(r.cashbackValue)}</td>
+              <tr key={i} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3 text-[14px] text-slate-500 whitespace-nowrap tabular-nums">{fmtDateTime(r.date)}</td>
+                <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{r.customerName}</td>
+                <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{r.cpf}</td>
+                <td className="px-4 py-3 text-[14px] font-semibold text-slate-800 text-right tabular-nums">{formatBRL(r.amount)}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-500 text-right tabular-nums">{r.cashbackPercent}%</td>
+                <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(r.cashbackValue)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-green-50 font-bold text-green-800">
-              <td className="px-3 py-2.5" colSpan={2}>TOTAIS — {totals.count} transações</td>
-              <td className="px-3 py-2.5"></td>
-              <td className="px-3 py-2.5 text-right">{formatBRL(totals.totalAmount)}</td>
-              <td className="px-3 py-2.5"></td>
-              <td className="px-3 py-2.5 text-right">{formatBRL(totals.totalCashback)}</td>
+            <tr className="bg-green-50 font-bold text-green-800 border-t border-green-100">
+              <td className="px-4 py-3 text-[13px]" colSpan={2}>TOTAIS — {totals.count} transações</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3 text-right tabular-nums">{formatBRL(totals.totalAmount)}</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3 text-right tabular-nums">{formatBRL(totals.totalCashback)}</td>
             </tr>
           </tfoot>
         </table>
@@ -157,32 +157,32 @@ function RedemptionsPreview({ data }) {
         <StatBox label="Total resgatado" value={formatBRL(totals.totalAmount)} accent />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-100">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-700 text-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-100">
+        <table className="w-full">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               {['Data/Hora', 'Cliente', 'CPF', 'Valor Resgatado', 'Operador'].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-100">
             {rows.slice(0, 100).map((r, i) => (
-              <tr key={i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500">{fmtDateTime(r.date)}</td>
-                <td className="px-3 py-2 font-medium text-gray-900">{r.customerName}</td>
-                <td className="px-3 py-2 font-mono text-gray-500">{r.cpf}</td>
-                <td className="px-3 py-2 text-right font-semibold text-green-700">{formatBRL(r.amountRedeemed)}</td>
-                <td className="px-3 py-2 text-gray-500">{r.operator}</td>
+              <tr key={i} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3 text-[14px] text-slate-500 whitespace-nowrap tabular-nums">{fmtDateTime(r.date)}</td>
+                <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{r.customerName}</td>
+                <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{r.cpf}</td>
+                <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(r.amountRedeemed)}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-500">{r.operator}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-green-50 font-bold text-green-800">
-              <td className="px-3 py-2.5" colSpan={2}>TOTAIS — {totals.count} resgates</td>
-              <td className="px-3 py-2.5"></td>
-              <td className="px-3 py-2.5 text-right">{formatBRL(totals.totalAmount)}</td>
-              <td className="px-3 py-2.5"></td>
+            <tr className="bg-green-50 font-bold text-green-800 border-t border-green-100">
+              <td className="px-4 py-3 text-[13px]" colSpan={2}>TOTAIS — {totals.count} resgates</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3 text-right tabular-nums">{formatBRL(totals.totalAmount)}</td>
+              <td className="px-4 py-3"></td>
             </tr>
           </tfoot>
         </table>
@@ -206,35 +206,35 @@ function CustomersPreview({ data }) {
         <StatBox label="Total gasto (lifetime)" value={formatBRL(totals.totalSpent)} accent />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-100">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-700 text-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-100">
+        <table className="w-full">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               {['Nome', 'CPF', 'Telefone', 'Saldo', 'Total Gasto', 'Último Abast.', 'Trans.'].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-100">
             {rows.slice(0, 100).map((r, i) => (
-              <tr key={i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                <td className="px-3 py-2 font-medium text-gray-900">{r.name}</td>
-                <td className="px-3 py-2 font-mono text-gray-500">{r.cpf}</td>
-                <td className="px-3 py-2 text-gray-600">{r.phone}</td>
-                <td className="px-3 py-2 text-right font-semibold text-green-700">{formatBRL(r.balance)}</td>
-                <td className="px-3 py-2 text-right text-gray-700">{formatBRL(r.totalSpent)}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-gray-500">{fmtDate(r.lastFuelDate)}</td>
-                <td className="px-3 py-2 text-center text-gray-600">{r.transactionCount}</td>
+              <tr key={i} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{r.name}</td>
+                <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{r.cpf}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-600">{r.phone}</td>
+                <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(r.balance)}</td>
+                <td className="px-4 py-3 text-[14px] font-semibold text-slate-800 text-right tabular-nums">{formatBRL(r.totalSpent)}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-500 whitespace-nowrap">{fmtDate(r.lastFuelDate)}</td>
+                <td className="px-4 py-3 text-[14px] text-slate-600 text-center tabular-nums">{r.transactionCount}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-green-50 font-bold text-green-800">
-              <td className="px-3 py-2.5">{totals.count} clientes</td>
-              <td className="px-3 py-2.5" colSpan={2}></td>
-              <td className="px-3 py-2.5 text-right">{formatBRL(totals.totalBalance)}</td>
-              <td className="px-3 py-2.5 text-right">{formatBRL(totals.totalSpent)}</td>
-              <td className="px-3 py-2.5" colSpan={2}></td>
+            <tr className="bg-green-50 font-bold text-green-800 border-t border-green-100">
+              <td className="px-4 py-3 text-[13px]">{totals.count} clientes</td>
+              <td className="px-4 py-3" colSpan={2}></td>
+              <td className="px-4 py-3 text-right tabular-nums">{formatBRL(totals.totalBalance)}</td>
+              <td className="px-4 py-3 text-right tabular-nums">{formatBRL(totals.totalSpent)}</td>
+              <td className="px-4 py-3" colSpan={2}></td>
             </tr>
           </tfoot>
         </table>
@@ -266,24 +266,24 @@ function SummaryPreview({ data }) {
       {topCustomers.length > 0 && (
         <>
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Top 10 Clientes por Volume</h3>
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-700 text-white">
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['#', 'Nome', 'CPF', 'Total Abast.', 'Cashback', 'Visitas'].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left font-semibold">{h}</th>
+                    <th key={h} className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {topCustomers.map((c, i) => (
-                  <tr key={i} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                    <td className="px-3 py-2 text-gray-400 font-medium">{c.rank}</td>
-                    <td className="px-3 py-2 font-medium text-gray-900">{c.name}</td>
-                    <td className="px-3 py-2 font-mono text-gray-500">{c.cpf}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-gray-800">{formatBRL(c.totalSpent)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-green-700">{formatBRL(c.totalCashback)}</td>
-                    <td className="px-3 py-2 text-center text-gray-600">{c.visits}</td>
+                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-[14px] text-slate-400 font-medium tabular-nums">{c.rank}</td>
+                    <td className="px-4 py-3 text-[14px] font-semibold text-slate-900">{c.name}</td>
+                    <td className="px-4 py-3 font-mono text-[13px] text-slate-500">{c.cpf}</td>
+                    <td className="px-4 py-3 text-[14px] font-semibold text-slate-800 text-right tabular-nums">{formatBRL(c.totalSpent)}</td>
+                    <td className="px-4 py-3 text-[14px] font-bold text-green-600 text-right tabular-nums">{formatBRL(c.totalCashback)}</td>
+                    <td className="px-4 py-3 text-[14px] text-slate-600 text-center tabular-nums">{c.visits}</td>
                   </tr>
                 ))}
               </tbody>

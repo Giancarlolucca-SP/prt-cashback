@@ -1367,18 +1367,18 @@ function AttendantRankingWidget({ params }) {
 
       {/* Table */}
       <div className="overflow-x-auto -mx-4 px-4">
-        <table className="w-full text-sm min-w-[480px]">
-          <thead>
-            <tr className="text-xs text-gray-400 border-b border-gray-100">
-              <th className="text-left pb-2 pr-3 font-medium w-6">#</th>
-              <th className="text-left pb-2 pr-3 font-medium">Nome</th>
-              <th className="text-right pb-2 pr-3 font-medium">Abastec.</th>
-              <th className="text-right pb-2 pr-3 font-medium">Litros</th>
-              <th className="text-right pb-2 pr-3 font-medium">Valor (R$)</th>
-              <th className="text-right pb-2 font-medium">Cashback gerado</th>
+        <table className="w-full min-w-[480px]">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap w-6">#</th>
+              <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Nome</th>
+              <th className="px-4 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Abastec.</th>
+              <th className="px-4 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Litros</th>
+              <th className="px-4 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Valor (R$)</th>
+              <th className="px-4 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Cashback gerado</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {data.map((att, idx) => {
               const medal     = MEDALS[idx] ?? null;
               const isTop     = idx < 3;
@@ -1388,22 +1388,22 @@ function AttendantRankingWidget({ params }) {
                 <tr
                   key={att.name}
                   className={[
-                    'border-b border-gray-50 last:border-0 transition-colors',
-                    isTop ? 'hover:bg-amber-50' : 'hover:bg-gray-50',
+                    'transition-colors',
+                    isTop ? 'hover:bg-amber-50' : 'hover:bg-slate-50',
                   ].join(' ')}
                 >
                   {/* Position */}
-                  <td className="py-3 pr-3 text-xs text-gray-400 font-medium">
+                  <td className="px-4 py-3 text-[14px] text-slate-400 font-medium tabular-nums">
                     {medal ?? idx + 1}
                   </td>
 
                   {/* Name */}
-                  <td className="py-3 pr-3">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <span
                         className={[
-                          'text-sm font-semibold',
-                          isTop ? 'text-gray-900' : 'text-gray-700',
+                          'text-[14px] font-semibold',
+                          isTop ? 'text-slate-900' : 'text-slate-700',
                         ].join(' ')}
                       >
                         {att.name}
@@ -1415,11 +1415,11 @@ function AttendantRankingWidget({ params }) {
                   </td>
 
                   {/* Count */}
-                  <td className="py-3 pr-3 text-right">
+                  <td className="px-4 py-3 text-right">
                     <span
                       className={[
-                        'text-sm font-bold tabular-nums',
-                        isTop ? 'text-amber-600' : 'text-gray-700',
+                        'text-[14px] font-bold tabular-nums',
+                        isTop ? 'text-amber-600' : 'text-slate-700',
                       ].join(' ')}
                     >
                       {att.count.toLocaleString('pt-BR')}
@@ -1427,20 +1427,20 @@ function AttendantRankingWidget({ params }) {
                   </td>
 
                   {/* Liters */}
-                  <td className="py-3 pr-3 text-right text-sm text-gray-600 tabular-nums">
+                  <td className="px-4 py-3 text-right text-[14px] text-slate-600 tabular-nums">
                     {att.totalLiters > 0
                       ? `${att.totalLiters.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} L`
                       : '—'}
                   </td>
 
                   {/* Value */}
-                  <td className="py-3 pr-3 text-right text-sm text-gray-700 tabular-nums font-medium">
+                  <td className="px-4 py-3 text-right text-[14px] font-semibold text-slate-700 tabular-nums">
                     {fmtBRL(att.totalValue)}
                   </td>
 
                   {/* Cashback */}
-                  <td className="py-3 text-right">
-                    <span className="text-sm text-green-600 font-semibold tabular-nums">
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-[14px] text-green-600 font-semibold tabular-nums">
                       {fmtBRL(att.totalCashback)}
                     </span>
                   </td>

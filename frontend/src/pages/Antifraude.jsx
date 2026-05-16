@@ -320,26 +320,26 @@ export default function Antifraude() {
             <p className="text-sm font-medium">Nenhum CPF bloqueado</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="px-4 py-3 text-left">CPF</th>
-                  <th className="px-4 py-3 text-left">Motivo</th>
-                  <th className="px-4 py-3 text-left hidden sm:table-cell">Bloqueado por</th>
-                  <th className="px-4 py-3 text-left hidden md:table-cell">Data</th>
-                  <th className="px-4 py-3 text-center">Ação</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">CPF</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Motivo</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap hidden sm:table-cell">Bloqueado por</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap hidden md:table-cell">Data</th>
+                  <th className="px-4 py-3 text-center text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em]">Ação</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {blacklist.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium text-gray-800">{entry.cpf}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[140px] truncate" title={entry.motivo}>
+                  <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-[13px] text-slate-800">{entry.cpf}</td>
+                    <td className="px-4 py-3 text-[14px] text-slate-600 max-w-[140px] truncate" title={entry.motivo}>
                       {entry.motivo}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{entry.bloqueadoPor}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell whitespace-nowrap">
+                    <td className="px-4 py-3 text-[14px] text-slate-500 hidden sm:table-cell">{entry.bloqueadoPor}</td>
+                    <td className="px-4 py-3 text-[13px] text-slate-400 hidden md:table-cell whitespace-nowrap">
                       {entry.bloqueadoEm}
                     </td>
                     <td className="px-4 py-3 text-center">
