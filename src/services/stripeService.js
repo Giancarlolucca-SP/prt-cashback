@@ -76,9 +76,15 @@ async function createSubscription(customerId, priceId, paymentMethodId) {
 }
 
 async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, metadata, utms }) {
-  const session = await getStripe().checkout.sessions.create({
+  const mode = 'subscription';
+
+  console.log('[STRIPE] Criando session:', JSON.stringify({
+    mode, successUrl, cancelUrl, metadata,
+  }));
+
+  const sessionParams = {
     payment_method_types: ['card'],
-    mode: 'subscription',
+    mode,
     line_items: [{
       price_data: {
         currency: 'brl',
@@ -94,7 +100,16 @@ async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, meta
     success_url: successUrl,
     cancel_url:  cancelUrl,
     metadata:    metadata || {},
-  });
+  };
+
+  // Pre-fill customer email on Stripe's hosted page if available
+  if (metadata?.email) {
+    sessionParams.customer_email = metadata.email;
+  }
+
+  const session = await getStripe().checkout.sessions.create(sessionParams);
+
+  console.log('[STRIPE] Session criada:', session.id, session.url);
 
   return { sessionId: session.id };
 }
