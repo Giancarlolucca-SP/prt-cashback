@@ -1847,7 +1847,7 @@
     });
 
     // ── REGISTRATION MODAL (Stripe) ───────────────
-    const POSTOCASH_API = 'https://postocash-api.onrender.com';
+    const POSTOCASH_API = 'https://postocash-api-udnj.onrender.com';
     const STRIPE_PUBLISHABLE_KEY = 'pk_test_51TUculLJIRKdmHRylGa6FR0zxjTGa3TVN7GHTZqIIZtb38NGPcdMn1bUEljT5d44P8UzzimHSGvaTbEishOEczh700Yc84HzA3';
     let registerFormData = {};
     let currentStep      = 1;
@@ -2039,21 +2039,24 @@
         payBtn.innerHTML = 'Encaminhando para pagamento...';
 
         try {
+          const priceInCents = 20000;
+          const successUrl = `https://sistemapostocash.app?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+          const cancelUrl = `https://sistemapostocash.app#assinar`;
+          const metadata = {
+            nome:         registerFormData.nome,
+            cnpj:         registerFormData.cnpj,
+            email:        registerFormData.email,
+            telefone:     registerFormData.telefone,
+            operatorName: registerFormData.operatorName,
+          };
+
+          console.log('[CHECKOUT] Chamando API:', POSTOCASH_API);
+          console.log('[CHECKOUT] Payload:', JSON.stringify({ priceInCents, successUrl, cancelUrl, metadata }));
+
           const response = await fetch(`${POSTOCASH_API}/stripe/create-checkout-session`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              priceInCents: 20000,
-              successUrl: `https://sistemapostocash.app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-              cancelUrl: `https://sistemapostocash.app#assinar`,
-              metadata: {
-                nome:         registerFormData.nome,
-                cnpj:         registerFormData.cnpj,
-                email:        registerFormData.email,
-                telefone:     registerFormData.telefone,
-                operatorName: registerFormData.operatorName,
-              },
-            }),
+            body: JSON.stringify({ priceInCents, successUrl, cancelUrl, metadata }),
           });
 
           const { sessionId } = await response.json();
