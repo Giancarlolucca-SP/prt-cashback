@@ -76,7 +76,7 @@ async function createSubscription(customerId, priceId, paymentMethodId) {
 }
 
 async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, metadata, utms }) {
-  const mode = 'subscription';
+  const mode = 'payment'; // TODO: revert to 'subscription' after payment flow test
 
   console.log('[STRIPE] Criando session:', JSON.stringify({
     mode, successUrl, cancelUrl, metadata,
@@ -93,7 +93,6 @@ async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, meta
           description: 'Sistema de cashback para postos de combustível',
         },
         unit_amount: priceInCents,
-        recurring: { interval: 'month' },
       },
       quantity: 1,
     }],
