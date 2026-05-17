@@ -130,41 +130,67 @@ async function getSubscriptionStatus(subscriptionId) {
 }
 
 async function handleCheckoutComplete(session) {
-  const { customer_email, customer, subscription, metadata } = session;
+  console.log('[STRIPE] Session completa:', JSON.stringify({
+    id:               session.id,
+    customer_email:   session.customer_email,
+    customer_details: session.customer_details,
+    metadata:         session.metadata,
+    customer:         session.customer,
+  }));
 
-  if (!customer_email) {
-    console.warn('[STRIPE] checkout.session.completed sem customer_email — ignorado');
+  const email = session.customer_email
+    || session.customer_details?.email
+    || session.metadata?.email;
+
+  if (!email) {
+    console.log('[STRIPE] Sem email — buscando via customer ID:', session.customer);
+
+    if (session.customer) {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      const customer = await stripe.customers.retrieve(session.customer);
+      if (customer.email) {
+        return processCheckout(session, customer.email);
+      }
+    }
+
+    console.log('[STRIPE] checkout.session.completed sem email — ignorado');
     return;
   }
 
-  const existing = await prisma.operator.findFirst({ where: { email: customer_email } });
+  return processCheckout(session, email);
+}
+
+async function processCheckout(session, email) {
+  console.log('[STRIPE] Processando checkout para:', email);
+
+  const existing = await prisma.operator.findFirst({ where: { email } });
   if (existing) {
-    console.log('[STRIPE] Estabelecimento já existe:', customer_email);
+    console.log('[STRIPE] Operador já existe:', email);
     return;
   }
 
-  const name  = metadata?.nome  || customer_email.split('@')[0];
-  const cnpj  = metadata?.cnpj  || '00000000000100';
+  const metadata = session.metadata || {};
+  const name = metadata.nome || email.split('@')[0];
+  const cnpj = metadata.cnpj || `${Date.now()}`.slice(-14).padStart(14, '0');
 
   const establishment = await prisma.establishment.create({
     data: {
       name,
       cnpj,
-      cashbackPercent: 5,
-      stripeCustomerId:     customer,
-      stripeSubscriptionId: subscription,
+      cashbackPercent:      5,
+      stripeCustomerId:     session.customer,
+      stripeSubscriptionId: session.subscription,
       subscriptionStatus:   'ACTIVE',
     },
   });
 
-  const chars    = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const password = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const password = Math.random().toString(36).slice(-8).toUpperCase();
   const hashed   = await bcrypt.hash(password, 10);
 
   await prisma.operator.create({
     data: {
-      name:            (metadata?.operatorName || name).trim(),
-      email:           customer_email,
+      name:            (metadata.operatorName || name).trim(),
+      email,
       password:        hashed,
       role:            'ADMIN',
       establishmentId: establishment.id,
@@ -172,13 +198,13 @@ async function handleCheckoutComplete(session) {
   });
 
   await emailService.sendWelcomeEmail({
-    name:              (metadata?.operatorName || name).trim(),
-    email:             customer_email,
+    name:              (metadata.operatorName || name).trim(),
+    email,
     password,
     establishmentName: name,
   }).catch((err) => console.error('[EMAIL] Falha ao enviar boas-vindas:', err.message));
 
-  console.log('[STRIPE] Estabelecimento criado com sucesso:', name);
+  console.log('[STRIPE] Estabelecimento criado com sucesso:', name, email);
 }
 
 function constructWebhookEvent(payload, signature) {
