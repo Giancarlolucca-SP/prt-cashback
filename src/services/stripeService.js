@@ -206,6 +206,27 @@ async function processCheckout(session, email) {
   console.log('[STRIPE] Estabelecimento criado com sucesso:', name, email);
 }
 
+async function handleSubscriptionCreated(subscription) {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const customer = await stripe.customers.retrieve(subscription.customer);
+
+    if (!customer.email) {
+      console.log('[STRIPE] Sem email no customer — ignorado');
+      return;
+    }
+
+    console.log('[STRIPE] Assinatura criada para:', customer.email);
+    await processCheckout({
+      customer:     subscription.customer,
+      subscription: subscription.id,
+      metadata:     customer.metadata || {},
+    }, customer.email);
+  } catch (err) {
+    console.error('[STRIPE] Erro handleSubscriptionCreated:', err.message);
+  }
+}
+
 function constructWebhookEvent(payload, signature) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
@@ -225,4 +246,5 @@ module.exports = {
   getSubscriptionStatus,
   constructWebhookEvent,
   handleCheckoutComplete,
+  handleSubscriptionCreated,
 };

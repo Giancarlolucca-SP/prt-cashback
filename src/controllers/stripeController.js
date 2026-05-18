@@ -224,6 +224,13 @@ async function handleWebhook(req, res) {
         });
         break;
       }
+      case 'customer.subscription.created': {
+        const subscription = event.data.object;
+        console.log('[STRIPE] Assinatura criada:', subscription.id);
+        console.log('[STRIPE] Customer:', subscription.customer);
+        await stripeService.handleSubscriptionCreated(subscription);
+        break;
+      }
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
         await prisma.establishment.updateMany({
