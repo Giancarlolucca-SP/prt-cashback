@@ -76,38 +76,22 @@ async function createSubscription(customerId, priceId, paymentMethodId) {
 }
 
 async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, metadata, utms }) {
-  const mode = 'subscription';
-
   console.log('[STRIPE] Criando session:', JSON.stringify({
-    mode, successUrl, cancelUrl, metadata,
+    successUrl, cancelUrl, metadata,
   }));
 
-  const sessionParams = {
+  const session = await getStripe().checkout.sessions.create({
     payment_method_types: ['card'],
-    mode,
+    mode: 'subscription',
     line_items: [{
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: 'PostoCash Essencial',
-          description: 'Sistema de cashback para postos de combustível',
-        },
-        unit_amount: priceInCents,
-        recurring: { interval: 'month' },
-      },
+      price: process.env.STRIPE_PRICE_ID,
       quantity: 1,
     }],
     success_url: successUrl,
     cancel_url:  cancelUrl,
-    metadata:    metadata || {},
-  };
-
-  // Pre-fill customer email on Stripe's hosted page if available
-  if (metadata?.email) {
-    sessionParams.customer_email = metadata.email;
-  }
-
-  const session = await getStripe().checkout.sessions.create(sessionParams);
+    customer_email: metadata?.email || undefined,
+    metadata: metadata || {},
+  });
 
   console.log('[STRIPE] Session criada:', session.id, session.url);
 
