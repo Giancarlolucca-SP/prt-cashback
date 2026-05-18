@@ -4,7 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendWelcomeEmail({ name, email, password, establishmentName }) {
   const { error } = await resend.emails.send({
-    from: 'PostoCash <onboarding@resend.dev>',
+    from: 'PostoCash <noreply@sistemapostocash.app>',
     to: email,
     subject: 'Bem-vindo ao PostoCash! Sua conta está ativa',
     html: `
