@@ -26,7 +26,7 @@ async function ensurePrice() {
   const price = await s.prices.create({
     product: product.id,
     unit_amount: 20000, // R$ 200,00 em centavos
-    currency: 'brl',
+    currency: 'usd',
     recurring: { interval: 'month' },
   });
 
@@ -87,7 +87,7 @@ async function createCheckoutSession({ priceInCents, successUrl, cancelUrl, meta
     mode,
     line_items: [{
       price_data: {
-        currency: 'brl',
+        currency: 'usd',
         product_data: {
           name: 'PostoCash Essencial',
           description: 'Sistema de cashback para postos de combustível',
