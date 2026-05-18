@@ -1627,6 +1627,18 @@
        SCRIPTS
   ══════════════════════════════════════════════ -->
   <script>
+    // ── CHECKOUT REDIRECT FEEDBACK ────────────────
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('checkout') === 'cancelled') {
+        console.log('[CHECKOUT] Pagamento cancelado pelo usuário');
+        alert('Pagamento cancelado. Tente novamente.');
+      }
+      if (params.get('checkout') === 'success') {
+        console.log('[CHECKOUT] Pagamento concluído com sucesso!');
+      }
+    })();
+
     // ── NAV LOAD ──────────────────────────────────
     document.querySelector('.nav-load').classList.add('loaded');
 
@@ -1746,7 +1758,7 @@
           priceInCents: 20000,
           billingInterval: 'month',
           successUrl: `${window.location.origin}${window.location.pathname}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${window.location.origin}${window.location.pathname}#assinar`,
+          cancelUrl: `https://sistemapostocash.app?checkout=cancelled`,
           utms: getTrackingParams(),
           metadata: {
             source: 'landing_postocash',
@@ -2041,7 +2053,7 @@
         try {
           const priceInCents = 20000;
           const successUrl = `https://sistemapostocash.app?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
-          const cancelUrl = `https://sistemapostocash.app#assinar`;
+          const cancelUrl = `https://sistemapostocash.app?checkout=cancelled`;
           const metadata = {
             nome:         registerFormData.nome,
             cnpj:         registerFormData.cnpj,
