@@ -31,4 +31,13 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { authenticate, requireAdmin };
+function requireSuperAdmin(req, res, next) {
+  if (!req.operator || req.operator.role !== 'SUPERADMIN') {
+    return res.status(403).json({
+      erro: 'Acesso negado. Apenas o super administrador pode realizar esta ação.',
+    });
+  }
+  next();
+}
+
+module.exports = { authenticate, requireAdmin, requireSuperAdmin };

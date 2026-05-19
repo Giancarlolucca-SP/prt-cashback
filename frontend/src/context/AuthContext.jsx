@@ -44,10 +44,11 @@ export function AuthProvider({ children }) {
     });
   }
 
-  const isAdmin = operator?.perfil === 'ADMIN';
+  const isAdmin      = operator?.perfil === 'ADMIN';
+  const isSuperAdmin = operator?.perfil === 'SUPERADMIN';
 
   return (
-    <AuthContext.Provider value={{ operator, token, isAdmin, loading, login, logout, updateOperator }}>
+    <AuthContext.Provider value={{ operator, token, isAdmin, isSuperAdmin, loading, login, logout, updateOperator }}>
       {children}
     </AuthContext.Provider>
   );

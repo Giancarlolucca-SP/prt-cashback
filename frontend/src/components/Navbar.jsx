@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { SquaresFour, ArrowCounterClockwise, UserPlus, Megaphone, ShieldCheck, Users, ChartBar, Trophy, Percent, Gear, Storefront } from '@phosphor-icons/react';
+import { SquaresFour, ArrowCounterClockwise, UserPlus, Megaphone, ShieldCheck, Users, ChartBar, Trophy, Percent, Gear, Storefront, ChartLineUp } from '@phosphor-icons/react';
 
 // ── Nav items ─────────────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ function SidebarLink({ to, icon, label, highlight, onClick }) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export default function Navbar({ open, onClose }) {
-  const { operator, isAdmin, logout } = useAuth();
+  const { operator, isAdmin, isSuperAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -128,6 +128,24 @@ export default function Navbar({ open, onClose }) {
           <Gear size={14} weight="duotone" />
           Configurações do Posto
         </NavLink>
+
+        {/* SaaS Dashboard — superadmin only */}
+        {isSuperAdmin && (
+          <NavLink
+            to="/saas"
+            onClick={onClose}
+            className={({ isActive }) => [
+              'w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg',
+              'border text-xs font-medium transition-colors',
+              isActive
+                ? 'border-amber-400/50 bg-amber-400/10 text-amber-300'
+                : 'border-white/15 text-white/40 hover:border-white/30 hover:text-white/70',
+            ].join(' ')}
+          >
+            <ChartLineUp size={14} weight="duotone" />
+            SaaS
+          </NavLink>
+        )}
 
         {/* Novo Estabelecimento — admin only */}
         {isAdmin && (

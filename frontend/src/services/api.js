@@ -120,6 +120,11 @@ export const rankingAPI = {
   get: (params = {}) => api.get('/ranking', { params }),
 };
 
+// ── Admin / SaaS ──────────────────────────────────────────────────────────────
+export const adminAPI = {
+  getSaasMetrics: () => api.get('/admin/saas-metrics'),
+};
+
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportsAPI = {
   preview: (params) => api.get('/reports/preview', { params }),

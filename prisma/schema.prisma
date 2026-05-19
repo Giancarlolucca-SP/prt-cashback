@@ -249,6 +249,7 @@ enum CashbackMode {
 enum Role {
   ADMIN
   OPERATOR
+  SUPERADMIN
 }
 
 enum RedemptionStatus {
