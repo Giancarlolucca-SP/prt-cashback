@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import SuperAdminRoute from './components/SuperAdminRoute.jsx';
 import Login from './pages/Login.jsx';
 import NovoEstabelecimento from './pages/NovoEstabelecimento.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -38,7 +39,9 @@ export default function App() {
           <Route path="/configuracoes-cashback"  element={<ConfiguracoesCashback />} />
           <Route path="/configuracoes-posto"     element={<ConfiguracoesPosto />} />
           <Route path="/ranking"                 element={<Ranking />} />
-          <Route path="/saas"                    element={<SaasDashboard />} />
+        </Route>
+        <Route element={<SuperAdminRoute />}>
+          <Route path="/saas" element={<SaasDashboard />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

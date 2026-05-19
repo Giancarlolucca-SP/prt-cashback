@@ -72,10 +72,10 @@ model Operator {
   name            String
   email           String        @unique
   password        String
-  role            Role          @default(OPERATOR)
-  establishmentId String
-  createdAt       DateTime      @default(now())
-  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  role            Role           @default(OPERATOR)
+  establishmentId String?
+  createdAt       DateTime       @default(now())
+  establishment   Establishment? @relation(fields: [establishmentId], references: [id])
   transactions    Transaction[]
   redemptions     Redemption[]
   campaigns       Campaign[]
@@ -247,9 +247,9 @@ enum CashbackMode {
 }
 
 enum Role {
+  SUPERADMIN
   ADMIN
   OPERATOR
-  SUPERADMIN
 }
 
 enum RedemptionStatus {
