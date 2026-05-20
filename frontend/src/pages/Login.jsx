@@ -27,6 +27,25 @@ function FacebookIcon() {
   );
 }
 
+// ── Google login button (must be a child so the hook only runs inside provider) ─
+
+const googleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
+function GoogleLoginButton({ onSuccess, onError, disabled }) {
+  const googleLogin = useGoogleLogin({ onSuccess, onError });
+  return (
+    <button
+      type="button"
+      onClick={() => googleLogin()}
+      disabled={disabled}
+      className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+    >
+      <GoogleIcon />
+      Entrar com Google
+    </button>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function Login() {
@@ -73,22 +92,19 @@ export default function Login() {
     }
   }
 
-  // ── Google OAuth ────────────────────────────────────────────────────────────
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setError('');
-      setLoading(true);
-      try {
-        const { data } = await authAPI.googleLogin(tokenResponse.access_token);
-        handleOAuthSuccess(data);
-      } catch (err) {
-        setError(err.response?.data?.erro || 'Erro ao fazer login com Google.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: () => setError('Login com Google cancelado ou falhou.'),
-  });
+  // ── Google OAuth handlers (passed down to child component) ──────────────────
+  async function handleGoogleSuccess(tokenResponse) {
+    setError('');
+    setLoading(true);
+    try {
+      const { data } = await authAPI.googleLogin(tokenResponse.access_token);
+      handleOAuthSuccess(data);
+    } catch (err) {
+      setError(err.response?.data?.erro || 'Erro ao fazer login com Google.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // ── Facebook OAuth ──────────────────────────────────────────────────────────
   function handleFacebookLogin() {
@@ -150,15 +166,13 @@ export default function Login() {
 
         {/* Social login buttons */}
         <div className="space-y-3 mb-5">
-          <button
-            type="button"
-            onClick={() => googleLogin()}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            <GoogleIcon />
-            Entrar com Google
-          </button>
+          {googleConfigured && (
+            <GoogleLoginButton
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Login com Google cancelado ou falhou.')}
+              disabled={loading}
+            />
+          )}
 
           <button
             type="button"
