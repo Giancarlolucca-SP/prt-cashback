@@ -39,6 +39,13 @@ export default function ProtectedRoute() {
     document.title = posto ? `${page} — ${posto}` : `${page} | PostoCash`;
   }, [location.pathname, operator?.estabelecimento]);
 
+  // OAuth users who haven't linked an establishment yet
+  const needsCompletion =
+    !loading && token && !operator?.estabelecimentoId && operator?.perfil !== 'SUPERADMIN';
+  if (needsCompletion && location.pathname !== '/completar-cadastro') {
+    return <Navigate to="/completar-cadastro" replace />;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

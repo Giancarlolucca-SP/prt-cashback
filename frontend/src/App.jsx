@@ -16,6 +16,7 @@ import ConfiguracoesPosto from './pages/ConfiguracoesPosto.jsx';
 import Ranking from './pages/Ranking.jsx';
 import SaasDashboard from './pages/SaasDashboard.jsx';
 import SaasLogin from './pages/SaasLogin.jsx';
+import CompletarCadastro from './pages/CompletarCadastro.jsx';
 import LogoutPage from './pages/Logout.jsx';
 import ToastContainer from './components/ui/Toast.jsx';
 
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/configuracoes-cashback"  element={<ConfiguracoesCashback />} />
           <Route path="/configuracoes-posto"     element={<ConfiguracoesPosto />} />
           <Route path="/ranking"                 element={<Ranking />} />
+          <Route path="/completar-cadastro"      element={<CompletarCadastro />} />
         </Route>
         <Route element={<SuperAdminRoute />}>
           <Route path="/saas" element={<SaasDashboard />} />

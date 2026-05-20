@@ -34,7 +34,9 @@ api.interceptors.response.use(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authAPI = {
-  login: (email, password) => api.post('/auth/login', { email, password }),
+  login:         (email, password) => api.post('/auth/login',    { email, password }),
+  googleLogin:   (token)           => api.post('/auth/google',   { token }),
+  facebookLogin: (token)           => api.post('/auth/facebook', { token }),
 };
 
 // ── Customers ─────────────────────────────────────────────────────────────────
@@ -118,6 +120,11 @@ export const subscriptionAPI = {
 // ── Ranking ───────────────────────────────────────────────────────────────────
 export const rankingAPI = {
   get: (params = {}) => api.get('/ranking', { params }),
+};
+
+// ── Establishment completion (OAuth) ─────────────────────────────────────────
+export const registrationAPI = {
+  completarCadastro: (data) => api.post('/establishments/completar-cadastro', data),
 };
 
 // ── Admin / SaaS ──────────────────────────────────────────────────────────────

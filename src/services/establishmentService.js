@@ -4,6 +4,7 @@ const sharp = require('sharp');
 const QRCode = require('qrcode');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const jwt   = require('jsonwebtoken');
 const { createError } = require('../middlewares/errorMiddleware');
 const { formatDateBR } = require('../utils/dateFormatter');
 const audit = require('./auditService');
@@ -275,4 +276,70 @@ async function createFromStripe({
   return { est, op };
 }
 
-module.exports = { create, createFromStripe, listAll, uploadLogo, updateBranding, getPublicData, generateQRCodeBuffer };
+// ── OAuth registration completion ──────────────────────────────────────────────
+
+async function completarCadastroOAuth({ nome, cnpj, telefone, cidade, estado }, operatorId) {
+  if (!nome?.trim()) throw createError('Nome do estabelecimento é obrigatório.', 400);
+
+  const cleanCnpj = String(cnpj || '').replace(/\D/g, '');
+  if (cleanCnpj.length !== 14) throw createError('CNPJ inválido (14 dígitos).', 400);
+
+  const [existingEst, operator] = await Promise.all([
+    prisma.establishment.findUnique({ where: { cnpj: cleanCnpj } }),
+    prisma.operator.findUnique({ where: { id: operatorId } }),
+  ]);
+
+  if (!operator)       throw createError('Operador não encontrado.', 404);
+  if (existingEst)     throw createError('CNPJ já cadastrado no sistema.', 409);
+  if (operator.establishmentId) throw createError('Estabelecimento já cadastrado para este operador.', 409);
+
+  const establishment = await prisma.establishment.create({
+    data: {
+      name:  nome.trim(),
+      cnpj:  cleanCnpj,
+      phone: telefone || null,
+      city:  cidade   || null,
+      state: estado   || null,
+    },
+  });
+
+  const updated = await prisma.operator.update({
+    where: { id: operatorId },
+    data:  { establishmentId: establishment.id, role: 'ADMIN' },
+    include: { establishment: true },
+  });
+
+  const token = jwt.sign(
+    {
+      id:              updated.id,
+      name:            updated.name,
+      email:           updated.email,
+      role:            updated.role,
+      establishmentId: updated.establishmentId,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_OPERATOR_EXPIRES_IN || '8h' }
+  );
+
+  const est = updated.establishment;
+
+  return {
+    mensagem: 'Cadastro completado com sucesso.',
+    token,
+    operador: {
+      id:                updated.id,
+      nome:              updated.name,
+      email:             updated.email,
+      perfil:            updated.role,
+      cargo:             updated.role,
+      estabelecimentoId: updated.establishmentId,
+      estabelecimento:   est.name,
+      logoUrl:           est.logoUrl      || null,
+      primaryColor:      est.primaryColor   ?? '#FF6B00',
+      secondaryColor:    est.secondaryColor ?? '#1e293b',
+      cashbackPercent:   parseFloat(est.cashbackPercent),
+    },
+  };
+}
+
+module.exports = { create, createFromStripe, listAll, uploadLogo, updateBranding, getPublicData, generateQRCodeBuffer, completarCadastroOAuth };

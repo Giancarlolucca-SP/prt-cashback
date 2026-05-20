@@ -5,6 +5,9 @@ const upload = require('../middlewares/uploadMiddleware');
 
 const router = Router();
 
+// POST /establishments/completar-cadastro — finish OAuth registration (authenticated)
+router.post('/completar-cadastro', authenticate, establishmentController.completarCadastro);
+
 // POST /establishments — public self-registration (no auth required)
 router.post('/', establishmentController.create);
 

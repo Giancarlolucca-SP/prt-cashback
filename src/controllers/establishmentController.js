@@ -57,4 +57,13 @@ async function updateBranding(req, res, next) {
   }
 }
 
-module.exports = { create, listAll, uploadLogo, updateBranding, getQRCode };
+async function completarCadastro(req, res, next) {
+  try {
+    const result = await establishmentService.completarCadastroOAuth(req.body, req.operator.id);
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { create, listAll, uploadLogo, updateBranding, getQRCode, completarCadastro };
