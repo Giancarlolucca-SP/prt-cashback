@@ -21,6 +21,13 @@ type SettingSummary = {
   operationalParameters: Array<{ id: string; key: string; value: unknown }>;
 };
 
+type BirthdayNotificationValue = {
+  channel: string;
+  daysBefore: number;
+  enabled: boolean;
+  responsibleUserId?: string | null;
+};
+
 type User = {
   id: string;
   name: string;
@@ -40,7 +47,7 @@ type ListResponse<T> = {
   total?: number;
 };
 
-type ModalKind = "user" | "message" | "document" | "category" | "deadline" | "parameter" | "accountant" | "tax";
+type ModalKind = "user" | "message" | "document" | "category" | "deadline" | "parameter" | "birthday" | "accountant" | "tax";
 
 type FormState = {
   action: string;
@@ -54,6 +61,7 @@ type FormState = {
   name: string;
   password: string;
   phone: string;
+  responsibleUserId: string;
   role: UserRole;
   taxRate: string;
   taxRegime: string;
@@ -72,6 +80,7 @@ const emptyForm: FormState = {
   name: "",
   password: "Temp12345",
   phone: "",
+  responsibleUserId: "",
   role: "SELLER",
   taxRate: "0.12",
   taxRegime: "Simples Nacional",
@@ -107,6 +116,7 @@ const fallbackUsers: User[] = [
 
 const modalLabels: Record<ModalKind, string> = {
   accountant: "Contador",
+  birthday: "Notificacoes de aniversario",
   category: "Categoria",
   deadline: "Prazo",
   document: "Template documento",
@@ -132,6 +142,10 @@ function parseJson(value: string) {
   } catch {
     return { raw: value };
   }
+}
+
+function isBirthdayNotificationValue(value: unknown): value is BirthdayNotificationValue {
+  return Boolean(value && typeof value === "object" && "daysBefore" in value && "enabled" in value);
 }
 
 function relativeDate(dateIso: string | null) {
@@ -182,6 +196,23 @@ export function LiveSettingsWorkspace() {
   }, [canManageSettings, canManageUsers, refreshKey, token]);
 
   function openModal(kind: ModalKind) {
+    if (kind === "birthday") {
+      const existing = summary.operationalParameters.find((parameter) => parameter.key === "customer_birthday_notifications");
+      const value = isBirthdayNotificationValue(existing?.value)
+        ? existing.value
+        : { channel: "WHATSAPP", daysBefore: 7, enabled: true, responsibleUserId: "" };
+      setForm({
+        ...emptyForm,
+        channel: value.channel,
+        hours: String(value.daysBefore),
+        responsibleUserId: value.responsibleUserId ?? "",
+        value: JSON.stringify({ enabled: value.enabled }, null, 2),
+      });
+      setSaveError(null);
+      setModalKind(kind);
+      return;
+    }
+
     setForm(emptyForm);
     setSaveError(null);
     setModalKind(kind);
@@ -244,6 +275,15 @@ export function LiveSettingsWorkspace() {
           value: parseJson(form.value),
         });
       }
+      if (modalKind === "birthday") {
+        const metadata = parseJson(form.value);
+        await apiPut<{ data: { id: string | null } }>("/settings/customer-birthday-notifications", token, {
+          channel: form.channel.trim(),
+          daysBefore: Number(form.hours),
+          enabled: typeof metadata.enabled === "boolean" ? metadata.enabled : true,
+          responsibleUserId: form.responsibleUserId || null,
+        });
+      }
       if (modalKind === "accountant") {
         await apiPost<{ data: { id: string } }>("/settings/accountants", token, {
           email: form.email.trim() || undefined,
@@ -288,6 +328,9 @@ export function LiveSettingsWorkspace() {
     loading: "Sincronizando",
     locked: "Sem permissao",
   }[status];
+  const birthdayParameter = summary.operationalParameters.find((parameter) => parameter.key === "customer_birthday_notifications");
+  const birthdayValue = isBirthdayNotificationValue(birthdayParameter?.value) ? birthdayParameter.value : null;
+  const birthdayResponsible = users.find((user) => user.id === birthdayValue?.responsibleUserId);
 
   return (
     <>
@@ -309,6 +352,7 @@ export function LiveSettingsWorkspace() {
         </div>
         <button className="primary-action" disabled={!canManageUsers} onClick={() => openModal("user")} type="button"><Plus aria-hidden="true" size={17} />Usuario</button>
         <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("message")} type="button">Template msg</button>
+        <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("birthday")} type="button">Aniversarios</button>
         <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("parameter")} type="button">Parametro</button>
       </section>
 
@@ -361,6 +405,14 @@ export function LiveSettingsWorkspace() {
                 <>
                   <label className="lead-modal-wide">Chave<input autoFocus required minLength={2} value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} /></label>
                   <label className="lead-modal-wide">Valor JSON<textarea value={form.value} onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))} /></label>
+                </>
+              ) : null}
+              {modalKind === "birthday" ? (
+                <>
+                  <label className="lead-modal-wide">Responsavel<select autoFocus value={form.responsibleUserId} onChange={(event) => setForm((current) => ({ ...current, responsibleUserId: event.target.value }))}><option value="">Sem responsavel fixo</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} | {roleLabels[user.role]}</option>)}</select></label>
+                  <label>Antecedencia dias<input min="0" max="31" required type="number" value={form.hours} onChange={(event) => setForm((current) => ({ ...current, hours: event.target.value }))} /></label>
+                  <label>Canal<input required value={form.channel} onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))} /></label>
+                  <label className="lead-modal-wide">Opcoes JSON<textarea value={form.value} onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))} /></label>
                 </>
               ) : null}
               {modalKind === "accountant" ? (
@@ -425,12 +477,14 @@ export function LiveSettingsWorkspace() {
           <div className="section-heading"><div><p className="eyebrow">Administracao</p><h3>Acoes rapidas</h3></div><Settings aria-hidden="true" size={20} /></div>
           <div className="stock-actions">
             <button disabled={!canManageSettings} onClick={() => openModal("document")} type="button"><FileText aria-hidden="true" size={17} />Template doc</button>
+            <button disabled={!canManageSettings} onClick={() => openModal("birthday")} type="button"><UsersRound aria-hidden="true" size={17} />Aniversarios</button>
             <button disabled={!canManageSettings} onClick={() => openModal("category")} type="button"><SlidersHorizontal aria-hidden="true" size={17} />Categoria</button>
             <button disabled={!canManageSettings} onClick={() => openModal("deadline")} type="button"><KeyRound aria-hidden="true" size={17} />Prazo</button>
             <button disabled={!canManageSettings} onClick={() => openModal("accountant")} type="button"><Database aria-hidden="true" size={17} />Contador</button>
             <button disabled={!canManageSettings} onClick={() => openModal("tax")} type="button"><ShieldCheck aria-hidden="true" size={17} />Fiscal</button>
           </div>
           <ul className="blueprint-side-list">
+            <li><UsersRound aria-hidden="true" size={18} /><div><strong>Aniversarios</strong><span>{birthdayValue?.enabled === false ? "Notificacoes pausadas" : `Responsavel: ${birthdayResponsible?.name ?? "nao definido"} | ${birthdayValue?.daysBefore ?? 7} dia(s) antes`}</span></div></li>
             <li><ShieldCheck aria-hidden="true" size={18} /><div><strong>RBAC real</strong><span>Usuarios e ajustes tecnicos exigem permissao sensivel.</span></div></li>
             <li><SlidersHorizontal aria-hidden="true" size={18} /><div><strong>Configuravel</strong><span>Templates, prazos e categorias saem do hardcode.</span></div></li>
             <li><Bot aria-hidden="true" size={18} /><div><strong>Integracoes</strong><span>Parametros operacionais guardam toggles e guardrails.</span></div></li>

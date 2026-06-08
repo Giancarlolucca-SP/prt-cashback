@@ -2866,6 +2866,50 @@ try {
   assert.equal(updateOperationalParameter.statusCode, 201);
   assert.equal(updateOperationalParameter.json().data.key, "sales_policy");
 
+  const invalidBirthdayNotificationResponsible = await app.inject({
+    method: "PUT",
+    url: "/settings/customer-birthday-notifications",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      channel: "WHATSAPP",
+      daysBefore: 7,
+      enabled: true,
+      responsibleUserId: "00000000-0000-0000-0000-000000000000",
+    },
+  });
+  assert.equal(invalidBirthdayNotificationResponsible.statusCode, 404);
+  assert.equal(invalidBirthdayNotificationResponsible.json().error.code, "NOT_FOUND");
+
+  const updateBirthdayNotifications = await app.inject({
+    method: "PUT",
+    url: "/settings/customer-birthday-notifications",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      channel: "WHATSAPP",
+      daysBefore: 5,
+      enabled: true,
+      responsibleUserId: sellerUserId,
+    },
+  });
+  assert.equal(updateBirthdayNotifications.statusCode, 201);
+  assert.equal(updateBirthdayNotifications.json().data.key, "customer_birthday_notifications");
+  assert.equal(updateBirthdayNotifications.json().data.value.responsibleUserId, sellerUserId);
+  assert.equal(updateBirthdayNotifications.json().data.value.daysBefore, 5);
+
+  const getBirthdayNotifications = await app.inject({
+    method: "GET",
+    url: "/settings/customer-birthday-notifications",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(getBirthdayNotifications.statusCode, 200);
+  assert.equal(getBirthdayNotifications.json().data.responsibleUser.id, sellerUserId);
+
   const createTaxSetting = await app.inject({
     method: "POST",
     url: "/settings/tax-settings",

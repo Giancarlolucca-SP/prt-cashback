@@ -214,6 +214,7 @@ Endpoints principais:
 - `POST /settings/document-templates`
 - `POST /settings/message-templates`
 - `PUT /settings/operational-parameters/:key`
+- `GET/PUT /settings/customer-birthday-notifications`
 - `GET/POST /users`
 - `GET/PATCH /users/:id`
 - `POST /users/:id/permissions`

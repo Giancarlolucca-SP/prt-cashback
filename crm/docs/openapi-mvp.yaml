@@ -202,6 +202,9 @@ paths:
     post: { tags: [Notifications], summary: Cria notificacao interna., responses: { "201": { $ref: "#/components/responses/Created" } } }
   /settings/summary:
     get: { tags: [Settings], summary: Sumario de configuracoes da loja., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /settings/customer-birthday-notifications:
+    get: { tags: [Settings], summary: Detalha responsavel e regras de notificacoes de aniversario., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    put: { tags: [Settings], summary: Configura responsavel por notificacoes de aniversario de clientes., responses: { "201": { $ref: "#/components/responses/Created" } } }
   /users:
     get: { tags: [Users], summary: Lista usuarios., responses: { "200": { $ref: "#/components/responses/List" } } }
     post: { tags: [Users], summary: Cria usuario., responses: { "201": { $ref: "#/components/responses/Created" } } }

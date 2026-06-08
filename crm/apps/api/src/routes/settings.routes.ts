@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { ApiError } from "../api/errors.js";
 import { requirePermission } from "../api/auth-guards.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
@@ -77,6 +78,15 @@ const operationalParameterSchema = z.object({
   snapshot: z.record(z.unknown()).optional(),
 });
 
+const birthdayNotificationParameterKey = "customer_birthday_notifications";
+
+const birthdayNotificationSchema = z.object({
+  daysBefore: z.number().int().min(0).max(31).default(7),
+  enabled: z.boolean().default(true),
+  responsibleUserId: z.string().uuid().nullable().optional(),
+  channel: z.string().trim().min(2).max(40).default("WHATSAPP"),
+});
+
 async function settingsSession(request: FastifyRequest) {
   return requirePermission(request, {
     module: "settings",
@@ -95,6 +105,27 @@ async function emitSettingChanged(input: { storeId: string; actorId: string; ent
     entityId: input.entityId,
     payload: { key: input.key },
   });
+}
+
+function sanitizeBirthdayNotificationSetting(parameter: {
+  id: string;
+  key: string;
+  value: unknown;
+  snapshot: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+} | null, responsibleUser?: { id: string; name: string; email: string; role: string } | null) {
+  const parsed = birthdayNotificationSchema.safeParse(parameter?.value ?? {});
+  const value = parsed.success ? parsed.data : birthdayNotificationSchema.parse({});
+
+  return {
+    id: parameter?.id ?? null,
+    key: birthdayNotificationParameterKey,
+    value,
+    responsibleUser: responsibleUser ?? null,
+    createdAt: parameter?.createdAt.toISOString() ?? null,
+    updatedAt: parameter?.updatedAt.toISOString() ?? null,
+  };
 }
 
 export async function registerSettingRoutes(app: FastifyInstance) {
@@ -149,6 +180,63 @@ export async function registerSettingRoutes(app: FastifyInstance) {
     });
     await emitSettingChanged({ storeId: session.user.storeId, actorId: session.user.id, entityType: "store_setting", entityId: setting.id, key: setting.key });
     return reply.code(201).send({ data: setting });
+  });
+
+  app.get("/customer-birthday-notifications", async (request) => {
+    const session = await settingsSession(request);
+    const parameter = await prisma.operationalParameter.findUnique({
+      where: { storeId_key: { storeId: session.user.storeId, key: birthdayNotificationParameterKey } },
+    });
+    const parsed = birthdayNotificationSchema.safeParse(parameter?.value ?? {});
+    const responsibleUserId = parsed.success ? parsed.data.responsibleUserId : null;
+    const responsibleUser = responsibleUserId
+      ? await prisma.user.findFirst({
+          where: { id: responsibleUserId, storeId: session.user.storeId, isActive: true, deletedAt: null },
+          select: { id: true, name: true, email: true, role: true },
+        })
+      : null;
+
+    return { data: sanitizeBirthdayNotificationSetting(parameter, responsibleUser) };
+  });
+
+  app.put("/customer-birthday-notifications", async (request, reply) => {
+    const session = await settingsSession(request);
+    const input = birthdayNotificationSchema.parse(request.body);
+
+    if (input.responsibleUserId) {
+      const responsibleUser = await prisma.user.findFirst({
+        where: { id: input.responsibleUserId, storeId: session.user.storeId, isActive: true, deletedAt: null },
+        select: { id: true },
+      });
+
+      if (!responsibleUser) {
+        throw new ApiError("NOT_FOUND", "Responsavel por aniversarios nao encontrado.");
+      }
+    }
+
+    const parameter = await prisma.operationalParameter.upsert({
+      where: { storeId_key: { storeId: session.user.storeId, key: birthdayNotificationParameterKey } },
+      update: {
+        value: input as Prisma.InputJsonObject,
+        snapshot: { source: "customer_birthday_notifications" },
+      },
+      create: {
+        storeId: session.user.storeId,
+        key: birthdayNotificationParameterKey,
+        value: input as Prisma.InputJsonObject,
+        snapshot: { source: "customer_birthday_notifications" },
+      },
+    });
+    const responsibleUser = input.responsibleUserId
+      ? await prisma.user.findFirst({
+          where: { id: input.responsibleUserId, storeId: session.user.storeId, isActive: true, deletedAt: null },
+          select: { id: true, name: true, email: true, role: true },
+        })
+      : null;
+
+    await emitSettingChanged({ storeId: session.user.storeId, actorId: session.user.id, entityType: "operational_parameter", entityId: parameter.id, key: parameter.key });
+
+    return reply.code(201).send({ data: sanitizeBirthdayNotificationSetting(parameter, responsibleUser) });
   });
 
   app.post("/tax-settings", async (request, reply) => {
