@@ -6,18 +6,29 @@ import { requirePermission } from "../api/auth-guards.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 
-const createCustomerSchema = z.object({
+const customerBaseSchema = z.object({
   type: z.enum(["PERSON", "COMPANY"]).default("PERSON"),
   name: z.string().trim().min(2).max(160),
   document: z.string().trim().min(5).max(32).optional(),
   email: z.string().email().optional(),
   phone: z.string().trim().min(8).max(32).optional(),
-  origin: z.string().trim().max(80).optional(),
+  origin: z.string().trim().min(2).max(80).default("manual"),
   notes: z.string().trim().max(1000).optional(),
 });
 
-const updateCustomerSchema = createCustomerSchema.partial().refine((input) => Object.keys(input).length > 0, {
+const createCustomerSchema = customerBaseSchema.refine((input) => Boolean(input.email || input.phone), {
+  message: "Informe telefone ou e-mail para cadastrar o cliente.",
+  path: ["phone"],
+});
+
+const updateCustomerSchema = customerBaseSchema.partial().refine((input) => Object.keys(input).length > 0, {
   message: "Informe ao menos um campo para atualizar.",
+});
+
+const customerListQuerySchema = paginationQuerySchema.extend({
+  origin: z.string().trim().max(80).optional(),
+  responsible_user_id: z.string().uuid().optional(),
+  created_by_user_id: z.string().uuid().optional(),
 });
 
 const customerParamsSchema = z.object({
@@ -54,6 +65,14 @@ function sanitizeCustomer(customer: {
   };
 }
 
+function customerScopeWhere(user: { id: string; role: string }) {
+  if (user.role === "SELLER" || user.role === "SDR") {
+    return { createdByUserId: user.id };
+  }
+
+  return {};
+}
+
 export async function registerCustomerRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const session = await requirePermission(request, {
@@ -62,13 +81,17 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       scope: "STORE",
       sensitiveArea: "general",
     });
-    const query = paginationQuerySchema.parse(request.query);
+    const query = customerListQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
+    const responsibleUserId = query.responsible_user_id ?? query.created_by_user_id;
 
     const where = {
       storeId: session.user.storeId,
       deletedAt: null,
+      ...customerScopeWhere(session.user),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.origin ? { origin: { equals: query.origin, mode: "insensitive" as const } } : {}),
+      ...(responsibleUserId ? { createdByUserId: responsibleUserId } : {}),
       ...(query.search
         ? {
             OR: [
@@ -108,6 +131,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         id: params.id,
         storeId: session.user.storeId,
         deletedAt: null,
+        ...customerScopeWhere(session.user),
       },
     });
 
@@ -205,6 +229,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         id: params.id,
         storeId: session.user.storeId,
         deletedAt: null,
+        ...customerScopeWhere(session.user),
       },
     });
 
@@ -295,6 +320,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         id: params.id,
         storeId: session.user.storeId,
         deletedAt: null,
+        ...customerScopeWhere(session.user),
       },
     });
 

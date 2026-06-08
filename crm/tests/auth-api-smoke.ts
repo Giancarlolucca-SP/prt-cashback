@@ -181,6 +181,35 @@ try {
   assert.equal(invalidCustomer.statusCode, 400);
   assert.equal(invalidCustomer.json().error.code, "VALIDATION_ERROR");
 
+  const customerWithoutContact = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: "Cliente Sem Contato",
+      origin: "qa-api",
+    },
+  });
+  assert.equal(customerWithoutContact.statusCode, 400);
+  assert.equal(customerWithoutContact.json().error.code, "VALIDATION_ERROR");
+
+  const emailOnlyCustomer = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      email: `cliente.email.${Date.now()}@gt3.local`,
+      name: "Cliente Somente Email API",
+      origin: "qa-email",
+    },
+  });
+  assert.equal(emailOnlyCustomer.statusCode, 201);
+  assert.equal(emailOnlyCustomer.json().data.phone, null);
+
   const document = `QA-${Date.now()}`;
   const createCustomer = await app.inject({
     method: "POST",
@@ -207,6 +236,7 @@ try {
     payload: {
       name: "Cliente Duplicado API",
       document,
+      phone: "11999990001",
     },
   });
   assert.equal(duplicatedCustomer.statusCode, 409);
@@ -225,6 +255,16 @@ try {
   assert.equal(customersBody.pageSize, 5);
   assert.ok(customersBody.total >= 1);
   assert.ok(customersBody.items.some((customer) => customer.name === "Cliente Contrato API"));
+
+  const listCustomersByOrigin = await app.inject({
+    method: "GET",
+    url: "/customers?page=1&page_size=5&origin=qa-api",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCustomersByOrigin.statusCode, 200);
+  assert.ok(listCustomersByOrigin.json().items.every((customer: { origin: string }) => customer.origin === "qa-api"));
 
   const createdCustomerId = createCustomer.json().data.id as string;
 
@@ -2131,6 +2171,39 @@ try {
   });
   assert.equal(sellerLoginAgain.statusCode, 200);
   const sellerTokenAgain = sellerLoginAgain.json().token as string;
+
+  const sellerCreateCustomer = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      name: "Cliente Carteira Vendedor",
+      phone: "11997776666",
+      origin: "qa-seller",
+    },
+  });
+  assert.equal(sellerCreateCustomer.statusCode, 201);
+  const sellerCustomerId = sellerCreateCustomer.json().data.id as string;
+
+  const sellerOwnCustomer = await app.inject({
+    method: "GET",
+    url: `/customers/${sellerCustomerId}`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+  });
+  assert.equal(sellerOwnCustomer.statusCode, 200);
+
+  const sellerOtherCustomer = await app.inject({
+    method: "GET",
+    url: `/customers/${createdCustomerId}`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+  });
+  assert.equal(sellerOtherCustomer.statusCode, 404);
 
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",

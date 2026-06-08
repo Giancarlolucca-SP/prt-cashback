@@ -208,6 +208,12 @@ export function LiveCustomersWorkspace() {
     }
 
     setSaveError(null);
+
+    if (!form.phone.trim() && !form.email.trim()) {
+      setSaveError("Informe telefone ou e-mail para cadastrar o cliente.");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -416,7 +422,7 @@ export function LiveCustomersWorkspace() {
                 <button className="text-button" onClick={() => setModalOpen(false)} type="button">
                   Cancelar
                 </button>
-                <button className="primary-action" disabled={saving || form.name.trim().length < 2} type="submit">
+                <button className="primary-action" disabled={saving || form.name.trim().length < 2 || (!form.phone.trim() && !form.email.trim())} type="submit">
                   {saving ? "Salvando..." : editingCustomer ? "Salvar cliente" : "Criar cliente"}
                 </button>
               </div>
