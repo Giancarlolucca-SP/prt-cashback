@@ -31,6 +31,18 @@ const customerListQuerySchema = paginationQuerySchema.extend({
   created_by_user_id: z.string().uuid().optional(),
 });
 
+const customerKanbanStatusSchema = z.enum([
+  "NEW_LEAD",
+  "IN_CONTACT",
+  "SCHEDULED",
+  "VISITED_STORE",
+  "TEST_DRIVE_DONE",
+  "NEGOTIATION",
+  "WAITING_RETURN",
+  "WAITING_PURCHASE_CONFIRMATION",
+  "LOST",
+]);
+
 const customerParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -38,6 +50,13 @@ const customerParamsSchema = z.object({
 const deleteCustomerSchema = z.object({
   reason: z.string().trim().min(8).max(300),
 });
+
+const updateCustomerKanbanStatusSchema = z.object({
+  toStatus: customerKanbanStatusSchema,
+  reason: z.string().trim().max(300).optional(),
+});
+
+const customerKanbanColumns = customerKanbanStatusSchema.options;
 
 function sanitizeCustomer(customer: {
   id: string;
@@ -73,6 +92,68 @@ function customerScopeWhere(user: { id: string; role: string }) {
   return {};
 }
 
+function customerListWhere(input: {
+  storeId: string;
+  user: { id: string; role: string };
+  query: z.infer<typeof customerListQuerySchema>;
+}) {
+  const responsibleUserId = input.query.responsible_user_id ?? input.query.created_by_user_id;
+
+  return {
+    storeId: input.storeId,
+    deletedAt: null,
+    ...customerScopeWhere(input.user),
+    ...(input.query.status ? { status: input.query.status } : {}),
+    ...(input.query.origin ? { origin: { equals: input.query.origin, mode: "insensitive" as const } } : {}),
+    ...(responsibleUserId ? { createdByUserId: responsibleUserId } : {}),
+    ...(input.query.search
+      ? {
+          OR: [
+            { name: { contains: input.query.search, mode: "insensitive" as const } },
+            { phone: { contains: input.query.search, mode: "insensitive" as const } },
+            { email: { contains: input.query.search, mode: "insensitive" as const } },
+            { document: { contains: input.query.search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+}
+
+function metadataStatus(metadata: unknown, key: "fromStatus" | "toStatus") {
+  if (!metadata || typeof metadata !== "object" || !(key in metadata)) {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" && customerKanbanColumns.includes(value as (typeof customerKanbanColumns)[number]) ? value : null;
+}
+
+async function latestCustomerKanbanStatuses(storeId: string, customerIds: string[]) {
+  if (customerIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const events = await prisma.customerHistoryEvent.findMany({
+    where: {
+      storeId,
+      customerId: { in: customerIds },
+      type: "customer.kanban_status_changed",
+    },
+    orderBy: { occurredAt: "desc" },
+  });
+  const statuses = new Map<string, string>();
+
+  for (const event of events) {
+    if (statuses.has(event.customerId)) {
+      continue;
+    }
+
+    statuses.set(event.customerId, metadataStatus(event.metadata, "toStatus") ?? "NEW_LEAD");
+  }
+
+  return statuses;
+}
+
 export async function registerCustomerRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const session = await requirePermission(request, {
@@ -83,26 +164,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
     const query = customerListQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
-    const responsibleUserId = query.responsible_user_id ?? query.created_by_user_id;
-
-    const where = {
-      storeId: session.user.storeId,
-      deletedAt: null,
-      ...customerScopeWhere(session.user),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.origin ? { origin: { equals: query.origin, mode: "insensitive" as const } } : {}),
-      ...(responsibleUserId ? { createdByUserId: responsibleUserId } : {}),
-      ...(query.search
-        ? {
-            OR: [
-              { name: { contains: query.search, mode: "insensitive" as const } },
-              { phone: { contains: query.search, mode: "insensitive" as const } },
-              { email: { contains: query.search, mode: "insensitive" as const } },
-              { document: { contains: query.search, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
-    };
+    const where = customerListWhere({ storeId: session.user.storeId, user: session.user, query });
 
     const [items, total] = await Promise.all([
       prisma.customer.findMany({
@@ -115,6 +177,40 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     ]);
 
     return listResponse(items.map(sanitizeCustomer), query, total);
+  });
+
+  app.get("/kanban", async (request) => {
+    const session = await requirePermission(request, {
+      module: "customers",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const query = customerListQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const where = customerListWhere({ storeId: session.user.storeId, user: session.user, query });
+
+    const customers = await prisma.customer.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      skip,
+      take,
+    });
+    const statuses = await latestCustomerKanbanStatuses(
+      session.user.storeId,
+      customers.map((customer) => customer.id),
+    );
+    const columns = customerKanbanColumns.map((status) => ({
+      status,
+      items: customers
+        .filter((customer) => (statuses.get(customer.id) ?? "NEW_LEAD") === status)
+        .map((customer) => ({
+          ...sanitizeCustomer(customer),
+          operationalStatus: statuses.get(customer.id) ?? "NEW_LEAD",
+        })),
+    }));
+
+    return { columns };
   });
 
   app.get("/:id", async (request) => {
@@ -140,6 +236,105 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     }
 
     return { data: sanitizeCustomer(customer) };
+  });
+
+  app.post("/:id/kanban-status", async (request) => {
+    const session = await requirePermission(request, {
+      module: "customers",
+      action: "update_status",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = customerParamsSchema.parse(request.params);
+    const input = updateCustomerKanbanStatusSchema.parse(request.body);
+    const current = await prisma.customer.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...customerScopeWhere(session.user),
+      },
+    });
+
+    if (!current) {
+      throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
+    }
+
+    const statuses = await latestCustomerKanbanStatuses(session.user.storeId, [current.id]);
+    const fromStatus = statuses.get(current.id) ?? "NEW_LEAD";
+
+    if (fromStatus === input.toStatus) {
+      return {
+        data: {
+          ...sanitizeCustomer(current),
+          operationalStatus: fromStatus,
+        },
+        unchanged: true,
+      };
+    }
+
+    const customer = await prisma.$transaction(async (tx) => {
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: current.id,
+          type: "customer.kanban_status_changed",
+          title: "Status operacional atualizado",
+          description: input.reason,
+          metadata: {
+            fromStatus,
+            toStatus: input.toStatus,
+            reason: input.reason,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "customers",
+          action: "kanban_status_changed",
+          entityType: "customer",
+          entityId: current.id,
+          result: "SUCCESS",
+          metadata: {
+            fromStatus,
+            toStatus: input.toStatus,
+            reason: input.reason,
+          },
+        },
+      });
+
+      return tx.customer.update({
+        where: { id: current.id },
+        data: {
+          updatedByUserId: session.user.id,
+        },
+      });
+    });
+
+    await emitInternalEvent({
+      name: "customer.kanban_status_changed",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "customer",
+      entityId: customer.id,
+      payload: {
+        fromStatus,
+        toStatus: input.toStatus,
+        reason: input.reason,
+      },
+    });
+
+    return {
+      data: {
+        ...sanitizeCustomer(customer),
+        operationalStatus: input.toStatus,
+      },
+      unchanged: false,
+    };
   });
 
   app.post("/", async (request, reply) => {

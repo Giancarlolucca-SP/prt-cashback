@@ -2196,6 +2196,34 @@ try {
   });
   assert.equal(sellerOwnCustomer.statusCode, 200);
 
+  const sellerMoveOwnCustomer = await app.inject({
+    method: "POST",
+    url: `/customers/${sellerCustomerId}/kanban-status`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      toStatus: "NEGOTIATION",
+      reason: "Cliente avancou para negociacao no atendimento.",
+    },
+  });
+  assert.equal(sellerMoveOwnCustomer.statusCode, 200);
+  assert.equal(sellerMoveOwnCustomer.json().data.operationalStatus, "NEGOTIATION");
+
+  const sellerKanban = await app.inject({
+    method: "GET",
+    url: "/customers/kanban?page=1&page_size=20",
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+  });
+  assert.equal(sellerKanban.statusCode, 200);
+  assert.ok(
+    sellerKanban
+      .json()
+      .columns.some((column: { status: string; items: Array<{ id: string }> }) => column.status === "NEGOTIATION" && column.items.some((item) => item.id === sellerCustomerId)),
+  );
+
   const sellerOtherCustomer = await app.inject({
     method: "GET",
     url: `/customers/${createdCustomerId}`,
@@ -2204,6 +2232,19 @@ try {
     },
   });
   assert.equal(sellerOtherCustomer.statusCode, 404);
+
+  const sellerMoveOtherCustomer = await app.inject({
+    method: "POST",
+    url: `/customers/${createdCustomerId}/kanban-status`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      toStatus: "WAITING_RETURN",
+      reason: "Tentativa indevida fora da carteira.",
+    },
+  });
+  assert.equal(sellerMoveOtherCustomer.statusCode, 404);
 
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",

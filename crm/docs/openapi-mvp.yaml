@@ -87,10 +87,14 @@ paths:
   /customers:
     get: { tags: [Customers], summary: Lista clientes., responses: { "200": { $ref: "#/components/responses/List" } } }
     post: { tags: [Customers], summary: Cria cliente., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /customers/kanban:
+    get: { tags: [Customers], summary: Lista clientes em colunas operacionais de Kanban., responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /customers/{id}:
     get: { tags: [Customers], summary: Detalha cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Customers], summary: Atualiza cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     delete: { tags: [Customers], summary: Arquiva cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /customers/{id}/kanban-status:
+    post: { tags: [Customers], summary: Move cliente/lead no Kanban operacional., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
 
   /leads:
     get: { tags: [Leads], summary: Lista leads., responses: { "200": { $ref: "#/components/responses/List" } } }
