@@ -7,6 +7,16 @@ import { useAuth } from "../auth/auth-provider";
 
 type CustomerStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 type CustomerType = "PERSON" | "COMPANY";
+type CustomerKanbanStatus =
+  | "NEW_LEAD"
+  | "IN_CONTACT"
+  | "SCHEDULED"
+  | "VISITED_STORE"
+  | "TEST_DRIVE_DONE"
+  | "NEGOTIATION"
+  | "WAITING_RETURN"
+  | "WAITING_PURCHASE_CONFIRMATION"
+  | "LOST";
 
 type Customer = {
   id: string;
@@ -19,6 +29,15 @@ type Customer = {
   status: CustomerStatus;
   createdAt: string;
   updatedAt: string;
+};
+
+type CustomerKanbanItem = Customer & {
+  operationalStatus: CustomerKanbanStatus;
+};
+
+type CustomerKanbanColumn = {
+  status: CustomerKanbanStatus;
+  items: CustomerKanbanItem[];
 };
 
 type ListResponse<T> = {
@@ -100,6 +119,20 @@ const statusLabels: Record<CustomerStatus, string> = {
   INACTIVE: "inativo",
 };
 
+const kanbanStatusLabels: Record<CustomerKanbanStatus, string> = {
+  IN_CONTACT: "Em contato",
+  LOST: "Perdido",
+  NEGOTIATION: "Em negociacao",
+  NEW_LEAD: "Novo lead",
+  SCHEDULED: "Agendado",
+  TEST_DRIVE_DONE: "Test drive",
+  VISITED_STORE: "Visitou loja",
+  WAITING_PURCHASE_CONFIRMATION: "Aguardando compra",
+  WAITING_RETURN: "Aguardando retorno",
+};
+
+const kanbanStatusOrder = Object.keys(kanbanStatusLabels) as CustomerKanbanStatus[];
+
 function maskDocument(document: string | null) {
   if (!document) {
     return "Documento nao informado";
@@ -143,6 +176,7 @@ export function LiveCustomersWorkspace() {
   const canReadCustomers = hasPermission({ module: "customers", action: "read" });
   const canCreateCustomers = hasPermission({ module: "customers", action: "create" });
   const canUpdateCustomers = hasPermission({ module: "customers", action: "update" });
+  const canMoveCustomers = hasPermission({ module: "customers", action: "update_status" });
   const canDeleteCustomers = hasPermission({ module: "customers", action: "delete" });
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [archiveReason, setArchiveReason] = useState("Cadastro duplicado ou inativo por revisao operacional.");
@@ -150,7 +184,15 @@ export function LiveCustomersWorkspace() {
   const [customers, setCustomers] = useState(fallbackCustomers);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyCustomerForm);
+  const [kanbanColumns, setKanbanColumns] = useState<CustomerKanbanColumn[]>(
+    kanbanStatusOrder.map((kanbanStatus, index) => ({
+      status: kanbanStatus,
+      items: index === 0 ? fallbackCustomers.map((customer) => ({ ...customer, operationalStatus: "NEW_LEAD" })) : [],
+    })),
+  );
+  const [kanbanStatus, setKanbanStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [modalOpen, setModalOpen] = useState(false);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -192,6 +234,47 @@ export function LiveCustomersWorkspace() {
       .catch(() => {
         if (isCurrent) {
           setStatus("error");
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeFilter, canReadCustomers, refreshKey, search, token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    if (!canReadCustomers) {
+      setKanbanStatus("locked");
+      return;
+    }
+
+    let isCurrent = true;
+    const query = new URLSearchParams({ page: "1", page_size: "50" });
+    if (activeFilter.status) {
+      query.set("status", activeFilter.status);
+    }
+    if (search.trim()) {
+      query.set("search", search.trim());
+    }
+
+    setKanbanStatus("loading");
+
+    apiGet<{ columns: CustomerKanbanColumn[] }>(`/customers/kanban?${query.toString()}`, token)
+      .then((response) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setKanbanColumns(response.columns);
+        setKanbanStatus("live");
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setKanbanStatus("error");
         }
       });
 
@@ -264,6 +347,26 @@ export function LiveCustomersWorkspace() {
     }
   }
 
+  async function moveCustomer(customer: CustomerKanbanItem, toStatus: CustomerKanbanStatus) {
+    if (!token || !canMoveCustomers || movingId || customer.operationalStatus === toStatus) {
+      return;
+    }
+
+    setMovingId(customer.id);
+
+    try {
+      await apiPost<{ data: CustomerKanbanItem }>(`/customers/${customer.id}/kanban-status`, token, {
+        reason: "Movido pela tela de clientes.",
+        toStatus,
+      });
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setKanbanStatus("error");
+    } finally {
+      setMovingId(null);
+    }
+  }
+
   function openCreateModal() {
     setEditingCustomer(null);
     setForm(emptyCustomerForm);
@@ -302,6 +405,13 @@ export function LiveCustomersWorkspace() {
     loading: "Sincronizando",
     locked: "Sem permissao",
   }[status];
+  const kanbanStatusLabel = {
+    error: "Kanban com erro",
+    fallback: "Kanban visual",
+    live: "Kanban real",
+    loading: "Sincronizando",
+    locked: "Sem permissao",
+  }[kanbanStatus];
 
   return (
     <>
@@ -430,6 +540,52 @@ export function LiveCustomersWorkspace() {
           </section>
         </div>
       ) : null}
+
+      <section className="module-kanban-panel panel" aria-label="Kanban operacional de clientes">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Status operacional</p>
+            <h3>Kanban de clientes e leads</h3>
+          </div>
+          <span className="live-pill">{kanbanStatusLabel}</span>
+        </div>
+
+        <div className="module-kanban">
+          {kanbanColumns.map((column) => (
+            <section className="module-kanban-column" key={column.status}>
+              <header>
+                <strong>{kanbanStatusLabels[column.status]}</strong>
+                <span>{column.items.length} card(s)</span>
+              </header>
+              {column.items.slice(0, 8).map((customer) => (
+                <article className="module-kanban-card" key={customer.id}>
+                  <strong>{customer.name}</strong>
+                  <span>{customer.phone || customer.email || "sem contato"} | {customer.origin || "origem nao informada"}</span>
+                  <select
+                    className="kanban-stage-select"
+                    disabled={!canMoveCustomers || movingId === customer.id}
+                    onChange={(event) => void moveCustomer(customer, event.target.value as CustomerKanbanStatus)}
+                    value={customer.operationalStatus}
+                  >
+                    {kanbanStatusOrder.map((kanbanStatusOption) => (
+                      <option key={kanbanStatusOption} value={kanbanStatusOption}>
+                        {kanbanStatusLabels[kanbanStatusOption]}
+                      </option>
+                    ))}
+                  </select>
+                </article>
+              ))}
+              {column.items.length === 0 ? (
+                <article className="module-kanban-card">
+                  <strong>Sem cards</strong>
+                  <span>Nenhum cliente nesta etapa</span>
+                  <em>0</em>
+                </article>
+              ) : null}
+            </section>
+          ))}
+        </div>
+      </section>
 
       <section className="blueprint-grid">
         <article className="panel">
