@@ -1,0 +1,382 @@
+import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { ApiError } from "../api/errors.js";
+import { requirePermission } from "../api/auth-guards.js";
+import { getPagination, listResponse } from "../api/pagination.js";
+import { emitInternalEvent } from "../events/internal-events.js";
+import { prisma } from "../lib/db.js";
+
+const appointmentStatusSchema = z.enum(["SCHEDULED", "CONFIRMED", "DONE", "CANCELLED", "NO_SHOW"]);
+
+const appointmentsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  status: appointmentStatusSchema.optional(),
+  customer_id: z.string().uuid().optional(),
+  lead_id: z.string().uuid().optional(),
+  assigned_user_id: z.string().uuid().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+const appointmentPayloadSchema = z.object({
+  customerId: z.string().uuid().optional(),
+  leadId: z.string().uuid().optional(),
+  vehicleId: z.string().uuid().optional(),
+  assignedUserId: z.string().uuid().optional(),
+  type: z.string().trim().min(2).max(80),
+  title: z.string().trim().min(2).max(180),
+  startsAt: z.coerce.date(),
+  endsAt: z.coerce.date().optional(),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+const createAppointmentSchema = appointmentPayloadSchema.refine((input) => !input.endsAt || input.endsAt > input.startsAt, {
+  message: "Horario final deve ser posterior ao horario inicial.",
+  path: ["endsAt"],
+});
+
+const updateAppointmentSchema = appointmentPayloadSchema
+  .partial()
+  .refine((input) => Object.keys(input).length > 0, {
+    message: "Informe ao menos um campo para atualizar.",
+  })
+  .refine((input) => !input.endsAt || !input.startsAt || input.endsAt > input.startsAt, {
+    message: "Horario final deve ser posterior ao horario inicial.",
+    path: ["endsAt"],
+  });
+
+const appointmentParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const updateAppointmentStatusSchema = z.object({
+  status: appointmentStatusSchema,
+  reason: z.string().trim().max(300).optional(),
+});
+
+type AppointmentRecord = {
+  id: string;
+  customerId: string | null;
+  leadId: string | null;
+  vehicleId: string | null;
+  assignedUserId: string | null;
+  type: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  status: string;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function sanitizeAppointment(appointment: AppointmentRecord) {
+  return {
+    id: appointment.id,
+    customerId: appointment.customerId,
+    leadId: appointment.leadId,
+    vehicleId: appointment.vehicleId,
+    assignedUserId: appointment.assignedUserId,
+    type: appointment.type,
+    title: appointment.title,
+    startsAt: appointment.startsAt.toISOString(),
+    endsAt: appointment.endsAt?.toISOString() ?? null,
+    status: appointment.status,
+    notes: appointment.notes,
+    createdAt: appointment.createdAt.toISOString(),
+    updatedAt: appointment.updatedAt.toISOString(),
+  };
+}
+
+async function ensureCustomerInStore(storeId: string, customerId?: string) {
+  if (!customerId) return;
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, storeId, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (!customer) {
+    throw new ApiError("NOT_FOUND", "Cliente vinculado ao agendamento nao encontrado.");
+  }
+}
+
+async function ensureLeadInStore(storeId: string, leadId?: string) {
+  if (!leadId) return;
+
+  const lead = await prisma.lead.findFirst({
+    where: { id: leadId, storeId, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (!lead) {
+    throw new ApiError("NOT_FOUND", "Lead vinculado ao agendamento nao encontrado.");
+  }
+}
+
+async function ensureUserInStore(storeId: string, userId?: string) {
+  if (!userId) return;
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, storeId, isActive: true, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new ApiError("NOT_FOUND", "Responsavel do agendamento nao encontrado.");
+  }
+}
+
+async function ensureVehicleInStore(storeId: string, vehicleId?: string) {
+  if (!vehicleId) return;
+
+  const vehicle = await prisma.vehicle.findFirst({
+    where: { id: vehicleId, storeId, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (!vehicle) {
+    throw new ApiError("NOT_FOUND", "Veiculo vinculado ao agendamento nao encontrado.");
+  }
+}
+
+export async function registerAppointmentRoutes(app: FastifyInstance) {
+  app.get("/", async (request) => {
+    const session = await requirePermission(request, {
+      module: "appointments",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const query = appointmentsQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+
+    const where = {
+      storeId: session.user.storeId,
+      deletedAt: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.customer_id ? { customerId: query.customer_id } : {}),
+      ...(query.lead_id ? { leadId: query.lead_id } : {}),
+      ...(query.assigned_user_id ? { assignedUserId: query.assigned_user_id } : {}),
+      ...(query.from || query.to
+        ? {
+            startsAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      prisma.appointment.findMany({
+        where,
+        orderBy: { startsAt: "asc" },
+        skip,
+        take,
+      }),
+      prisma.appointment.count({ where }),
+    ]);
+
+    return listResponse(items.map(sanitizeAppointment), query, total);
+  });
+
+  app.get("/:id", async (request) => {
+    const session = await requirePermission(request, {
+      module: "appointments",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = appointmentParamsSchema.parse(request.params);
+
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+    });
+
+    if (!appointment) {
+      throw new ApiError("NOT_FOUND", "Agendamento nao encontrado.");
+    }
+
+    return { data: sanitizeAppointment(appointment) };
+  });
+
+  app.post("/", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "appointments",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const input = createAppointmentSchema.parse(request.body);
+    const assignedUserId = input.assignedUserId ?? session.user.id;
+
+    await ensureCustomerInStore(session.user.storeId, input.customerId);
+    await ensureLeadInStore(session.user.storeId, input.leadId);
+    await ensureVehicleInStore(session.user.storeId, input.vehicleId);
+    await ensureUserInStore(session.user.storeId, assignedUserId);
+
+    const appointment = await prisma.$transaction(async (tx) => {
+      const created = await tx.appointment.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: input.customerId,
+          leadId: input.leadId,
+          vehicleId: input.vehicleId,
+          assignedUserId,
+          type: input.type,
+          title: input.title,
+          startsAt: input.startsAt,
+          endsAt: input.endsAt,
+          notes: input.notes,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "appointments",
+          action: "create",
+          entityType: "appointment",
+          entityId: created.id,
+          result: "SUCCESS",
+          metadata: {
+            customerId: created.customerId,
+            leadId: created.leadId,
+            assignedUserId: created.assignedUserId,
+            startsAt: created.startsAt.toISOString(),
+          },
+        },
+      });
+
+      return created;
+    });
+
+    await emitInternalEvent({
+      name: "appointment.created",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "appointment",
+      entityId: appointment.id,
+      payload: { leadId: appointment.leadId, startsAt: appointment.startsAt.toISOString() },
+    });
+
+    return reply.code(201).send({ data: sanitizeAppointment(appointment) });
+  });
+
+  app.patch("/:id", async (request) => {
+    const session = await requirePermission(request, {
+      module: "appointments",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = appointmentParamsSchema.parse(request.params);
+    const input = updateAppointmentSchema.parse(request.body);
+
+    const current = await prisma.appointment.findFirst({
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+    });
+
+    if (!current) {
+      throw new ApiError("NOT_FOUND", "Agendamento nao encontrado.");
+    }
+
+    await ensureCustomerInStore(session.user.storeId, input.customerId);
+    await ensureLeadInStore(session.user.storeId, input.leadId);
+    await ensureVehicleInStore(session.user.storeId, input.vehicleId);
+    await ensureUserInStore(session.user.storeId, input.assignedUserId);
+
+    const appointment = await prisma.$transaction(async (tx) => {
+      const updated = await tx.appointment.update({
+        where: { id: current.id },
+        data: input,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "appointments",
+          action: "update",
+          entityType: "appointment",
+          entityId: updated.id,
+          result: "SUCCESS",
+          metadata: { changedFields: Object.keys(input) },
+        },
+      });
+
+      return updated;
+    });
+
+    return { data: sanitizeAppointment(appointment) };
+  });
+
+  app.post("/:id/status", async (request) => {
+    const session = await requirePermission(request, {
+      module: "appointments",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = appointmentParamsSchema.parse(request.params);
+    const input = updateAppointmentStatusSchema.parse(request.body);
+
+    const current = await prisma.appointment.findFirst({
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+    });
+
+    if (!current) {
+      throw new ApiError("NOT_FOUND", "Agendamento nao encontrado.");
+    }
+
+    const appointment = await prisma.$transaction(async (tx) => {
+      const updated = await tx.appointment.update({
+        where: { id: current.id },
+        data: {
+          status: input.status,
+          deletedAt: input.status === "CANCELLED" ? new Date() : null,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "appointments",
+          action: "status_changed",
+          entityType: "appointment",
+          entityId: updated.id,
+          result: "SUCCESS",
+          metadata: {
+            fromStatus: current.status,
+            toStatus: input.status,
+            reason: input.reason,
+          },
+        },
+      });
+
+      return updated;
+    });
+
+    await emitInternalEvent({
+      name: "appointment.status_changed",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "appointment",
+      entityId: appointment.id,
+      payload: {
+        fromStatus: current.status,
+        toStatus: input.status,
+        reason: input.reason,
+      },
+    });
+
+    return { data: sanitizeAppointment(appointment) };
+  });
+}

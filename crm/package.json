@@ -1,0 +1,55 @@
+{
+  "name": "crm-automotivo-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Base tecnica do MVP do CRM automotivo conforme Sprint 11 BMAP.",
+  "type": "module",
+  "scripts": {
+    "dev:check": "node scripts/dev-check.mjs",
+    "dev:check:web": "node scripts/dev-check.mjs web",
+    "dev:check:api": "node scripts/dev-check.mjs api",
+    "dev:web": "npm run dev:check:web && next dev apps/web",
+    "dev:api": "npm run dev:check:api && tsx watch apps/api/src/server.ts",
+    "build:web": "next build apps/web",
+    "build:api": "tsc -p apps/api/tsconfig.json",
+    "db:generate": "prisma generate --schema packages/db/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema packages/db/prisma/schema.prisma",
+    "db:seed": "node packages/db/prisma/seed.mjs",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:restore": "node scripts/db-restore.mjs",
+    "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
+    "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
+    "qa:local": "npm run qa && npm run smoke:local",
+    "smoke:local": "node scripts/smoke-local.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@prisma/client": "^5.22.0",
+    "@supabase/supabase-js": "^2.46.1",
+    "fastify": "^5.8.5",
+    "lucide-react": "^1.17.0",
+    "next": "^16.2.7",
+    "pg-boss": "^10.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^3.8.1",
+    "zod": "^3.23.8"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

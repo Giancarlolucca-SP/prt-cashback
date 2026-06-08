@@ -1,0 +1,285 @@
+openapi: 3.1.0
+info:
+  title: CRM Automotivo MVP API
+  version: 0.1.0
+  description: Contrato inicial da API Fastify do CRM automotivo MVP.
+servers:
+  - url: http://localhost:3333
+    description: Desenvolvimento local
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Health
+  - name: Customers
+  - name: Leads
+  - name: Appointments
+  - name: Inventory
+  - name: Purchases
+  - name: Sales
+  - name: Finance
+  - name: Commissions
+  - name: Contracts
+  - name: Files
+  - name: Dispatch
+  - name: Listings
+  - name: Campaigns
+  - name: Communications
+  - name: Services
+  - name: Repasse
+  - name: Analytics
+  - name: Notifications
+  - name: Settings
+  - name: Users
+  - name: Compliance
+  - name: AI
+  - name: OCR
+  - name: Automations
+  - name: Audit
+  - name: Jobs
+  - name: Ops
+  - name: Webhooks
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Autentica usuario e cria sessao.
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoga sessao atual.
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Retorna usuario autenticado e permissoes efetivas.
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+  /auth/permissions/check:
+    post:
+      tags: [Auth]
+      summary: Checa permissao RBAC especifica.
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "403": { $ref: "#/components/responses/Error" }
+  /health:
+    get:
+      tags: [Health]
+      security: []
+      summary: Health check simples.
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+  /health/ready:
+    get:
+      tags: [Health]
+      security: []
+      summary: Readiness com checagem de banco.
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+
+  /customers:
+    get: { tags: [Customers], summary: Lista clientes., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Customers], summary: Cria cliente., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /customers/{id}:
+    get: { tags: [Customers], summary: Detalha cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    patch: { tags: [Customers], summary: Atualiza cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    delete: { tags: [Customers], summary: Arquiva cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /leads:
+    get: { tags: [Leads], summary: Lista leads., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Leads], summary: Cria lead., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /leads/{id}:
+    get: { tags: [Leads], summary: Detalha lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    patch: { tags: [Leads], summary: Atualiza lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /leads/{id}/stage:
+    post: { tags: [Leads], summary: Move lead no funil., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /appointments:
+    get: { tags: [Appointments], summary: Lista agendamentos., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Appointments], summary: Cria agendamento., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /appointments/{id}:
+    get: { tags: [Appointments], summary: Detalha agendamento., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    patch: { tags: [Appointments], summary: Atualiza agendamento., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /appointments/{id}/status:
+    post: { tags: [Appointments], summary: Altera status do agendamento., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /inventory:
+    get: { tags: [Inventory], summary: Lista estoque., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Inventory], summary: Cria item de estoque e veiculo., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /inventory/{id}:
+    get: { tags: [Inventory], summary: Detalha estoque., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    patch: { tags: [Inventory], summary: Atualiza estoque/veiculo., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /inventory/{id}/costs:
+    post: { tags: [Inventory], summary: Adiciona custo ao veiculo., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "201": { $ref: "#/components/responses/Created" } } }
+
+  /sales:
+    get: { tags: [Sales], summary: Lista vendas., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Sales], summary: Cria venda/proposta., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /sales/{id}:
+    get: { tags: [Sales], summary: Detalha venda., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    patch: { tags: [Sales], summary: Atualiza venda., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /sales/{id}/status:
+    post: { tags: [Sales], summary: Altera status/aprova/fecha venda., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /finance/transactions:
+    get: { tags: [Finance], summary: Lista lancamentos financeiros., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Finance], summary: Cria lancamento financeiro., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /finance/transactions/{id}:
+    get: { tags: [Finance], summary: Detalha lancamento financeiro., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    patch: { tags: [Finance], summary: Atualiza lancamento financeiro., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /finance/transactions/{id}/settle:
+    post: { tags: [Finance], summary: Baixa/cancela/reagenda lancamento., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /finance/summary:
+    get: { tags: [Finance], summary: Resumo financeiro por periodo., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /purchases/leads:
+    get: { tags: [Purchases], summary: Lista leads de compra., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Purchases], summary: Cria lead de compra., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /purchases/evaluations:
+    get: { tags: [Purchases], summary: Lista avaliacoes., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Purchases], summary: Cria avaliacao de veiculo., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /purchases/payments:
+    post: { tags: [Purchases], summary: Registra pagamento de compra., responses: { "201": { $ref: "#/components/responses/Created" } } }
+
+  /contracts/generate:
+    post: { tags: [Contracts], summary: Gera contrato de venda., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /contracts/{id}/sign:
+    post: { tags: [Contracts], summary: Assina contrato., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /files/prepare-upload:
+    post: { tags: [Files], summary: Prepara upload e persiste metadados., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /files/{id}/download:
+    get: { tags: [Files], summary: Gera URL de download., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /listings:
+    get: { tags: [Listings], summary: Lista anuncios., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Listings], summary: Cria anuncio., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /campaigns:
+    get: { tags: [Campaigns], summary: Lista campanhas., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Campaigns], summary: Cria campanha., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /communications/threads:
+    get: { tags: [Communications], summary: Lista conversas., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Communications], summary: Cria conversa., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /services/providers:
+    get: { tags: [Services], summary: Lista prestadores e fornecedores de servico., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Services], summary: Cria prestador ou fornecedor de servico., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /services/catalog:
+    get: { tags: [Services], summary: Lista catalogo de servicos., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Services], summary: Cria ou atualiza item do catalogo de servicos., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /services/post-sale/customers:
+    get: { tags: [Services], summary: Lista clientes de pos-venda., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Services], summary: Cria cliente de pos-venda., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /services/orders:
+    get: { tags: [Services], summary: Lista ordens de servico., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Services], summary: Cria ordem de servico., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /repasse:
+    get: { tags: [Repasse], summary: Lista processos de repasse., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Repasse], summary: Cria processo de repasse., responses: { "201": { $ref: "#/components/responses/Created" } } }
+
+  /analytics/executive-summary:
+    get: { tags: [Analytics], summary: Resumo executivo., description: Inclui totais operacionais, financeiros e serie mensal de vendas/margem em revenueSeries., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /analytics/sales-funnel:
+    get: { tags: [Analytics], summary: Funil comercial., description: Retorna leads por status, origem, vendas por status e agendamentos por status., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /analytics/inventory-performance:
+    get: { tags: [Analytics], summary: Performance de estoque/anuncios., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+  /notifications:
+    get: { tags: [Notifications], summary: Lista notificacoes do usuario., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Notifications], summary: Cria notificacao interna., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /settings/summary:
+    get: { tags: [Settings], summary: Sumario de configuracoes da loja., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /users:
+    get: { tags: [Users], summary: Lista usuarios., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Users], summary: Cria usuario., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /compliance/legal-checks:
+    get: { tags: [Compliance], summary: Lista checagens legais., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Compliance], summary: Cria checagem legal., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /ai/suggestions:
+    get: { tags: [AI], summary: Lista sugestoes de IA., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [AI], summary: Cria sugestao de IA., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /ocr/jobs:
+    get: { tags: [OCR], summary: Lista jobs de OCR., responses: { "200": { $ref: "#/components/responses/List" } } }
+  /automations/rules:
+    get: { tags: [Automations], summary: Lista regras de automacao., responses: { "200": { $ref: "#/components/responses/List" } } }
+    post: { tags: [Automations], summary: Cria regra de automacao., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /audit/logs:
+    get: { tags: [Audit], summary: Lista logs de auditoria., responses: { "200": { $ref: "#/components/responses/List" } } }
+  /audit/summary:
+    get: { tags: [Audit], summary: Sumario de auditoria e seguranca., responses: { "200": { $ref: "#/components/responses/Ok" } } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Ok:
+      description: Resposta bem-sucedida.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    Created:
+      description: Recurso criado.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    List:
+      description: Lista paginada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ListResponse"
+    Error:
+      description: Erro padronizado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+      required: [items, page, pageSize]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details: {}
+            correlationId:
+              type: string

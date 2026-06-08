@@ -1,0 +1,72 @@
+import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
+import { ZodError } from "zod";
+
+export type ApiErrorCode =
+  | "UNAUTHENTICATED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "VALIDATION_ERROR"
+  | "CONFLICT"
+  | "BUSINESS_RULE_ERROR"
+  | "EXTERNAL_SERVICE_ERROR"
+  | "JOB_ENQUEUED"
+  | "INTERNAL_ERROR";
+
+const statusByCode: Record<ApiErrorCode, number> = {
+  UNAUTHENTICATED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  VALIDATION_ERROR: 400,
+  CONFLICT: 409,
+  BUSINESS_RULE_ERROR: 422,
+  EXTERNAL_SERVICE_ERROR: 502,
+  JOB_ENQUEUED: 202,
+  INTERNAL_ERROR: 500,
+};
+
+export class ApiError extends Error {
+  code: ApiErrorCode;
+  details?: unknown;
+  statusCode: number;
+
+  constructor(code: ApiErrorCode, message: string, details?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.details = details;
+    this.statusCode = statusByCode[code];
+  }
+}
+
+export function apiErrorHandler(error: FastifyError | ApiError | ZodError, request: FastifyRequest, reply: FastifyReply) {
+  if (error instanceof ZodError) {
+    return reply.code(400).send({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Dados invalidos.",
+        details: error.flatten(),
+        correlationId: request.id,
+      },
+    });
+  }
+
+  if (error instanceof ApiError) {
+    return reply.code(error.statusCode).send({
+      error: {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        correlationId: request.id,
+      },
+    });
+  }
+
+  request.log.error(error);
+  return reply.code(500).send({
+    error: {
+      code: "INTERNAL_ERROR",
+      message: "Erro interno inesperado.",
+      correlationId: request.id,
+    },
+  });
+}

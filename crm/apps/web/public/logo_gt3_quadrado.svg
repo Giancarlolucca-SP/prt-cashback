@@ -1,0 +1,21 @@
+<svg width="100%" viewBox="0 0 680 680" role="img" style="" xmlns="http://www.w3.org/2000/svg">
+<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Logo GT3</title>
+<desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Logo GT3 quadrado fundo preto com texto dourado</desc>
+<defs>
+  
+<mask id="imagine-text-gaps-1dwjp5" maskUnits="userSpaceOnUse"><rect x="0" y="0" width="680" height="680" fill="white"/><rect x="191.171875" y="179" width="297.65625" height="304" fill="black" rx="2"/><rect x="260.0078125" y="424" width="158.984375" height="23" fill="black" rx="2"/></mask></defs>
+
+<!-- Quadrado externo -->
+<rect x="60" y="60" width="560" height="560" fill="none" stroke="#C9A84C" stroke-width="1.5" rx="8" style="fill:none;stroke:rgb(201, 168, 76);color:rgb(0, 0, 0);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- Quadrado interno -->
+<rect x="76" y="76" width="528" height="528" fill="#0A0A0A" stroke="#C9A84C" stroke-width="0.8" rx="4" style="fill:rgb(10, 10, 10);stroke:rgb(201, 168, 76);color:rgb(0, 0, 0);stroke-width:0.8px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+<!-- GT3 -->
+<text x="340" y="400" font-family="'Bebas Neue', sans-serif" font-size="230" fill="#C9A84C" text-anchor="middle" letter-spacing="8" style="fill:rgb(201, 168, 76);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Bebas Neue&quot;, sans-serif;font-size:230px;font-weight:400;text-anchor:middle;dominant-baseline:auto">GT3</text>
+
+<!-- Linhas + VEÍCULOS -->
+<line x1="100" y1="435" x2="215" y2="435" stroke="#C9A84C" stroke-width="0.8" mask="url(#imagine-text-gaps-1dwjp5)" style="fill:rgb(0, 0, 0);stroke:rgb(201, 168, 76);color:rgb(0, 0, 0);stroke-width:0.8px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<text x="340" y="441" font-family="'Montserrat', sans-serif" font-size="17" fill="#C9A84C" text-anchor="middle" letter-spacing="8" font-weight="200" style="fill:rgb(201, 168, 76);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Montserrat, sans-serif;font-size:17px;font-weight:200;text-anchor:middle;dominant-baseline:auto">VEÍCULOS</text>
+<line x1="465" y1="435" x2="580" y2="435" stroke="#C9A84C" stroke-width="0.8" mask="url(#imagine-text-gaps-1dwjp5)" style="fill:rgb(0, 0, 0);stroke:rgb(201, 168, 76);color:rgb(0, 0, 0);stroke-width:0.8px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+</svg>

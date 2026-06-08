@@ -1,0 +1,31 @@
+node_modules/
+.next/
+dist/
+coverage/
+*.log
+.dev-logs/
+backups/
+
+.env
+.env.*
+!.env.example
+
+# BMAP/BMAD - bastidores internos
+.bmap/
+.bmad/
+.bmap-logs/
+.bmap-prompts/
+.bmap-scripts/
+.bmap-workbench/
+.bmap-internal/
+_bmap-internal/
+_bmad-internal/
+
+# Rascunhos e memoria operacional nao entregue
+**/drafts/
+**/scratch/
+**/internal-notes/
+**/*-raw-notes.md
+**/*-prompt-log.md
+**/*-agent-log.md
+**/*-working-copy.md

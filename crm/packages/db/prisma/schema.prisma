@@ -1,0 +1,2125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Store {
+  id         String       @id @default(uuid())
+  name       String
+  legalName  String?      @map("legal_name")
+  cnpj       String?      @unique
+  stateTaxId String?      @map("state_tax_id")
+  taxRegime  String?      @map("tax_regime")
+  cnaes      String[]     @default([])
+  status     RecordStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  deletedAt  DateTime?    @map("deleted_at")
+
+  users User[]
+
+  @@map("stores")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  storeId            String    @map("store_id")
+  name               String
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  role               UserRole
+  isActive           Boolean   @default(true) @map("is_active")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  storeId     String?      @map("store_id")
+  code        String
+  name        String
+  description String?
+  isSystem    Boolean      @default(false) @map("is_system")
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+
+  @@unique([storeId, code])
+  @@index([storeId])
+  @@map("roles")
+}
+
+model Permission {
+  id            String              @id @default(uuid())
+  module        String
+  action        String
+  scope         PermissionScopeType
+  sensitiveArea String?             @map("sensitive_area")
+  description   String?
+  status        RecordStatus        @default(ACTIVE)
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  @@unique([module, action, scope, sensitiveArea])
+  @@index([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  id           String           @id @default(uuid())
+  userId       String           @map("user_id")
+  permissionId String           @map("permission_id")
+  effect       PermissionEffect @default(ALLOW)
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@unique([userId, permissionId, effect])
+  @@index([userId])
+  @@index([permissionId])
+  @@map("user_permissions")
+}
+
+model PermissionScope {
+  id         String              @id @default(uuid())
+  userId     String              @map("user_id")
+  module     String
+  entityType String?             @map("entity_type")
+  entityId   String?             @map("entity_id")
+  scope      PermissionScopeType
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([module])
+  @@index([entityType, entityId])
+  @@map("permission_scopes")
+}
+
+model UserSession {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  tokenHash     String    @unique @map("token_hash")
+  userAgent     String?   @map("user_agent")
+  ipAddress     String?   @map("ip_address")
+  revokedAt     DateTime? @map("revoked_at")
+  forceReauthAt DateTime? @map("force_reauth_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
+
+  @@index([userId])
+  @@index([revokedAt])
+  @@map("user_sessions")
+}
+
+model UserResponsibilityTransfer {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  fromUserId    String   @map("from_user_id")
+  toUserId      String   @map("to_user_id")
+  entityType    String   @map("entity_type")
+  entityId      String?  @map("entity_id")
+  reason        String?
+  transferredBy String   @map("transferred_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([entityType, entityId])
+  @@map("user_responsibility_transfers")
+}
+
+model StoreSetting {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  key       String
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([storeId, key])
+  @@map("store_settings")
+}
+
+model StoreTaxSetting {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  name          String
+  taxRegime     String?   @map("tax_regime")
+  profitTaxRate Decimal?  @map("profit_tax_rate") @db.Decimal(6, 4)
+  snapshot      Json?
+  validFrom     DateTime  @default(now()) @map("valid_from")
+  validTo       DateTime? @map("valid_to")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@map("store_tax_settings")
+}
+
+model AccountantSetting {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  name      String
+  email     String?
+  phone     String?
+  document  String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@map("accountant_settings")
+}
+
+model BusinessHour {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  weekday   Int
+  opensAt   String?  @map("opens_at")
+  closesAt  String?  @map("closes_at")
+  isClosed  Boolean  @default(false) @map("is_closed")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([storeId, weekday])
+  @@map("business_hours")
+}
+
+model StoreHoliday {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  date        DateTime
+  name        String
+  isRecurring Boolean  @default(false) @map("is_recurring")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId, date])
+  @@map("store_holidays")
+}
+
+model OperationalDeadline {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  module    String
+  action    String
+  hours     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([storeId, module, action])
+  @@map("operational_deadlines")
+}
+
+model ConfigurableCategory {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  domain    String
+  name      String
+  metadata  Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, domain, name])
+  @@index([storeId, domain])
+  @@map("configurable_categories")
+}
+
+model DocumentTemplate {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  name      String
+  module    String
+  version   Int          @default(1)
+  content   String
+  snapshot  Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, name, version])
+  @@index([storeId, module])
+  @@map("document_templates")
+}
+
+model MessageTemplate {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  name      String
+  channel   String
+  version   Int          @default(1)
+  content   String
+  variables Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, name, version])
+  @@index([storeId, channel])
+  @@map("message_templates")
+}
+
+model OperationalParameter {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  key       String
+  value     Json
+  snapshot  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([storeId, key])
+  @@map("operational_parameters")
+}
+
+model Customer {
+  id              String       @id @default(uuid())
+  storeId         String       @map("store_id")
+  type            CustomerType @default(PERSON)
+  name            String
+  document        String?
+  email           String?
+  phone           String?
+  birthDate       DateTime?    @map("birth_date")
+  origin          String?
+  notes           String?
+  status          RecordStatus @default(ACTIVE)
+  createdByUserId String?      @map("created_by_user_id")
+  updatedByUserId String?      @map("updated_by_user_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  deletedAt       DateTime?    @map("deleted_at")
+
+  @@unique([storeId, document])
+  @@index([storeId])
+  @@index([phone])
+  @@map("customers")
+}
+
+model PostSaleCustomer {
+  id               String       @id @default(uuid())
+  storeId          String       @map("store_id")
+  customerId       String?      @map("customer_id")
+  name             String
+  phone            String?
+  email            String?
+  vehicleInfo      String?      @map("vehicle_info")
+  recurrenceStatus String?      @map("recurrence_status")
+  totalRevenue     Decimal?     @map("total_revenue") @db.Decimal(14, 2)
+  lastServiceAt    DateTime?    @map("last_service_at")
+  nextActionAt     DateTime?    @map("next_action_at")
+  status           RecordStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+
+  @@index([storeId])
+  @@index([customerId])
+  @@map("post_sale_customers")
+}
+
+model CustomerContact {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String   @map("customer_id")
+  type       String
+  value      String
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([customerId])
+  @@map("customer_contacts")
+}
+
+model CustomerAddress {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String   @map("customer_id")
+  label      String?
+  street     String?
+  number     String?
+  complement String?
+  district   String?
+  city       String?
+  state      String?
+  zipCode    String?  @map("zip_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([customerId])
+  @@map("customer_addresses")
+}
+
+model CustomerHistoryEvent {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  customerId  String   @map("customer_id")
+  type        String
+  title       String
+  description String?
+  metadata    Json?
+  occurredAt  DateTime @default(now()) @map("occurred_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([customerId, occurredAt])
+  @@map("customer_history_events")
+}
+
+model CustomerInteraction {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String   @map("customer_id")
+  channel    String
+  summary    String?
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([customerId, occurredAt])
+  @@index([entityType, entityId])
+  @@map("customer_interactions")
+}
+
+model PrivacyPreference {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String   @map("customer_id")
+  channel    String
+  allowed    Boolean  @default(true)
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([customerId, channel])
+  @@index([storeId])
+  @@map("privacy_preferences")
+}
+
+model CustomerRelationshipFlag {
+  id         String       @id @default(uuid())
+  storeId    String       @map("store_id")
+  customerId String       @map("customer_id")
+  flag       String
+  metadata   Json?
+  status     RecordStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([customerId])
+  @@map("customer_relationship_flags")
+}
+
+model Lead {
+  id             String     @id @default(uuid())
+  storeId        String     @map("store_id")
+  customerId     String?    @map("customer_id")
+  assignedUserId String?    @map("assigned_user_id")
+  source         String?
+  title          String
+  status         LeadStatus @default(NEW)
+  interest       String?
+  temperature    Int?
+  nextActionAt   DateTime?  @map("next_action_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  deletedAt      DateTime?  @map("deleted_at")
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([assignedUserId])
+  @@index([status, nextActionAt])
+  @@map("leads")
+}
+
+model LeadCard {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  leadId    String   @map("lead_id")
+  boardKey  String   @map("board_key")
+  stageKey  String   @map("stage_key")
+  position  Int      @default(0)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId, boardKey, stageKey])
+  @@index([leadId])
+  @@map("lead_cards")
+}
+
+model LeadStageHistory {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  leadId      String   @map("lead_id")
+  fromStage   String?  @map("from_stage")
+  toStage     String   @map("to_stage")
+  actorUserId String?  @map("actor_user_id")
+  reason      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([leadId, createdAt])
+  @@map("lead_stage_history")
+}
+
+model LeadAssignment {
+  id               String    @id @default(uuid())
+  storeId          String    @map("store_id")
+  leadId           String    @map("lead_id")
+  assignedUserId   String    @map("assigned_user_id")
+  assignedByUserId String?   @map("assigned_by_user_id")
+  assignedAt       DateTime  @default(now()) @map("assigned_at")
+  releasedAt       DateTime? @map("released_at")
+
+  @@index([storeId])
+  @@index([leadId])
+  @@index([assignedUserId])
+  @@map("lead_assignments")
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  storeId        String            @map("store_id")
+  customerId     String?           @map("customer_id")
+  leadId         String?           @map("lead_id")
+  vehicleId      String?           @map("vehicle_id")
+  assignedUserId String?           @map("assigned_user_id")
+  type           String
+  title          String
+  startsAt       DateTime          @map("starts_at")
+  endsAt         DateTime?         @map("ends_at")
+  status         AppointmentStatus @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  deletedAt      DateTime?         @map("deleted_at")
+
+  @@index([storeId, startsAt])
+  @@index([customerId])
+  @@index([leadId])
+  @@map("appointments")
+}
+
+model FollowUp {
+  id             String    @id @default(uuid())
+  storeId        String    @map("store_id")
+  leadId         String?   @map("lead_id")
+  customerId     String?   @map("customer_id")
+  assignedUserId String?   @map("assigned_user_id")
+  type           String
+  dueAt          DateTime  @map("due_at")
+  completedAt    DateTime? @map("completed_at")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId, dueAt])
+  @@index([leadId])
+  @@index([customerId])
+  @@map("follow_ups")
+}
+
+model Vehicle {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  brand     String
+  model     String
+  version   String?
+  yearModel Int?         @map("year_model")
+  yearBuild Int?         @map("year_build")
+  plate     String?
+  vin       String?
+  color     String?
+  mileage   Int?
+  fipeCode  String?      @map("fipe_code")
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, plate])
+  @@index([storeId])
+  @@index([vin])
+  @@map("vehicles")
+}
+
+model VehicleInventoryRecord {
+  id              String               @id @default(uuid())
+  storeId         String               @map("store_id")
+  vehicleId       String               @map("vehicle_id")
+  ownershipType   VehicleOwnershipType @map("ownership_type")
+  status          InventoryStatus      @default(IN_PREPARATION)
+  ownerCustomerId String?              @map("owner_customer_id")
+  purchaseCost    Decimal?             @map("purchase_cost") @db.Decimal(14, 2)
+  askingPrice     Decimal?             @map("asking_price") @db.Decimal(14, 2)
+  entryDate       DateTime             @default(now()) @map("entry_date")
+  exitDate        DateTime?            @map("exit_date")
+  notes           String?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  deletedAt       DateTime?            @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([vehicleId])
+  @@index([ownershipType])
+  @@map("vehicle_inventory_records")
+}
+
+model VehicleCost {
+  id                     String    @id @default(uuid())
+  storeId                String    @map("store_id")
+  vehicleId              String    @map("vehicle_id")
+  inventoryId            String?   @map("inventory_id")
+  category               String
+  description            String
+  amount                 Decimal   @db.Decimal(14, 2)
+  occurredAt             DateTime  @default(now()) @map("occurred_at")
+  capitalized            Boolean   @default(true)
+  financialTransactionId String?   @map("financial_transaction_id")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+  deletedAt              DateTime? @map("deleted_at")
+
+  @@index([storeId])
+  @@index([vehicleId])
+  @@index([inventoryId])
+  @@map("vehicle_costs")
+}
+
+model VehiclePreparationItem {
+  id             String       @id @default(uuid())
+  storeId        String       @map("store_id")
+  vehicleId      String       @map("vehicle_id")
+  serviceOrderId String?      @map("service_order_id")
+  title          String
+  status         RecordStatus @default(ACTIVE)
+  dueAt          DateTime?    @map("due_at")
+  completedAt    DateTime?    @map("completed_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([vehicleId])
+  @@map("vehicle_preparation_items")
+}
+
+model VehicleInspection {
+  id                String   @id @default(uuid())
+  storeId           String   @map("store_id")
+  vehicleId         String   @map("vehicle_id")
+  type              String
+  result            String?
+  checklist         Json?
+  inspectedByUserId String?  @map("inspected_by_user_id")
+  inspectedAt       DateTime @default(now()) @map("inspected_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([vehicleId])
+  @@map("vehicle_inspections")
+}
+
+model VehicleStatusHistory {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  vehicleId   String   @map("vehicle_id")
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  actorUserId String?  @map("actor_user_id")
+  reason      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([vehicleId, createdAt])
+  @@map("vehicle_status_history")
+}
+
+model VehicleMarginSnapshot {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  vehicleId    String   @map("vehicle_id")
+  inventoryId  String?  @map("inventory_id")
+  saleId       String?  @map("sale_id")
+  revenue      Decimal? @db.Decimal(14, 2)
+  totalCost    Decimal? @map("total_cost") @db.Decimal(14, 2)
+  marginAmount Decimal? @map("margin_amount") @db.Decimal(14, 2)
+  marginRate   Decimal? @map("margin_rate") @db.Decimal(8, 4)
+  snapshot     Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([vehicleId])
+  @@index([saleId])
+  @@map("vehicle_margin_snapshots")
+}
+
+model Sale {
+  id           String     @id @default(uuid())
+  storeId      String     @map("store_id")
+  customerId   String?    @map("customer_id")
+  vehicleId    String?    @map("vehicle_id")
+  sellerUserId String?    @map("seller_user_id")
+  type         SaleType   @default(VEHICLE)
+  status       SaleStatus @default(DRAFT)
+  salePrice    Decimal?   @map("sale_price") @db.Decimal(14, 2)
+  grossMargin  Decimal?   @map("gross_margin") @db.Decimal(14, 2)
+  snapshot     Json?
+  closedAt     DateTime?  @map("closed_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([sellerUserId])
+  @@map("sales")
+}
+
+model SaleCard {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  saleId    String   @map("sale_id")
+  stageKey  String   @map("stage_key")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId, stageKey])
+  @@index([saleId])
+  @@map("sale_cards")
+}
+
+model SaleStageHistory {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  saleId      String   @map("sale_id")
+  fromStage   String?  @map("from_stage")
+  toStage     String   @map("to_stage")
+  actorUserId String?  @map("actor_user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([saleId, createdAt])
+  @@map("sale_stage_history")
+}
+
+model SalePaymentTerm {
+  id        String    @id @default(uuid())
+  storeId   String    @map("store_id")
+  saleId    String    @map("sale_id")
+  type      String
+  amount    Decimal   @db.Decimal(14, 2)
+  dueAt     DateTime? @map("due_at")
+  snapshot  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@map("sale_payment_terms")
+}
+
+model SaleDocumentChecklist {
+  id          String    @id @default(uuid())
+  storeId     String    @map("store_id")
+  saleId      String    @map("sale_id")
+  itemKey     String    @map("item_key")
+  label       String
+  isDone      Boolean   @default(false) @map("is_done")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([saleId, itemKey])
+  @@index([storeId])
+  @@map("sale_document_checklists")
+}
+
+model Contract {
+  id          String    @id @default(uuid())
+  storeId     String    @map("store_id")
+  saleId      String    @map("sale_id")
+  templateId  String?   @map("template_id")
+  version     Int       @default(1)
+  status      String
+  snapshot    Json
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  signedAt    DateTime? @map("signed_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@map("contracts")
+}
+
+model WarrantyTerm {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  saleId    String   @map("sale_id")
+  terms     Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@map("warranty_terms")
+}
+
+model DeliveryChecklist {
+  id          String    @id @default(uuid())
+  storeId     String    @map("store_id")
+  saleId      String    @map("sale_id")
+  checklist   Json
+  status      String
+  deliveredAt DateTime? @map("delivered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@map("delivery_checklists")
+}
+
+model DispatcherProcess {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  saleId     String   @map("sale_id")
+  providerId String?  @map("provider_id")
+  status     String
+  channel    String?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@map("dispatcher_processes")
+}
+
+model PurchaseLead {
+  id          String         @id @default(uuid())
+  storeId     String         @map("store_id")
+  customerId  String?        @map("customer_id")
+  vehicleId   String?        @map("vehicle_id")
+  source      String?
+  status      PurchaseStatus @default(OPEN)
+  askingPrice Decimal?       @map("asking_price") @db.Decimal(14, 2)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  deletedAt   DateTime?      @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([customerId])
+  @@map("purchase_leads")
+}
+
+model VehicleEvaluation {
+  id               String             @id @default(uuid())
+  storeId          String             @map("store_id")
+  purchaseLeadId   String?            @map("purchase_lead_id")
+  customerId       String?            @map("customer_id")
+  vehicleId        String?            @map("vehicle_id")
+  appraiserUserId  String?            @map("appraiser_user_id")
+  requestedPrice   Decimal?           @map("requested_price") @db.Decimal(14, 2)
+  fipeValue        Decimal?           @map("fipe_value") @db.Decimal(14, 2)
+  suggestedPrice   Decimal?           @map("suggested_price") @db.Decimal(14, 2)
+  expectedPrepCost Decimal?           @map("expected_prep_cost") @db.Decimal(14, 2)
+  expectedMargin   Decimal?           @map("expected_margin") @db.Decimal(14, 2)
+  decision         EvaluationDecision @default(PENDING)
+  snapshot         Json?
+  evaluatedAt      DateTime           @default(now()) @map("evaluated_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([purchaseLeadId])
+  @@index([vehicleId])
+  @@index([decision])
+  @@map("vehicle_evaluations")
+}
+
+model EvaluationChecklist {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  evaluationId String   @map("evaluation_id")
+  itemKey      String   @map("item_key")
+  label        String
+  value        String?
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([evaluationId])
+  @@map("evaluation_checklists")
+}
+
+model PurchaseApproval {
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  evaluationId     String   @map("evaluation_id")
+  approvedByUserId String?  @map("approved_by_user_id")
+  status           String
+  reason           String?
+  snapshot         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([evaluationId])
+  @@map("purchase_approvals")
+}
+
+model PurchasePayment {
+  id             String                     @id @default(uuid())
+  storeId        String                     @map("store_id")
+  purchaseLeadId String?                    @map("purchase_lead_id")
+  vehicleId      String?                    @map("vehicle_id")
+  amount         Decimal                    @db.Decimal(14, 2)
+  status         FinancialTransactionStatus @default(PENDING)
+  paidAt         DateTime?                  @map("paid_at")
+  snapshot       Json?
+  createdAt      DateTime                   @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([purchaseLeadId])
+  @@index([vehicleId])
+  @@map("purchase_payments")
+}
+
+model RepasseProcess {
+  id          String    @id @default(uuid())
+  storeId     String    @map("store_id")
+  vehicleId   String    @map("vehicle_id")
+  status      String
+  price       Decimal?  @db.Decimal(14, 2)
+  channelPlan Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([vehicleId])
+  @@map("repasse_processes")
+}
+
+model RepasseRevenue {
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  repasseProcessId String   @map("repasse_process_id")
+  saleId           String?  @map("sale_id")
+  amount           Decimal  @db.Decimal(14, 2)
+  snapshot         Json?
+  recognizedAt     DateTime @default(now()) @map("recognized_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([repasseProcessId])
+  @@map("repasse_revenues")
+}
+
+model LegalRestrictionCheck {
+  id         String      @id @default(uuid())
+  storeId    String      @map("store_id")
+  vehicleId  String?     @map("vehicle_id")
+  customerId String?     @map("customer_id")
+  provider   String
+  status     QueryStatus @default(PENDING)
+  result     Json?
+  error      String?
+  checkedAt  DateTime?   @map("checked_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@map("legal_restriction_checks")
+}
+
+model FinancialAccount {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  name      String
+  type      String
+  bankName  String?      @map("bank_name")
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@index([storeId])
+  @@map("financial_accounts")
+}
+
+model FinancialCategory {
+  id        String                   @id @default(uuid())
+  storeId   String                   @map("store_id")
+  name      String
+  type      FinancialTransactionType
+  dreGroup  String?                  @map("dre_group")
+  status    RecordStatus             @default(ACTIVE)
+  createdAt DateTime                 @default(now()) @map("created_at")
+  updatedAt DateTime                 @updatedAt @map("updated_at")
+  deletedAt DateTime?                @map("deleted_at")
+
+  @@unique([storeId, name, type])
+  @@index([storeId])
+  @@map("financial_categories")
+}
+
+model FinancialTransaction {
+  id          String                     @id @default(uuid())
+  storeId     String                     @map("store_id")
+  accountId   String?                    @map("account_id")
+  categoryId  String?                    @map("category_id")
+  type        FinancialTransactionType
+  status      FinancialTransactionStatus @default(PENDING)
+  description String
+  amount      Decimal                    @db.Decimal(14, 2)
+  dueAt       DateTime?                  @map("due_at")
+  paidAt      DateTime?                  @map("paid_at")
+  entityType  String?                    @map("entity_type")
+  entityId    String?                    @map("entity_id")
+  snapshot    Json?
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
+  deletedAt   DateTime?                  @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([dueAt])
+  @@index([entityType, entityId])
+  @@map("financial_transactions")
+}
+
+model VehicleFinancialResult {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  vehicleId String   @map("vehicle_id")
+  saleId    String?  @map("sale_id")
+  revenue   Decimal? @db.Decimal(14, 2)
+  totalCost Decimal? @map("total_cost") @db.Decimal(14, 2)
+  netProfit Decimal? @map("net_profit") @db.Decimal(14, 2)
+  snapshot  Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([vehicleId])
+  @@index([saleId])
+  @@map("vehicle_financial_results")
+}
+
+model DreSnapshot {
+  id             String    @id @default(uuid())
+  storeId        String    @map("store_id")
+  periodStart    DateTime  @map("period_start")
+  periodEnd      DateTime  @map("period_end")
+  view           String    @default("CONSOLIDATED")
+  data           Json
+  closedByUserId String?   @map("closed_by_user_id")
+  closedAt       DateTime? @map("closed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@unique([storeId, periodStart, periodEnd, view])
+  @@index([storeId])
+  @@map("dre_snapshots")
+}
+
+model BalanceSheetSnapshot {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  periodEnd   DateTime @map("period_end")
+  assets      Json
+  liabilities Json
+  equity      Json
+  isBalanced  Boolean  @default(false) @map("is_balanced")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([storeId, periodEnd])
+  @@map("balance_sheet_snapshots")
+}
+
+model CommissionRule {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  name      String
+  appliesTo String       @map("applies_to")
+  basis     String
+  value     Decimal?     @db.Decimal(12, 4)
+  version   Int          @default(1)
+  snapshot  Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, name, version])
+  @@index([storeId])
+  @@map("commission_rules")
+}
+
+model CommissionCalculation {
+  id             String           @id @default(uuid())
+  storeId        String           @map("store_id")
+  userId         String?          @map("user_id")
+  saleId         String?          @map("sale_id")
+  serviceOrderId String?          @map("service_order_id")
+  ruleId         String?          @map("rule_id")
+  amount         Decimal          @db.Decimal(14, 2)
+  status         CommissionStatus @default(PENDING)
+  snapshot       Json
+  approvedAt     DateTime?        @map("approved_at")
+  paidAt         DateTime?        @map("paid_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([storeId, status])
+  @@index([userId])
+  @@index([saleId])
+  @@index([serviceOrderId])
+  @@map("commission_calculations")
+}
+
+model CommissionAdjustment {
+  id                      String   @id @default(uuid())
+  storeId                 String   @map("store_id")
+  commissionCalculationId String   @map("commission_calculation_id")
+  amount                  Decimal  @db.Decimal(14, 2)
+  reason                  String
+  createdByUserId         String?  @map("created_by_user_id")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([commissionCalculationId])
+  @@map("commission_adjustments")
+}
+
+model TaxSettingsSnapshot {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  snapshot   Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([entityType, entityId])
+  @@map("tax_settings_snapshots")
+}
+
+model BankReconciliation {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  accountId   String?  @map("account_id")
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  status      String
+  summary     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([accountId])
+  @@map("bank_reconciliations")
+}
+
+model Listing {
+  id          String        @id @default(uuid())
+  storeId     String        @map("store_id")
+  vehicleId   String        @map("vehicle_id")
+  title       String
+  description String?
+  askingPrice Decimal?      @map("asking_price") @db.Decimal(14, 2)
+  status      ListingStatus @default(DRAFT)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  deletedAt   DateTime?     @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([vehicleId])
+  @@map("listings")
+}
+
+model ListingChannel {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  name      String
+  type      String
+  settings  Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, name])
+  @@map("listing_channels")
+}
+
+model ListingPublication {
+  id            String        @id @default(uuid())
+  storeId       String        @map("store_id")
+  listingId     String        @map("listing_id")
+  channelId     String        @map("channel_id")
+  externalId    String?       @map("external_id")
+  status        ListingStatus @default(DRAFT)
+  publishedAt   DateTime?     @map("published_at")
+  unpublishedAt DateTime?     @map("unpublished_at")
+  metadata      Json?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@index([storeId, status])
+  @@index([listingId])
+  @@index([channelId])
+  @@map("listing_publications")
+}
+
+model ListingSyncLog {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  listingId     String?  @map("listing_id")
+  publicationId String?  @map("publication_id")
+  action        String
+  status        String
+  payload       Json?
+  response      Json?
+  error         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([listingId])
+  @@map("listing_sync_logs")
+}
+
+model ListingMetric {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  listingId      String   @map("listing_id")
+  channelId      String?  @map("channel_id")
+  metricDate     DateTime @map("metric_date")
+  views          Int      @default(0)
+  leads          Int      @default(0)
+  clicks         Int      @default(0)
+  ctr            Decimal? @db.Decimal(8, 4)
+  conversionRate Decimal? @map("conversion_rate") @db.Decimal(8, 4)
+  costPerLead    Decimal? @map("cost_per_lead") @db.Decimal(14, 2)
+  score          Decimal? @db.Decimal(8, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([listingId, channelId, metricDate])
+  @@index([storeId])
+  @@map("listing_metrics")
+}
+
+model Campaign {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  name      String
+  channel   String
+  status    RecordStatus @default(ACTIVE)
+  startsAt  DateTime?    @map("starts_at")
+  endsAt    DateTime?    @map("ends_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@index([storeId])
+  @@map("campaigns")
+}
+
+model CampaignCost {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  campaignId String   @map("campaign_id")
+  amount     Decimal  @db.Decimal(14, 2)
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([campaignId])
+  @@map("campaign_costs")
+}
+
+model CampaignResult {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  campaignId String   @map("campaign_id")
+  resultDate DateTime @map("result_date")
+  data       Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([campaignId, resultDate])
+  @@index([storeId])
+  @@map("campaign_results")
+}
+
+model ServiceProvider {
+  id              String       @id @default(uuid())
+  storeId         String       @map("store_id")
+  name            String
+  serviceTypes    String[]     @default([]) @map("service_types")
+  document        String?
+  contactName     String?      @map("contact_name")
+  phone           String?
+  email           String?
+  accessUrl       String?      @map("access_url")
+  accessLogin     String?      @map("access_login")
+  accessSecretRef String?      @map("access_secret_ref")
+  status          RecordStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  deletedAt       DateTime?    @map("deleted_at")
+
+  @@index([storeId])
+  @@map("service_providers")
+}
+
+model ServiceCatalogItem {
+  id               String       @id @default(uuid())
+  storeId          String       @map("store_id")
+  name             String
+  category         String
+  basePrice        Decimal?     @map("base_price") @db.Decimal(14, 2)
+  slaHours         Int?         @map("sla_hours")
+  commissionRuleId String?      @map("commission_rule_id")
+  status           RecordStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+
+  @@unique([storeId, name])
+  @@index([storeId, category])
+  @@map("service_catalog_items")
+}
+
+model ServiceOrder {
+  id                 String             @id @default(uuid())
+  storeId            String             @map("store_id")
+  customerId         String?            @map("customer_id")
+  postSaleCustomerId String?            @map("post_sale_customer_id")
+  vehicleId          String?            @map("vehicle_id")
+  saleId             String?            @map("sale_id")
+  providerId         String?            @map("provider_id")
+  type               String
+  status             ServiceOrderStatus @default(OPEN)
+  totalAmount        Decimal?           @map("total_amount") @db.Decimal(14, 2)
+  startedAt          DateTime?          @map("started_at")
+  finishedAt         DateTime?          @map("finished_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  deletedAt          DateTime?          @map("deleted_at")
+
+  @@index([storeId, status])
+  @@index([customerId])
+  @@index([postSaleCustomerId])
+  @@index([vehicleId])
+  @@map("service_orders")
+}
+
+model ServiceOrderItem {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  serviceOrderId String   @map("service_order_id")
+  catalogItemId  String?  @map("catalog_item_id")
+  description    String
+  quantity       Decimal  @default(1) @db.Decimal(12, 2)
+  unitPrice      Decimal? @map("unit_price") @db.Decimal(14, 2)
+  costAmount     Decimal? @map("cost_amount") @db.Decimal(14, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([serviceOrderId])
+  @@map("service_order_items")
+}
+
+model ServiceAppointment {
+  id                 String            @id @default(uuid())
+  storeId            String            @map("store_id")
+  serviceOrderId     String?           @map("service_order_id")
+  customerId         String?           @map("customer_id")
+  providerId         String?           @map("provider_id")
+  professionalUserId String?           @map("professional_user_id")
+  title              String
+  startsAt           DateTime          @map("starts_at")
+  endsAt             DateTime?         @map("ends_at")
+  status             AppointmentStatus @default(SCHEDULED)
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  @@index([storeId, startsAt])
+  @@index([serviceOrderId])
+  @@map("service_appointments")
+}
+
+model ServiceCost {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  serviceOrderId String   @map("service_order_id")
+  providerId     String?  @map("provider_id")
+  description    String
+  amount         Decimal  @db.Decimal(14, 2)
+  occurredAt     DateTime @default(now()) @map("occurred_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([serviceOrderId])
+  @@map("service_costs")
+}
+
+model ServiceInvoice {
+  id             String    @id @default(uuid())
+  storeId        String    @map("store_id")
+  serviceOrderId String?   @map("service_order_id")
+  providerId     String?   @map("provider_id")
+  number         String?
+  amount         Decimal?  @db.Decimal(14, 2)
+  issuedAt       DateTime? @map("issued_at")
+  snapshot       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([serviceOrderId])
+  @@map("service_invoices")
+}
+
+model ProviderPayable {
+  id             String                     @id @default(uuid())
+  storeId        String                     @map("store_id")
+  providerId     String                     @map("provider_id")
+  serviceOrderId String?                    @map("service_order_id")
+  amount         Decimal                    @db.Decimal(14, 2)
+  status         FinancialTransactionStatus @default(PENDING)
+  dueAt          DateTime?                  @map("due_at")
+  paidAt         DateTime?                  @map("paid_at")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  @@index([storeId, status])
+  @@index([providerId])
+  @@map("provider_payables")
+}
+
+model FileAttachment {
+  id               String               @id @default(uuid())
+  storeId          String?              @map("store_id")
+  bucket           String
+  path             String
+  originalName     String               @map("original_name")
+  mimeType         String?              @map("mime_type")
+  sizeBytes        Int?                 @map("size_bytes")
+  checksum         String?
+  classification   String?
+  status           FileAttachmentStatus @default(ACTIVE)
+  uploadedByUserId String?              @map("uploaded_by_user_id")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  deletedAt        DateTime?            @map("deleted_at")
+
+  @@unique([bucket, path])
+  @@index([storeId])
+  @@index([classification])
+  @@map("file_attachments")
+}
+
+model FileAttachmentLink {
+  id           String   @id @default(uuid())
+  storeId      String?  @map("store_id")
+  attachmentId String   @map("attachment_id")
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id")
+  purpose      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([attachmentId, entityType, entityId, purpose])
+  @@index([storeId])
+  @@index([entityType, entityId])
+  @@map("file_attachment_links")
+}
+
+model DocumentClassification {
+  id              String       @id @default(uuid())
+  storeId         String?      @map("store_id")
+  code            String
+  name            String
+  retentionPolicy Json?        @map("retention_policy")
+  status          RecordStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@unique([storeId, code])
+  @@map("document_classifications")
+}
+
+model DocumentVersion {
+  id           String   @id @default(uuid())
+  storeId      String?  @map("store_id")
+  attachmentId String   @map("attachment_id")
+  version      Int
+  snapshot     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([attachmentId, version])
+  @@index([storeId])
+  @@map("document_versions")
+}
+
+model DocumentAccessLog {
+  id           String   @id @default(uuid())
+  storeId      String?  @map("store_id")
+  attachmentId String   @map("attachment_id")
+  actorUserId  String?  @map("actor_user_id")
+  action       String
+  reason       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([attachmentId])
+  @@map("document_access_logs")
+}
+
+model PrivacyRetentionRecord {
+  id         String    @id @default(uuid())
+  storeId    String?   @map("store_id")
+  entityType String    @map("entity_type")
+  entityId   String    @map("entity_id")
+  policy     String
+  reason     String?
+  expiresAt  DateTime? @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([entityType, entityId])
+  @@map("privacy_retention_records")
+}
+
+model CommunicationChannel {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  type      String
+  name      String
+  settings  Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  @@unique([storeId, type, name])
+  @@map("communication_channels")
+}
+
+model WhatsappInstance {
+  id          String       @id @default(uuid())
+  storeId     String       @map("store_id")
+  name        String
+  instanceKey String       @map("instance_key")
+  status      RecordStatus @default(ACTIVE)
+  settings    Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([storeId, instanceKey])
+  @@map("whatsapp_instances")
+}
+
+model EmailAccount {
+  id        String       @id @default(uuid())
+  storeId   String       @map("store_id")
+  email     String
+  name      String?
+  settings  Json?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@unique([storeId, email])
+  @@map("email_accounts")
+}
+
+model MessageThread {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  customerId    String?   @map("customer_id")
+  leadId        String?   @map("lead_id")
+  channelId     String?   @map("channel_id")
+  subject       String?
+  status        String
+  lastMessageAt DateTime? @map("last_message_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId, status])
+  @@index([customerId])
+  @@index([leadId])
+  @@map("message_threads")
+}
+
+model Message {
+  id         String           @id @default(uuid())
+  storeId    String           @map("store_id")
+  threadId   String           @map("thread_id")
+  direction  MessageDirection
+  sender     String?
+  recipient  String?
+  body       String?
+  metadata   Json?
+  sentAt     DateTime?        @map("sent_at")
+  receivedAt DateTime?        @map("received_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([threadId, createdAt])
+  @@map("messages")
+}
+
+model EmailMessage {
+  id          String           @id @default(uuid())
+  storeId     String           @map("store_id")
+  threadId    String?          @map("thread_id")
+  direction   MessageDirection
+  subject     String?
+  fromAddress String?          @map("from_address")
+  toAddresses String[]         @default([]) @map("to_addresses")
+  body        String?
+  metadata    Json?
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([threadId])
+  @@map("email_messages")
+}
+
+model EmailAttachment {
+  id             String   @id @default(uuid())
+  storeId        String?  @map("store_id")
+  emailMessageId String   @map("email_message_id")
+  attachmentId   String   @map("attachment_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([emailMessageId])
+  @@map("email_attachments")
+}
+
+model ChannelPreference {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  customerId String?  @map("customer_id")
+  channel    String
+  allowed    Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([customerId])
+  @@map("channel_preferences")
+}
+
+model AutomationRule {
+  id             String           @id @default(uuid())
+  storeId        String           @map("store_id")
+  name           String
+  trigger        String
+  status         AutomationStatus @default(DRAFT)
+  currentVersion Int              @default(1) @map("current_version")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  deletedAt      DateTime?        @map("deleted_at")
+
+  @@index([storeId, status])
+  @@map("automation_rules")
+}
+
+model AutomationRuleVersion {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  ruleId     String   @map("rule_id")
+  version    Int
+  definition Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([ruleId, version])
+  @@index([storeId])
+  @@map("automation_rule_versions")
+}
+
+model AutomationEvent {
+  id          String   @id @default(uuid())
+  storeId     String?  @map("store_id")
+  ruleId      String?  @map("rule_id")
+  ruleVersion Int?     @map("rule_version")
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  status      String
+  context     Json?
+  result      Json?
+  error       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([entityType, entityId])
+  @@map("automation_events")
+}
+
+model AutomationTest {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  ruleId    String   @map("rule_id")
+  input     Json
+  output    Json?
+  status    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([ruleId])
+  @@map("automation_tests")
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  storeId    String?   @map("store_id")
+  userId     String?   @map("user_id")
+  title      String
+  body       String?
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model BackgroundJob {
+  id             String    @id @default(uuid())
+  storeId        String?   @map("store_id")
+  jobType        String    @map("job_type")
+  status         JobStatus @default(QUEUED)
+  entityType     String?   @map("entity_type")
+  entityId       String?   @map("entity_id")
+  idempotencyKey String?   @unique @map("idempotency_key")
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(3) @map("max_attempts")
+  payload        Json?
+  result         Json?
+  lastError      String?   @map("last_error")
+  scheduledAt    DateTime  @default(now()) @map("scheduled_at")
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([status, scheduledAt])
+  @@index([jobType])
+  @@index([entityType, entityId])
+  @@map("background_jobs")
+}
+
+model JobExecutionLog {
+  id        String    @id @default(uuid())
+  storeId   String?   @map("store_id")
+  jobId     String    @map("job_id")
+  status    JobStatus
+  message   String?
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([jobId])
+  @@map("job_execution_logs")
+}
+
+model DocumentOcrJob {
+  id               String      @id @default(uuid())
+  storeId          String?     @map("store_id")
+  attachmentId     String      @map("attachment_id")
+  status           QueryStatus @default(PENDING)
+  provider         String?
+  result           Json?
+  error            String?
+  reviewedByUserId String?     @map("reviewed_by_user_id")
+  reviewedAt       DateTime?   @map("reviewed_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([attachmentId])
+  @@map("document_ocr_jobs")
+}
+
+model DocumentExtractedField {
+  id         String   @id @default(uuid())
+  storeId    String?  @map("store_id")
+  ocrJobId   String   @map("ocr_job_id")
+  fieldKey   String   @map("field_key")
+  value      String?
+  confidence Decimal? @db.Decimal(5, 4)
+  reviewed   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([ocrJobId])
+  @@map("document_extracted_fields")
+}
+
+model AiQueryLog {
+  id           String   @id @default(uuid())
+  storeId      String?  @map("store_id")
+  userId       String?  @map("user_id")
+  purpose      String
+  model        String?
+  inputTokens  Int?     @map("input_tokens")
+  outputTokens Int?     @map("output_tokens")
+  costCents    Int?     @map("cost_cents")
+  entityType   String?  @map("entity_type")
+  entityId     String?  @map("entity_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("ai_query_logs")
+}
+
+model AiSuggestion {
+  id         String      @id @default(uuid())
+  storeId    String?     @map("store_id")
+  userId     String?     @map("user_id")
+  purpose    String
+  entityType String?     @map("entity_type")
+  entityId   String?     @map("entity_id")
+  content    Json
+  status     QueryStatus @default(PENDING)
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([entityType, entityId])
+  @@map("ai_suggestions")
+}
+
+model AiSuggestionFeedback {
+  id           String   @id @default(uuid())
+  storeId      String?  @map("store_id")
+  suggestionId String   @map("suggestion_id")
+  userId       String?  @map("user_id")
+  feedback     String
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([suggestionId])
+  @@map("ai_suggestion_feedback")
+}
+
+model ExternalQueryJob {
+  id                  String      @id @default(uuid())
+  storeId             String?     @map("store_id")
+  provider            String
+  purpose             String
+  entityType          String?     @map("entity_type")
+  entityId            String?     @map("entity_id")
+  status              QueryStatus @default(PENDING)
+  requiresHumanAction Boolean     @default(false) @map("requires_human_action")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([entityType, entityId])
+  @@index([status])
+  @@map("external_query_jobs")
+}
+
+model ExternalQueryResult {
+  id        String      @id @default(uuid())
+  storeId   String?     @map("store_id")
+  jobId     String      @map("job_id")
+  status    QueryStatus
+  result    Json?
+  error     String?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([jobId])
+  @@map("external_query_results")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  storeId    String?     @map("store_id")
+  actorId    String?     @map("actor_id")
+  actorRole  String?     @map("actor_role")
+  module     String?
+  action     String
+  entityType String      @map("entity_type")
+  entityId   String      @map("entity_id")
+  result     AuditResult @default(SUCCESS)
+  metadata   Json?
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model TechnicalEvent {
+  id        String   @id @default(uuid())
+  storeId   String?  @map("store_id")
+  level     String
+  source    String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([level, createdAt])
+  @@map("technical_events")
+}
+
+model SecurityEvent {
+  id        String   @id @default(uuid())
+  storeId   String?  @map("store_id")
+  userId    String?  @map("user_id")
+  type      String
+  severity  String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([severity, createdAt])
+  @@map("security_events")
+}
+
+model BackupStatusLog {
+  id          String   @id @default(uuid())
+  environment String
+  target      String
+  status      String
+  details     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([environment])
+  @@index([status, createdAt])
+  @@map("backup_status_logs")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum UserRole {
+  OWNER_MANAGER
+  ADMIN
+  ADMINISTRATIVE
+  SELLER
+  SDR
+  APPRAISER
+  SERVICE_MANAGER
+}
+
+enum PermissionScopeType {
+  ALL
+  OWN_PORTFOLIO
+  OWN_LEAD
+  OWN_SALE
+  LINKED_VEHICLE
+  STORE
+  NONE
+}
+
+enum PermissionEffect {
+  ALLOW
+  DENY
+}
+
+enum CustomerType {
+  PERSON
+  COMPANY
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  SCHEDULED
+  NEGOTIATION
+  WON
+  LOST
+  COLD
+}
+
+enum VehicleOwnershipType {
+  OWN
+  CONSIGNED
+  REPASSE
+  TRADE_IN
+}
+
+enum InventoryStatus {
+  IN_PREPARATION
+  AVAILABLE
+  RESERVED
+  SOLD
+  REPASSE
+  REMOVED
+}
+
+enum SaleType {
+  VEHICLE
+  REPASSE
+  SERVICE
+}
+
+enum SaleStatus {
+  DRAFT
+  PROPOSAL
+  APPROVED
+  DOCUMENTATION
+  CLOSED
+  CANCELLED
+}
+
+enum PurchaseStatus {
+  OPEN
+  EVALUATING
+  APPROVED
+  REJECTED
+  PURCHASED
+  CANCELLED
+}
+
+enum EvaluationDecision {
+  PENDING
+  APPROVED_BUY
+  APPROVED_REPASSE
+  REJECTED
+  NEGOTIATING
+}
+
+enum FinancialTransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum FinancialTransactionStatus {
+  PENDING
+  SCHEDULED
+  PAID
+  CANCELLED
+  OVERDUE
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  BLOCKED
+  PAID
+  CANCELLED
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  PAUSED
+  SOLD
+  ERROR
+}
+
+enum ServiceOrderStatus {
+  OPEN
+  SCHEDULED
+  RUNNING
+  WAITING_PROVIDER
+  WAITING_INVOICE
+  DONE
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  DONE
+  CANCELLED
+  NO_SHOW
+}
+
+enum FileAttachmentStatus {
+  ACTIVE
+  DELETED
+  RETAINED
+  QUARANTINED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum AutomationStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum QueryStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  NEEDS_HUMAN
+  CANCELLED
+}
+
+enum AuditResult {
+  SUCCESS
+  DENIED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
