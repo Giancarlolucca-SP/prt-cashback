@@ -2246,6 +2246,57 @@ try {
   });
   assert.equal(sellerMoveOtherCustomer.statusCode, 404);
 
+  const sdrLogin = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: {
+      email: "sdr@gt3.local",
+      password: "Gt3@2026dev",
+    },
+  });
+  assert.equal(sdrLogin.statusCode, 200);
+  const sdrToken = sdrLogin.json().token as string;
+
+  const sdrFullCustomer = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${sdrToken}`,
+    },
+    payload: {
+      name: "Cliente Completo SDR",
+      phone: "11996665555",
+      origin: "qa-sdr",
+    },
+  });
+  assert.equal(sdrFullCustomer.statusCode, 403);
+
+  const sdrMinimalLead = await app.inject({
+    method: "POST",
+    url: "/customers/minimal-leads",
+    headers: {
+      authorization: `Bearer ${sdrToken}`,
+    },
+    payload: {
+      interest: "Financiamento de hatch automatico",
+      name: "Lead Minimo SDR",
+      origin: "qa-sdr",
+      phone: "11995554444",
+    },
+  });
+  assert.equal(sdrMinimalLead.statusCode, 201);
+  assert.equal(sdrMinimalLead.json().data.customer.name, "Lead Minimo SDR");
+  assert.equal(sdrMinimalLead.json().data.lead.status, "NEW");
+
+  const sdrCustomer = await app.inject({
+    method: "GET",
+    url: `/customers/${sdrMinimalLead.json().data.customer.id}`,
+    headers: {
+      authorization: `Bearer ${sdrToken}`,
+    },
+  });
+  assert.equal(sdrCustomer.statusCode, 200);
+
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,

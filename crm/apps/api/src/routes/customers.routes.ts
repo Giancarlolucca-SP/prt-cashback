@@ -58,6 +58,18 @@ const updateCustomerKanbanStatusSchema = z.object({
 
 const customerKanbanColumns = customerKanbanStatusSchema.options;
 
+const createMinimalLeadSchema = z.object({
+  email: z.string().email().optional(),
+  interest: z.string().trim().max(180).optional(),
+  name: z.string().trim().min(2).max(160),
+  notes: z.string().trim().max(500).optional(),
+  origin: z.string().trim().min(2).max(80).default("manual"),
+  phone: z.string().trim().min(8).max(32).optional(),
+}).refine((input) => Boolean(input.email || input.phone), {
+  message: "Informe telefone ou e-mail para cadastrar o lead minimo.",
+  path: ["phone"],
+});
+
 function sanitizeCustomer(customer: {
   id: string;
   type: string;
@@ -211,6 +223,146 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     }));
 
     return { columns };
+  });
+
+  app.post("/minimal-leads", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "create",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const input = createMinimalLeadSchema.parse(request.body);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.create({
+        data: {
+          storeId: session.user.storeId,
+          type: "PERSON",
+          name: input.name,
+          email: input.email,
+          phone: input.phone,
+          origin: input.origin,
+          notes: input.notes,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id,
+        },
+      });
+
+      const lead = await tx.lead.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          assignedUserId: session.user.id,
+          source: input.origin,
+          title: input.name,
+          status: "NEW",
+          interest: input.interest,
+        },
+      });
+
+      await tx.leadCard.create({
+        data: {
+          storeId: session.user.storeId,
+          leadId: lead.id,
+          boardKey: "leads",
+          stageKey: lead.status,
+          position: 0,
+        },
+      });
+
+      await tx.leadStageHistory.create({
+        data: {
+          storeId: session.user.storeId,
+          leadId: lead.id,
+          fromStage: null,
+          toStage: lead.status,
+          actorUserId: session.user.id,
+          reason: "Lead minimo criado",
+        },
+      });
+
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          type: "customer.minimal_lead_created",
+          title: "Lead minimo criado",
+          description: input.notes,
+          metadata: {
+            leadId: lead.id,
+            origin: input.origin,
+            interest: input.interest,
+          },
+        },
+      });
+
+      await tx.auditLog.createMany({
+        data: [
+          {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "customers",
+            action: "create_minimal_lead_customer",
+            entityType: "customer",
+            entityId: customer.id,
+            result: "SUCCESS",
+            metadata: {
+              leadId: lead.id,
+              origin: input.origin,
+            },
+          },
+          {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "create_minimal_lead",
+            entityType: "lead",
+            entityId: lead.id,
+            result: "SUCCESS",
+            metadata: {
+              customerId: customer.id,
+              source: lead.source,
+            },
+          },
+        ],
+      });
+
+      return { customer, lead };
+    });
+
+    await emitInternalEvent({
+      name: "customer.created",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "customer",
+      entityId: result.customer.id,
+      payload: { origin: result.customer.origin, source: "minimal_lead" },
+    });
+    await emitInternalEvent({
+      name: "lead.created",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "lead",
+      entityId: result.lead.id,
+      payload: { customerId: result.customer.id, source: result.lead.source },
+    });
+
+    return reply.code(201).send({
+      data: {
+        customer: sanitizeCustomer(result.customer),
+        lead: {
+          id: result.lead.id,
+          customerId: result.lead.customerId,
+          assignedUserId: result.lead.assignedUserId,
+          source: result.lead.source,
+          status: result.lead.status,
+          title: result.lead.title,
+        },
+      },
+    });
   });
 
   app.get("/:id", async (request) => {

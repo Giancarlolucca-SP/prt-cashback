@@ -57,6 +57,15 @@ type CustomerFormState = {
   type: CustomerType;
 };
 
+type MinimalLeadFormState = {
+  email: string;
+  interest: string;
+  name: string;
+  notes: string;
+  origin: string;
+  phone: string;
+};
+
 const emptyCustomerForm: CustomerFormState = {
   document: "",
   email: "",
@@ -65,6 +74,15 @@ const emptyCustomerForm: CustomerFormState = {
   origin: "Loja",
   phone: "",
   type: "PERSON",
+};
+
+const emptyMinimalLeadForm: MinimalLeadFormState = {
+  email: "",
+  interest: "",
+  name: "",
+  notes: "",
+  origin: "WhatsApp",
+  phone: "",
 };
 
 const fallbackCustomers: Customer[] = [
@@ -175,6 +193,7 @@ export function LiveCustomersWorkspace() {
   const { hasPermission, token } = useAuth();
   const canReadCustomers = hasPermission({ module: "customers", action: "read" });
   const canCreateCustomers = hasPermission({ module: "customers", action: "create" });
+  const canCreateLeads = hasPermission({ module: "leads", action: "create" });
   const canUpdateCustomers = hasPermission({ module: "customers", action: "update" });
   const canMoveCustomers = hasPermission({ module: "customers", action: "update_status" });
   const canDeleteCustomers = hasPermission({ module: "customers", action: "delete" });
@@ -191,6 +210,8 @@ export function LiveCustomersWorkspace() {
     })),
   );
   const [kanbanStatus, setKanbanStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
+  const [leadForm, setLeadForm] = useState<MinimalLeadFormState>(emptyMinimalLeadForm);
+  const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -347,6 +368,41 @@ export function LiveCustomersWorkspace() {
     }
   }
 
+  async function handleCreateMinimalLead(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!token || saving || !canCreateLeads) {
+      return;
+    }
+
+    setSaveError(null);
+
+    if (!leadForm.phone.trim() && !leadForm.email.trim()) {
+      setSaveError("Informe telefone ou e-mail para cadastrar o lead minimo.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await apiPost<{ data: { customer: Customer } }>("/customers/minimal-leads", token, {
+        email: leadForm.email.trim() || undefined,
+        interest: leadForm.interest.trim() || undefined,
+        name: leadForm.name.trim(),
+        notes: leadForm.notes.trim() || undefined,
+        origin: leadForm.origin.trim() || undefined,
+        phone: leadForm.phone.trim() || undefined,
+      });
+      setLeadForm(emptyMinimalLeadForm);
+      setLeadModalOpen(false);
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setSaveError("Nao foi possivel criar o lead minimo. Confira nome e contato.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function moveCustomer(customer: CustomerKanbanItem, toStatus: CustomerKanbanStatus) {
     if (!token || !canMoveCustomers || movingId || customer.operationalStatus === toStatus) {
       return;
@@ -372,6 +428,12 @@ export function LiveCustomersWorkspace() {
     setForm(emptyCustomerForm);
     setSaveError(null);
     setModalOpen(true);
+  }
+
+  function openLeadModal() {
+    setLeadForm(emptyMinimalLeadForm);
+    setSaveError(null);
+    setLeadModalOpen(true);
   }
 
   function openEditModal(customer: Customer) {
@@ -442,6 +504,10 @@ export function LiveCustomersWorkspace() {
         <button className="primary-action" disabled={!canCreateCustomers} onClick={openCreateModal} type="button">
           <Plus aria-hidden="true" size={17} />
           Novo cliente
+        </button>
+        <button className="text-button" disabled={!canCreateLeads} onClick={openLeadModal} type="button">
+          <Plus aria-hidden="true" size={17} />
+          Lead minimo
         </button>
       </section>
 
@@ -534,6 +600,95 @@ export function LiveCustomersWorkspace() {
                 </button>
                 <button className="primary-action" disabled={saving || form.name.trim().length < 2 || (!form.phone.trim() && !form.email.trim())} type="submit">
                   {saving ? "Salvando..." : editingCustomer ? "Salvar cliente" : "Criar cliente"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {leadModalOpen ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Novo lead minimo">
+          <section className="dre-modal lead-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Entrada rapida</p>
+                <h3>Novo lead minimo</h3>
+              </div>
+              <button aria-label="Fechar lead minimo" className="icon-button" onClick={() => setLeadModalOpen(false)} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+
+            <form className="lead-modal-form" onSubmit={handleCreateMinimalLead}>
+              <label>
+                Nome ou identificacao
+                <input
+                  autoFocus
+                  maxLength={160}
+                  minLength={2}
+                  onChange={(event) => setLeadForm((current) => ({ ...current, name: event.target.value }))}
+                  placeholder="Ex.: Cliente interessado no Corolla"
+                  required
+                  value={leadForm.name}
+                />
+              </label>
+              <label>
+                Telefone
+                <input
+                  maxLength={32}
+                  onChange={(event) => setLeadForm((current) => ({ ...current, phone: event.target.value }))}
+                  placeholder="(11) 99999-0000"
+                  value={leadForm.phone}
+                />
+              </label>
+              <label>
+                E-mail
+                <input
+                  onChange={(event) => setLeadForm((current) => ({ ...current, email: event.target.value }))}
+                  placeholder="lead@exemplo.com"
+                  type="email"
+                  value={leadForm.email}
+                />
+              </label>
+              <label>
+                Origem
+                <select onChange={(event) => setLeadForm((current) => ({ ...current, origin: event.target.value }))} value={leadForm.origin}>
+                  <option>WhatsApp</option>
+                  <option>Loja</option>
+                  <option>Site</option>
+                  <option>Marketplace</option>
+                  <option>Indicacao</option>
+                  <option>Telefone</option>
+                </select>
+              </label>
+              <label className="lead-modal-wide">
+                Interesse
+                <input
+                  maxLength={180}
+                  onChange={(event) => setLeadForm((current) => ({ ...current, interest: event.target.value }))}
+                  placeholder="Comprar, trocar, financiar, avaliar..."
+                  value={leadForm.interest}
+                />
+              </label>
+              <label className="lead-modal-wide">
+                Observacao curta
+                <input
+                  maxLength={500}
+                  onChange={(event) => setLeadForm((current) => ({ ...current, notes: event.target.value }))}
+                  placeholder="Contexto rapido do atendimento"
+                  value={leadForm.notes}
+                />
+              </label>
+
+              {saveError ? <p className="lead-modal-error">{saveError}</p> : null}
+
+              <div className="lead-modal-actions">
+                <button className="text-button" onClick={() => setLeadModalOpen(false)} type="button">
+                  Cancelar
+                </button>
+                <button className="primary-action" disabled={saving || leadForm.name.trim().length < 2 || (!leadForm.phone.trim() && !leadForm.email.trim())} type="submit">
+                  {saving ? "Salvando..." : "Criar lead"}
                 </button>
               </div>
             </form>
