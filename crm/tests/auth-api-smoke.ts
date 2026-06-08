@@ -221,11 +221,13 @@ try {
       name: "Cliente Contrato API",
       document,
       phone: "11999990000",
+      birthDate: "1990-06-15",
       origin: "qa-api",
     },
   });
   assert.equal(createCustomer.statusCode, 201);
   assert.equal(createCustomer.json().data.name, "Cliente Contrato API");
+  assert.ok(createCustomer.json().data.birthDate);
 
   const duplicatedCustomer = await app.inject({
     method: "POST",
@@ -265,6 +267,16 @@ try {
   });
   assert.equal(listCustomersByOrigin.statusCode, 200);
   assert.ok(listCustomersByOrigin.json().items.every((customer: { origin: string }) => customer.origin === "qa-api"));
+
+  const listCustomersByBirthMonth = await app.inject({
+    method: "GET",
+    url: "/customers?page=1&page_size=5&birth_month=6",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCustomersByBirthMonth.statusCode, 200);
+  assert.ok(listCustomersByBirthMonth.json().items.some((customer: { id: string }) => customer.id === createCustomer.json().data.id));
 
   const createdCustomerId = createCustomer.json().data.id as string;
 
@@ -860,6 +872,30 @@ try {
   });
   assert.equal(confirmAppointment.statusCode, 200);
   assert.equal(confirmAppointment.json().data.status, "CONFIRMED");
+
+  const finishAppointment = await app.inject({
+    method: "POST",
+    url: `/appointments/${createdAppointmentId}/status`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "DONE",
+      reason: "Visita concluida em QA",
+    },
+  });
+  assert.equal(finishAppointment.statusCode, 200);
+  assert.equal(finishAppointment.json().data.status, "DONE");
+
+  const listCustomersByVisit = await app.inject({
+    method: "GET",
+    url: "/customers?page=1&page_size=5&visit_done=true",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCustomersByVisit.statusCode, 200);
+  assert.ok(listCustomersByVisit.json().items.some((customer: { id: string }) => customer.id === createdCustomerId));
 
   const unauthenticatedInventory = await app.inject({
     method: "GET",
@@ -1737,6 +1773,16 @@ try {
   assert.equal(closeSale.statusCode, 200);
   assert.equal(closeSale.json().data.status, "CLOSED");
   assert.ok(closeSale.json().data.closedAt);
+
+  const listCustomersByPurchase = await app.inject({
+    method: "GET",
+    url: "/customers?page=1&page_size=5&purchase_done=true",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCustomersByPurchase.statusCode, 200);
+  assert.ok(listCustomersByPurchase.json().items.some((customer: { id: string }) => customer.id === createdCustomerId));
 
   const soldInventory = await app.inject({
     method: "GET",

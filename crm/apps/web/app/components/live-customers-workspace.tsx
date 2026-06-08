@@ -25,6 +25,7 @@ type Customer = {
   document: string | null;
   email: string | null;
   phone: string | null;
+  birthDate: string | null;
   origin: string | null;
   status: CustomerStatus;
   createdAt: string;
@@ -48,6 +49,7 @@ type ListResponse<T> = {
 };
 
 type CustomerFormState = {
+  birthDate: string;
   document: string;
   email: string;
   name: string;
@@ -67,6 +69,7 @@ type MinimalLeadFormState = {
 };
 
 const emptyCustomerForm: CustomerFormState = {
+  birthDate: "",
   document: "",
   email: "",
   name: "",
@@ -93,6 +96,7 @@ const fallbackCustomers: Customer[] = [
     document: "123***789",
     email: "marina@exemplo.com",
     phone: "(11) 99999-0001",
+    birthDate: new Date("1990-06-15T00:00:00.000Z").toISOString(),
     origin: "WhatsApp",
     status: "ACTIVE",
     createdAt: new Date().toISOString(),
@@ -105,6 +109,7 @@ const fallbackCustomers: Customer[] = [
     document: null,
     email: "roberta@exemplo.com",
     phone: "(11) 99999-0002",
+    birthDate: null,
     origin: "Loja",
     status: "ACTIVE",
     createdAt: new Date(Date.now() - 12 * 86400000).toISOString(),
@@ -117,6 +122,7 @@ const fallbackCustomers: Customer[] = [
     document: null,
     email: null,
     phone: "(11) 99999-0003",
+    birthDate: null,
     origin: "Marketplace",
     status: "INACTIVE",
     createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
@@ -151,6 +157,21 @@ const kanbanStatusLabels: Record<CustomerKanbanStatus, string> = {
 
 const kanbanStatusOrder = Object.keys(kanbanStatusLabels) as CustomerKanbanStatus[];
 
+const birthMonthOptions = [
+  "Janeiro",
+  "Fevereiro",
+  "Marco",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
 function maskDocument(document: string | null) {
   if (!document) {
     return "Documento nao informado";
@@ -177,8 +198,49 @@ function relativeDate(dateIso: string) {
   return `${diffDays} dias`;
 }
 
+function dateInputValue(dateIso: string | null) {
+  return dateIso ? dateIso.slice(0, 10) : "";
+}
+
+function birthMonthLabel(dateIso: string | null) {
+  if (!dateIso) {
+    return "Aniversario pendente";
+  }
+
+  const month = new Date(dateIso).getUTCMonth();
+  return `Aniversario: ${birthMonthOptions[month]}`;
+}
+
+function applyCustomerFilters(
+  query: URLSearchParams,
+  filters: {
+    activeStatus?: CustomerStatus;
+    birthMonth: string;
+    purchaseDone: string;
+    search: string;
+    visitDone: string;
+  },
+) {
+  if (filters.activeStatus) {
+    query.set("status", filters.activeStatus);
+  }
+  if (filters.search.trim()) {
+    query.set("search", filters.search.trim());
+  }
+  if (filters.birthMonth) {
+    query.set("birth_month", filters.birthMonth);
+  }
+  if (filters.purchaseDone) {
+    query.set("purchase_done", filters.purchaseDone);
+  }
+  if (filters.visitDone) {
+    query.set("visit_done", filters.visitDone);
+  }
+}
+
 function customerToForm(customer: Customer): CustomerFormState {
   return {
+    birthDate: dateInputValue(customer.birthDate),
     document: customer.document ?? "",
     email: customer.email ?? "",
     name: customer.name,
@@ -201,6 +263,7 @@ export function LiveCustomersWorkspace() {
   const [archiveReason, setArchiveReason] = useState("Cadastro duplicado ou inativo por revisao operacional.");
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [customers, setCustomers] = useState(fallbackCustomers);
+  const [birthMonthFilter, setBirthMonthFilter] = useState("");
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyCustomerForm);
   const [kanbanColumns, setKanbanColumns] = useState<CustomerKanbanColumn[]>(
@@ -214,12 +277,14 @@ export function LiveCustomersWorkspace() {
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [purchaseFilter, setPurchaseFilter] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [total, setTotal] = useState(fallbackCustomers.length);
+  const [visitFilter, setVisitFilter] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -233,12 +298,13 @@ export function LiveCustomersWorkspace() {
 
     let isCurrent = true;
     const query = new URLSearchParams({ page: "1", page_size: "50" });
-    if (activeFilter.status) {
-      query.set("status", activeFilter.status);
-    }
-    if (search.trim()) {
-      query.set("search", search.trim());
-    }
+    applyCustomerFilters(query, {
+      activeStatus: activeFilter.status,
+      birthMonth: birthMonthFilter,
+      purchaseDone: purchaseFilter,
+      search,
+      visitDone: visitFilter,
+    });
 
     setStatus("loading");
 
@@ -261,7 +327,7 @@ export function LiveCustomersWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canReadCustomers, refreshKey, search, token]);
+  }, [activeFilter, birthMonthFilter, canReadCustomers, purchaseFilter, refreshKey, search, token, visitFilter]);
 
   useEffect(() => {
     if (!token) {
@@ -275,12 +341,13 @@ export function LiveCustomersWorkspace() {
 
     let isCurrent = true;
     const query = new URLSearchParams({ page: "1", page_size: "50" });
-    if (activeFilter.status) {
-      query.set("status", activeFilter.status);
-    }
-    if (search.trim()) {
-      query.set("search", search.trim());
-    }
+    applyCustomerFilters(query, {
+      activeStatus: activeFilter.status,
+      birthMonth: birthMonthFilter,
+      purchaseDone: purchaseFilter,
+      search,
+      visitDone: visitFilter,
+    });
 
     setKanbanStatus("loading");
 
@@ -302,7 +369,7 @@ export function LiveCustomersWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canReadCustomers, refreshKey, search, token]);
+  }, [activeFilter, birthMonthFilter, canReadCustomers, purchaseFilter, refreshKey, search, token, visitFilter]);
 
   async function handleCreateCustomer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -322,6 +389,7 @@ export function LiveCustomersWorkspace() {
 
     try {
       const payload = {
+        birthDate: form.birthDate || undefined,
         document: form.document.trim() || undefined,
         email: form.email.trim() || undefined,
         name: form.name.trim(),
@@ -501,6 +569,24 @@ export function LiveCustomersWorkspace() {
           <Search aria-hidden="true" size={17} />
           <input aria-label="Buscar clientes" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nome, telefone, e-mail" value={search} />
         </label>
+        <select aria-label="Filtrar por mes de aniversario" onChange={(event) => setBirthMonthFilter(event.target.value)} value={birthMonthFilter}>
+          <option value="">Aniversario</option>
+          {birthMonthOptions.map((month, index) => (
+            <option key={month} value={String(index + 1)}>
+              {month}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Filtrar compra realizada" onChange={(event) => setPurchaseFilter(event.target.value)} value={purchaseFilter}>
+          <option value="">Compra</option>
+          <option value="true">Com compra</option>
+          <option value="false">Sem compra</option>
+        </select>
+        <select aria-label="Filtrar visita realizada" onChange={(event) => setVisitFilter(event.target.value)} value={visitFilter}>
+          <option value="">Visita</option>
+          <option value="true">Com visita</option>
+          <option value="false">Sem visita</option>
+        </select>
         <button className="primary-action" disabled={!canCreateCustomers} onClick={openCreateModal} type="button">
           <Plus aria-hidden="true" size={17} />
           Novo cliente
@@ -570,6 +656,10 @@ export function LiveCustomersWorkspace() {
                   type="email"
                   value={form.email}
                 />
+              </label>
+              <label>
+                Nascimento
+                <input onChange={(event) => setForm((current) => ({ ...current, birthDate: event.target.value }))} type="date" value={form.birthDate} />
               </label>
               <label>
                 Origem
@@ -767,6 +857,7 @@ export function LiveCustomersWorkspace() {
                   <span>{customer.phone ?? "Telefone pendente"}</span>
                   <span>{customer.email ?? "E-mail pendente"}</span>
                   <span>{customer.origin ?? "Origem nao informada"}</span>
+                  <span>{birthMonthLabel(customer.birthDate)}</span>
                 </div>
                 <div className="blueprint-value">
                   <strong>{relativeDate(customer.updatedAt)}</strong>

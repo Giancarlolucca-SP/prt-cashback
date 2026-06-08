@@ -85,7 +85,7 @@ paths:
         "200": { $ref: "#/components/responses/Ok" }
 
   /customers:
-    get: { tags: [Customers], summary: Lista clientes., responses: { "200": { $ref: "#/components/responses/List" } } }
+    get: { tags: [Customers], summary: Lista clientes com filtros por origem, responsavel, aniversario, compra e visita., responses: { "200": { $ref: "#/components/responses/List" } } }
     post: { tags: [Customers], summary: Cria cliente., responses: { "201": { $ref: "#/components/responses/Created" } } }
   /customers/minimal-leads:
     post: { tags: [Customers], summary: Cria lead minimo vinculado a cliente para SDR/vendedor autorizado., responses: { "201": { $ref: "#/components/responses/Created" } } }

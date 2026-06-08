@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { paginationQuerySchema, getPagination, listResponse } from "../api/pagination.js";
@@ -12,6 +13,7 @@ const customerBaseSchema = z.object({
   document: z.string().trim().min(5).max(32).optional(),
   email: z.string().email().optional(),
   phone: z.string().trim().min(8).max(32).optional(),
+  birthDate: z.coerce.date().optional(),
   origin: z.string().trim().min(2).max(80).default("manual"),
   notes: z.string().trim().max(1000).optional(),
 });
@@ -29,6 +31,9 @@ const customerListQuerySchema = paginationQuerySchema.extend({
   origin: z.string().trim().max(80).optional(),
   responsible_user_id: z.string().uuid().optional(),
   created_by_user_id: z.string().uuid().optional(),
+  birth_month: z.coerce.number().int().min(1).max(12).optional(),
+  purchase_done: z.enum(["true", "false"]).optional(),
+  visit_done: z.enum(["true", "false"]).optional(),
 });
 
 const customerKanbanStatusSchema = z.enum([
@@ -77,6 +82,7 @@ function sanitizeCustomer(customer: {
   document: string | null;
   email: string | null;
   phone: string | null;
+  birthDate: Date | null;
   origin: string | null;
   status: string;
   createdAt: Date;
@@ -89,6 +95,7 @@ function sanitizeCustomer(customer: {
     document: customer.document,
     email: customer.email,
     phone: customer.phone,
+    birthDate: customer.birthDate?.toISOString() ?? null,
     origin: customer.origin,
     status: customer.status,
     createdAt: customer.createdAt.toISOString(),
@@ -108,7 +115,7 @@ function customerListWhere(input: {
   storeId: string;
   user: { id: string; role: string };
   query: z.infer<typeof customerListQuerySchema>;
-}) {
+}): Prisma.CustomerWhereInput {
   const responsibleUserId = input.query.responsible_user_id ?? input.query.created_by_user_id;
 
   return {
@@ -129,6 +136,85 @@ function customerListWhere(input: {
         }
       : {}),
   };
+}
+
+function intersectIds(current: string[] | null, next: string[]) {
+  if (current === null) {
+    return next;
+  }
+
+  const nextIds = new Set(next);
+  return current.filter((id) => nextIds.has(id));
+}
+
+async function customerOperationalFilters(input: {
+  storeId: string;
+  query: z.infer<typeof customerListQuerySchema>;
+}): Promise<Prisma.CustomerWhereInput[]> {
+  let includeIds: string[] | null = null;
+  const excludedIds = new Set<string>();
+
+  if (input.query.birth_month) {
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM customers
+      WHERE store_id = ${input.storeId}
+        AND deleted_at IS NULL
+        AND birth_date IS NOT NULL
+        AND EXTRACT(MONTH FROM birth_date) = ${input.query.birth_month}
+    `;
+    includeIds = intersectIds(includeIds, rows.map((row) => row.id));
+  }
+
+  if (input.query.purchase_done) {
+    const sales = await prisma.sale.findMany({
+      where: {
+        storeId: input.storeId,
+        deletedAt: null,
+        status: "CLOSED",
+        customerId: { not: null },
+      },
+      distinct: ["customerId"],
+      select: { customerId: true },
+    });
+    const ids = sales.flatMap((sale) => (sale.customerId ? [sale.customerId] : []));
+
+    if (input.query.purchase_done === "true") {
+      includeIds = intersectIds(includeIds, ids);
+    } else {
+      ids.forEach((id) => excludedIds.add(id));
+    }
+  }
+
+  if (input.query.visit_done) {
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        storeId: input.storeId,
+        deletedAt: null,
+        status: "DONE",
+        customerId: { not: null },
+      },
+      distinct: ["customerId"],
+      select: { customerId: true },
+    });
+    const ids = appointments.flatMap((appointment) => (appointment.customerId ? [appointment.customerId] : []));
+
+    if (input.query.visit_done === "true") {
+      includeIds = intersectIds(includeIds, ids);
+    } else {
+      ids.forEach((id) => excludedIds.add(id));
+    }
+  }
+
+  const filters: Prisma.CustomerWhereInput[] = [];
+  if (includeIds !== null) {
+    filters.push({ id: { in: includeIds } });
+  }
+  if (excludedIds.size > 0) {
+    filters.push({ id: { notIn: Array.from(excludedIds) } });
+  }
+
+  return filters;
 }
 
 function metadataStatus(metadata: unknown, key: "fromStatus" | "toStatus") {
@@ -176,7 +262,9 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
     const query = customerListQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
-    const where = customerListWhere({ storeId: session.user.storeId, user: session.user, query });
+    const baseWhere = customerListWhere({ storeId: session.user.storeId, user: session.user, query });
+    const operationalFilters = await customerOperationalFilters({ storeId: session.user.storeId, query });
+    const where: Prisma.CustomerWhereInput = operationalFilters.length > 0 ? { AND: [baseWhere, ...operationalFilters] } : baseWhere;
 
     const [items, total] = await Promise.all([
       prisma.customer.findMany({
@@ -200,7 +288,9 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
     const query = customerListQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
-    const where = customerListWhere({ storeId: session.user.storeId, user: session.user, query });
+    const baseWhere = customerListWhere({ storeId: session.user.storeId, user: session.user, query });
+    const operationalFilters = await customerOperationalFilters({ storeId: session.user.storeId, query });
+    const where: Prisma.CustomerWhereInput = operationalFilters.length > 0 ? { AND: [baseWhere, ...operationalFilters] } : baseWhere;
 
     const customers = await prisma.customer.findMany({
       where,
@@ -522,6 +612,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           document: input.document,
           email: input.email,
           phone: input.phone,
+          birthDate: input.birthDate,
           origin: input.origin,
           notes: input.notes,
           createdByUserId: session.user.id,
