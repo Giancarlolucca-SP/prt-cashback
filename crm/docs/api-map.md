@@ -58,6 +58,7 @@ Endpoints principais:
 - `POST /customers/minimal-leads`
 - `GET /customers/kanban`
 - `GET/PATCH/DELETE /customers/:id`
+- `GET /customers/:id/history`
 - `POST /customers/:id/kanban-status`
 - `GET/POST /leads`
 - `GET/PATCH /leads/:id`

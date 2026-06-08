@@ -2985,6 +2985,54 @@ input:focus-visible {
   opacity: 0.62;
 }
 
+.customer-history-card {
+  align-items: flex-start;
+}
+
+.customer-history-card > div {
+  gap: 10px;
+}
+
+.customer-history-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
+
+.customer-history-summary span {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+}
+
+.customer-history-summary strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.customer-history-entry {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  width: 100%;
+}
+
+.customer-history-entry strong {
+  color: var(--ink);
+}
+
+.customer-history-entry span {
+  color: var(--muted);
+}
+
 .customer-archive-reason {
   background: var(--surface);
   border: 1px solid var(--border);

@@ -103,6 +103,100 @@ function sanitizeCustomer(customer: {
   };
 }
 
+function sanitizeCustomerSale(sale: {
+  id: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  sellerUserId: string | null;
+  type: string;
+  status: string;
+  salePrice: { toString(): string } | null;
+  grossMargin: { toString(): string } | null;
+  closedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: sale.id,
+    customerId: sale.customerId,
+    vehicleId: sale.vehicleId,
+    sellerUserId: sale.sellerUserId,
+    type: sale.type,
+    status: sale.status,
+    salePrice: sale.salePrice?.toString() ?? null,
+    grossMargin: sale.grossMargin?.toString() ?? null,
+    closedAt: sale.closedAt?.toISOString() ?? null,
+    createdAt: sale.createdAt.toISOString(),
+    updatedAt: sale.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeCustomerPurchaseLead(lead: {
+  id: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  source: string | null;
+  status: string;
+  askingPrice: { toString(): string } | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: lead.id,
+    customerId: lead.customerId,
+    vehicleId: lead.vehicleId,
+    source: lead.source,
+    status: lead.status,
+    askingPrice: lead.askingPrice?.toString() ?? null,
+    createdAt: lead.createdAt.toISOString(),
+    updatedAt: lead.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeCustomerEvaluation(evaluation: {
+  id: string;
+  purchaseLeadId: string | null;
+  customerId: string | null;
+  vehicleId: string | null;
+  requestedPrice: { toString(): string } | null;
+  suggestedPrice: { toString(): string } | null;
+  decision: string;
+  evaluatedAt: Date;
+  createdAt: Date;
+}) {
+  return {
+    id: evaluation.id,
+    purchaseLeadId: evaluation.purchaseLeadId,
+    customerId: evaluation.customerId,
+    vehicleId: evaluation.vehicleId,
+    requestedPrice: evaluation.requestedPrice?.toString() ?? null,
+    suggestedPrice: evaluation.suggestedPrice?.toString() ?? null,
+    decision: evaluation.decision,
+    evaluatedAt: evaluation.evaluatedAt.toISOString(),
+    createdAt: evaluation.createdAt.toISOString(),
+  };
+}
+
+function sanitizeCustomerHistoryEvent(event: {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  metadata: unknown;
+  occurredAt: Date;
+  createdAt: Date;
+}) {
+  return {
+    id: event.id,
+    type: event.type,
+    title: event.title,
+    description: event.description,
+    metadata: event.metadata,
+    occurredAt: event.occurredAt.toISOString(),
+    createdAt: event.createdAt.toISOString(),
+  };
+}
+
 function customerScopeWhere(user: { id: string; role: string }) {
   if (user.role === "SELLER" || user.role === "SDR") {
     return { createdByUserId: user.id };
@@ -478,6 +572,60 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     }
 
     return { data: sanitizeCustomer(customer) };
+  });
+
+  app.get("/:id/history", async (request) => {
+    const session = await requirePermission(request, {
+      module: "customers",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = customerParamsSchema.parse(request.params);
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...customerScopeWhere(session.user),
+      },
+    });
+
+    if (!customer) {
+      throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
+    }
+
+    const [sales, purchaseLeads, evaluations, events] = await Promise.all([
+      prisma.sale.findMany({
+        where: { storeId: session.user.storeId, customerId: customer.id, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+      prisma.purchaseLead.findMany({
+        where: { storeId: session.user.storeId, customerId: customer.id, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+      prisma.vehicleEvaluation.findMany({
+        where: { storeId: session.user.storeId, customerId: customer.id },
+        orderBy: { evaluatedAt: "desc" },
+        take: 10,
+      }),
+      prisma.customerHistoryEvent.findMany({
+        where: { storeId: session.user.storeId, customerId: customer.id },
+        orderBy: { occurredAt: "desc" },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      customer: sanitizeCustomer(customer),
+      sales: sales.map(sanitizeCustomerSale),
+      purchaseLeads: purchaseLeads.map(sanitizeCustomerPurchaseLead),
+      evaluations: evaluations.map(sanitizeCustomerEvaluation),
+      events: events.map(sanitizeCustomerHistoryEvent),
+    };
   });
 
   app.post("/:id/kanban-status", async (request) => {

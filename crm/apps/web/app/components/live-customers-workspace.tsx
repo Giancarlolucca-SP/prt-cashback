@@ -41,6 +41,49 @@ type CustomerKanbanColumn = {
   items: CustomerKanbanItem[];
 };
 
+type CustomerHistorySale = {
+  id: string;
+  type: string;
+  status: string;
+  salePrice: string | null;
+  grossMargin: string | null;
+  closedAt: string | null;
+  createdAt: string;
+};
+
+type CustomerHistoryPurchaseLead = {
+  id: string;
+  source: string | null;
+  status: string;
+  askingPrice: string | null;
+  createdAt: string;
+};
+
+type CustomerHistoryEvaluation = {
+  id: string;
+  purchaseLeadId: string | null;
+  requestedPrice: string | null;
+  suggestedPrice: string | null;
+  decision: string;
+  evaluatedAt: string;
+};
+
+type CustomerHistoryEvent = {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  occurredAt: string;
+};
+
+type CustomerHistoryResponse = {
+  customer: Customer;
+  sales: CustomerHistorySale[];
+  purchaseLeads: CustomerHistoryPurchaseLead[];
+  evaluations: CustomerHistoryEvaluation[];
+  events: CustomerHistoryEvent[];
+};
+
 type ListResponse<T> = {
   items: T[];
   page: number;
@@ -198,6 +241,14 @@ function relativeDate(dateIso: string) {
   return `${diffDays} dias`;
 }
 
+function money(value: string | null | undefined) {
+  if (!value) {
+    return "R$ 0,00";
+  }
+
+  return Number(value).toLocaleString("pt-BR", { currency: "BRL", style: "currency" });
+}
+
 function dateInputValue(dateIso: string | null) {
   return dateIso ? dateIso.slice(0, 10) : "";
 }
@@ -282,6 +333,8 @@ export function LiveCustomersWorkspace() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [selectedHistory, setSelectedHistory] = useState<CustomerHistoryResponse | null>(null);
+  const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<"idle" | "loading" | "loaded" | "error" | "locked">("idle");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [total, setTotal] = useState(fallbackCustomers.length);
   const [visitFilter, setVisitFilter] = useState("");
@@ -488,6 +541,24 @@ export function LiveCustomersWorkspace() {
       setKanbanStatus("error");
     } finally {
       setMovingId(null);
+    }
+  }
+
+  async function openCustomerHistory(customer: Customer) {
+    if (!token || !canReadCustomers) {
+      setSelectedHistoryStatus("locked");
+      return;
+    }
+
+    setSelectedHistoryStatus("loading");
+    setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], events: [] });
+
+    try {
+      const response = await apiGet<CustomerHistoryResponse>(`/customers/${customer.id}/history`, token);
+      setSelectedHistory(response);
+      setSelectedHistoryStatus("loaded");
+    } catch {
+      setSelectedHistoryStatus("error");
     }
   }
 
@@ -866,6 +937,9 @@ export function LiveCustomersWorkspace() {
                     <button disabled={!canUpdateCustomers} onClick={() => openEditModal(customer)} type="button">
                       Editar
                     </button>
+                    <button disabled={!canReadCustomers} onClick={() => void openCustomerHistory(customer)} type="button">
+                      Historico
+                    </button>
                     {customer.status !== "ARCHIVED" ? (
                       <button disabled={!canDeleteCustomers || archivingId === customer.id} onClick={() => void handleArchiveCustomer(customer)} type="button">
                         {archivingId === customer.id ? "Arquivando" : "Arquivar"}
@@ -886,6 +960,46 @@ export function LiveCustomersWorkspace() {
             </div>
           </div>
           <ul className="blueprint-side-list">
+            {selectedHistory ? (
+              <li className="customer-history-card">
+                <History aria-hidden="true" size={18} />
+                <div>
+                  <strong>{selectedHistory.customer.name}</strong>
+                  <span>
+                    Historico {selectedHistoryStatus === "loading" ? "carregando" : selectedHistoryStatus === "error" ? "indisponivel" : "carregado"}
+                  </span>
+                  <div className="customer-history-summary">
+                    <span>Vendas<strong>{selectedHistory.sales.length}</strong></span>
+                    <span>Compras<strong>{selectedHistory.purchaseLeads.length}</strong></span>
+                    <span>Avaliacoes<strong>{selectedHistory.evaluations.length}</strong></span>
+                  </div>
+                  {selectedHistory.sales.slice(0, 4).map((sale) => (
+                    <article className="customer-history-entry" key={sale.id}>
+                      <strong>Venda {sale.status}</strong>
+                      <span>{sale.type} | {money(sale.salePrice)} | {sale.closedAt ? "fechada" : "em andamento"}</span>
+                    </article>
+                  ))}
+                  {selectedHistory.purchaseLeads.slice(0, 3).map((lead) => (
+                    <article className="customer-history-entry" key={lead.id}>
+                      <strong>Compra {lead.status}</strong>
+                      <span>{lead.source ?? "Origem nao informada"} | {money(lead.askingPrice)}</span>
+                    </article>
+                  ))}
+                  {selectedHistory.evaluations.slice(0, 3).map((evaluation) => (
+                    <article className="customer-history-entry" key={evaluation.id}>
+                      <strong>Avaliacao {evaluation.decision}</strong>
+                      <span>Pedido {money(evaluation.requestedPrice)} | sugerido {money(evaluation.suggestedPrice)}</span>
+                    </article>
+                  ))}
+                  {selectedHistory.events.slice(0, 3).map((event) => (
+                    <article className="customer-history-entry" key={event.id}>
+                      <strong>{event.title}</strong>
+                      <span>{relativeDate(event.occurredAt)} | {event.description ?? event.type}</span>
+                    </article>
+                  ))}
+                </div>
+              </li>
+            ) : null}
             <li>
               <FileText aria-hidden="true" size={18} />
               <div>

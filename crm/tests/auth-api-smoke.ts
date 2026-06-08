@@ -353,7 +353,7 @@ try {
 
   const listCatalog = await app.inject({
     method: "GET",
-    url: "/services/catalog?page=1&page_size=10&category=QA",
+    url: "/services/catalog?page=1&page_size=100&category=QA",
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -1783,6 +1783,19 @@ try {
   });
   assert.equal(listCustomersByPurchase.statusCode, 200);
   assert.ok(listCustomersByPurchase.json().items.some((customer: { id: string }) => customer.id === createdCustomerId));
+
+  const customerHistory = await app.inject({
+    method: "GET",
+    url: `/customers/${createdCustomerId}/history`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(customerHistory.statusCode, 200);
+  assert.ok(customerHistory.json().sales.some((sale: { id: string }) => sale.id === saleId));
+  assert.ok(customerHistory.json().purchaseLeads.some((lead: { id: string }) => lead.id === purchaseLeadId));
+  assert.ok(customerHistory.json().evaluations.some((evaluation: { id: string }) => evaluation.id === evaluationId));
+  assert.ok(customerHistory.json().events.length >= 1);
 
   const soldInventory = await app.inject({
     method: "GET",

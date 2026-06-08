@@ -95,6 +95,8 @@ paths:
     get: { tags: [Customers], summary: Detalha cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Customers], summary: Atualiza cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     delete: { tags: [Customers], summary: Arquiva cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /customers/{id}/history:
+    get: { tags: [Customers], summary: Lista historico comercial do cliente com vendas, compras, avaliacoes e eventos., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /customers/{id}/kanban-status:
     post: { tags: [Customers], summary: Move cliente/lead no Kanban operacional., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
 
