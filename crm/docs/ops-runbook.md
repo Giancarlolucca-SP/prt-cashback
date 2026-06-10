@@ -79,6 +79,7 @@ Antes de restaurar em staging/producao, confirmar ambiente, arquivo, data do bac
 - Rate limit registra eventos de seguranca quando ha lockout ou limite excedido.
 - Endpoints-isca de checagem de usuario registram eventos de seguranca e nunca confirmam existencia de conta.
 - Falha de ownership/escopo em recurso especifico retorna `404`; `403` fica para bloqueio global de perfil/permissao.
+- SQL deve usar Prisma Client com filtros estruturados. SQL raw so e permitido com tagged template parametrizado; `queryRawUnsafe`, `executeRawUnsafe` e `Prisma.raw` nao devem ser usados.
 
 Perfis iniciais de rate limiting:
 
