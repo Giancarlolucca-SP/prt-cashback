@@ -19,6 +19,43 @@ const allowedBuckets = [
 ] as const;
 
 const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"] as const;
+const extensionsByMimeType: Record<(typeof allowedMimeTypes)[number], string[]> = {
+  "application/pdf": [".pdf"],
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/jpg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+};
+const forbiddenExtensions = new Set([
+  ".bat",
+  ".cmd",
+  ".com",
+  ".dll",
+  ".exe",
+  ".hta",
+  ".html",
+  ".js",
+  ".msi",
+  ".php",
+  ".ps1",
+  ".scr",
+  ".sh",
+  ".svg",
+  ".vbs",
+]);
+const allowedLinkEntityTypes = [
+  "appointment",
+  "contract",
+  "customer",
+  "financial_transaction",
+  "lead",
+  "listing",
+  "post_sale_customer",
+  "purchase_lead",
+  "sale",
+  "service_order",
+  "vehicle",
+  "vehicle_evaluation",
+] as const;
 
 const prepareUploadSchema = z.object({
   bucket: z.enum(allowedBuckets),
@@ -28,7 +65,7 @@ const prepareUploadSchema = z.object({
   checksum: z.string().trim().max(160).optional(),
   classification: z.string().trim().min(2).max(80),
   link: z.object({
-    entityType: z.string().trim().min(2).max(80),
+    entityType: z.enum(allowedLinkEntityTypes),
     entityId: z.string().uuid(),
     purpose: z.string().trim().min(2).max(80).optional(),
   }),
@@ -65,6 +102,29 @@ function safeFilename(originalName: string) {
   return `${name || "arquivo"}${ext}`;
 }
 
+function originalNameExtensions(originalName: string) {
+  return path
+    .basename(originalName)
+    .split(".")
+    .slice(1)
+    .map((extension) => `.${extension.toLowerCase().replace(/[^a-z0-9]/g, "")}`)
+    .filter((extension) => extension.length > 1);
+}
+
+function validateUploadFilePolicy(input: z.infer<typeof prepareUploadSchema>) {
+  const extensions = originalNameExtensions(input.originalName);
+  const finalExtension = extensions.at(-1);
+  const allowedExtensions = extensionsByMimeType[input.mimeType];
+
+  if (!finalExtension || !allowedExtensions.includes(finalExtension)) {
+    throw new ApiError("VALIDATION_ERROR", "Extensao do arquivo nao corresponde ao tipo permitido.");
+  }
+
+  if (extensions.some((extension) => forbiddenExtensions.has(extension))) {
+    throw new ApiError("VALIDATION_ERROR", "Extensao de arquivo nao permitida.");
+  }
+}
+
 function buildStoragePath(input: {
   storeId: string;
   entityType: string;
@@ -72,6 +132,82 @@ function buildStoragePath(input: {
   originalName: string;
 }) {
   return `${input.storeId}/${input.entityType}/${input.entityId}/${randomUUID()}-${safeFilename(input.originalName)}`;
+}
+
+async function ensureLinkedEntityAccess(input: {
+  entityId: string;
+  entityType: (typeof allowedLinkEntityTypes)[number];
+  storeId: string;
+  user: Awaited<ReturnType<typeof requireAuth>>["user"];
+}) {
+  const scopedOwnerWhere = input.user.role === "SELLER" || input.user.role === "SDR" ? { createdByUserId: input.user.id } : {};
+  const scopedAssignedWhere = input.user.role === "SELLER" || input.user.role === "SDR" ? { assignedUserId: input.user.id } : {};
+  const scopedSellerWhere = input.user.role === "SELLER" || input.user.role === "SDR" ? { sellerUserId: input.user.id } : {};
+
+  const exists =
+    input.entityType === "customer"
+      ? await prisma.customer.findFirst({
+          where: { id: input.entityId, storeId: input.storeId, deletedAt: null, ...scopedOwnerWhere },
+          select: { id: true },
+        })
+      : input.entityType === "lead"
+        ? await prisma.lead.findFirst({
+            where: { id: input.entityId, storeId: input.storeId, deletedAt: null, ...scopedAssignedWhere },
+            select: { id: true },
+          })
+        : input.entityType === "appointment"
+          ? await prisma.appointment.findFirst({
+              where: { id: input.entityId, storeId: input.storeId, deletedAt: null, ...scopedAssignedWhere },
+              select: { id: true },
+            })
+          : input.entityType === "sale"
+            ? await prisma.sale.findFirst({
+                where: { id: input.entityId, storeId: input.storeId, deletedAt: null, ...scopedSellerWhere },
+                select: { id: true },
+              })
+            : input.entityType === "vehicle"
+              ? await prisma.vehicle.findFirst({
+                  where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                  select: { id: true },
+                })
+              : input.entityType === "listing"
+                ? await prisma.listing.findFirst({
+                    where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                    select: { id: true },
+                  })
+                : input.entityType === "service_order"
+                  ? await prisma.serviceOrder.findFirst({
+                      where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                      select: { id: true },
+                    })
+                  : input.entityType === "contract"
+                    ? await prisma.contract.findFirst({
+                        where: { id: input.entityId, storeId: input.storeId },
+                        select: { id: true },
+                      })
+                    : input.entityType === "post_sale_customer"
+                      ? await prisma.postSaleCustomer.findFirst({
+                          where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                          select: { id: true },
+                        })
+                      : input.entityType === "purchase_lead"
+                        ? await prisma.purchaseLead.findFirst({
+                            where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                            select: { id: true },
+                          })
+                        : input.entityType === "vehicle_evaluation"
+                          ? await prisma.vehicleEvaluation.findFirst({
+                              where: { id: input.entityId, storeId: input.storeId },
+                              select: { id: true },
+                            })
+                          : await prisma.financialTransaction.findFirst({
+                              where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                              select: { id: true },
+                            });
+
+  if (!exists) {
+    throw new ApiError("NOT_FOUND", "Recurso vinculado ao arquivo nao encontrado.");
+  }
 }
 
 async function ensureAttachmentAccess(input: {
@@ -128,6 +264,13 @@ export async function registerFileRoutes(app: FastifyInstance) {
       sensitiveArea: "documents",
     });
     const input = prepareUploadSchema.parse(request.body);
+    validateUploadFilePolicy(input);
+    await ensureLinkedEntityAccess({
+      entityId: input.link.entityId,
+      entityType: input.link.entityType,
+      storeId: session.user.storeId,
+      user: session.user,
+    });
     const storagePath = buildStoragePath({
       storeId: session.user.storeId,
       entityType: input.link.entityType,

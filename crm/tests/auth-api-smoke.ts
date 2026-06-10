@@ -2238,6 +2238,69 @@ try {
   assert.equal(downloadAttachment.statusCode, 200);
   assert.match(downloadAttachment.json().data.url, /^dev-storage:\/\/customer-documents\//);
 
+  const uploadWithExecutableExtension = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      bucket: "customer-documents",
+      originalName: "Contrato Cliente.pdf.exe",
+      mimeType: "application/pdf",
+      sizeBytes: 1024,
+      classification: "customer_personal",
+      link: {
+        entityType: "customer",
+        entityId: createdCustomerId,
+        purpose: "identity_document",
+      },
+    },
+  });
+  assert.equal(uploadWithExecutableExtension.statusCode, 400);
+
+  const uploadWithMimeMismatch = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      bucket: "customer-documents",
+      originalName: "Contrato Cliente.pdf",
+      mimeType: "image/png",
+      sizeBytes: 1024,
+      classification: "customer_personal",
+      link: {
+        entityType: "customer",
+        entityId: createdCustomerId,
+        purpose: "identity_document",
+      },
+    },
+  });
+  assert.equal(uploadWithMimeMismatch.statusCode, 400);
+
+  const uploadLinkedToMissingEntity = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      bucket: "customer-documents",
+      originalName: "Contrato Cliente.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1024,
+      classification: "customer_personal",
+      link: {
+        entityType: "customer",
+        entityId: "00000000-0000-4000-8000-000000000000",
+        purpose: "identity_document",
+      },
+    },
+  });
+  assert.equal(uploadLinkedToMissingEntity.statusCode, 404);
+
   const sensitiveUpload = await app.inject({
     method: "POST",
     url: "/files/prepare-upload",
@@ -2269,6 +2332,27 @@ try {
   });
   assert.equal(sellerLoginAgain.statusCode, 200);
   const sellerTokenAgain = sellerLoginAgain.json().token as string;
+
+  const sellerUploadOtherCustomerDocument = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      bucket: "customer-documents",
+      originalName: "Tentativa Fora Carteira.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1024,
+      classification: "customer_personal",
+      link: {
+        entityType: "customer",
+        entityId: createdCustomerId,
+        purpose: "identity_document",
+      },
+    },
+  });
+  assert.equal(sellerUploadOtherCustomerDocument.statusCode, 404);
 
   const sellerCreateCustomer = await app.inject({
     method: "POST",

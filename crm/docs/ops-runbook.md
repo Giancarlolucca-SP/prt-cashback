@@ -80,6 +80,8 @@ Antes de restaurar em staging/producao, confirmar ambiente, arquivo, data do bac
 - Endpoints-isca de checagem de usuario registram eventos de seguranca e nunca confirmam existencia de conta.
 - Falha de ownership/escopo em recurso especifico retorna `404`; `403` fica para bloqueio global de perfil/permissao.
 - SQL deve usar Prisma Client com filtros estruturados. SQL raw so e permitido com tagged template parametrizado; `queryRawUnsafe`, `executeRawUnsafe` e `Prisma.raw` nao devem ser usados.
+- Uploads aceitam somente buckets, MIME types e extensoes permitidas; extensoes executaveis ou nomes duplos perigosos sao bloqueados. O recurso vinculado deve existir e estar no escopo do usuario antes de persistir metadados.
+- Antes de producao real, ativar verificacao de conteudo/magic bytes no upload binario e antivirus/quarentena antes de liberar download para documentos externos.
 
 Perfis iniciais de rate limiting:
 
