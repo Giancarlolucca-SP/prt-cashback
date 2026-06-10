@@ -100,3 +100,5 @@ Checklist antes de producao:
 - `.env` revisado sem segredos no repositorio
 - backup/restore testado
 - RBAC basico validado com perfis reais
+- novas senhas usando Argon2id
+- login com resposta generica para e-mail inexistente, senha errada e usuario inativo/bloqueado

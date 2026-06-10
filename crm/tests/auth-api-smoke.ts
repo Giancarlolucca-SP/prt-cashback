@@ -21,6 +21,18 @@ try {
     },
   });
   assert.equal(invalidLogin.statusCode, 401);
+  assert.equal(invalidLogin.json().error, "invalid_credentials");
+
+  const unknownUserLogin = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: {
+      email: "usuario.inexistente@gt3.local",
+      password: "senha-errada",
+    },
+  });
+  assert.equal(unknownUserLogin.statusCode, 401);
+  assert.deepEqual(unknownUserLogin.json(), invalidLogin.json());
 
   const sellerLogin = await app.inject({
     method: "POST",
@@ -3009,6 +3021,11 @@ try {
   assert.equal(createUser.json().data.email, qaUserEmail);
   assert.equal(createUser.json().data.mustChangePassword, true);
   const qaUserId = createUser.json().data.id as string;
+  const qaUserHash = await prisma.user.findUniqueOrThrow({
+    where: { id: qaUserId },
+    select: { passwordHash: true },
+  });
+  assert.ok(qaUserHash.passwordHash.startsWith("$argon2id$"));
 
   const listUsers = await app.inject({
     method: "GET",
@@ -3082,6 +3099,17 @@ try {
   });
   assert.equal(updateUser.statusCode, 200);
   assert.equal(updateUser.json().data.isActive, false);
+
+  const inactiveUserLogin = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: {
+      email: qaUserEmail,
+      password: "Gt3@2026qa",
+    },
+  });
+  assert.equal(inactiveUserLogin.statusCode, 401);
+  assert.deepEqual(inactiveUserLogin.json(), invalidLogin.json());
 
   const getUser = await app.inject({
     method: "GET",

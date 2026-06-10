@@ -1,14 +1,17 @@
 import { PrismaClient } from "@prisma/client";
-import { randomBytes, scryptSync } from "node:crypto";
+import argon2 from "argon2";
 
 const prisma = new PrismaClient();
 
 const DEV_PASSWORD = "Gt3@2026dev";
 
-function hashPassword(password) {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
-  return `scrypt:16384:8:1:${salt}:${hash}`;
+async function hashPassword(password) {
+  return argon2.hash(password, {
+    memoryCost: 19456,
+    parallelism: 1,
+    timeCost: 2,
+    type: argon2.argon2id,
+  });
 }
 
 const roles = [
@@ -511,12 +514,14 @@ async function main() {
 
   const userByRole = new Map();
   for (const [name, email, role] of users) {
+    const passwordHash = await hashPassword(DEV_PASSWORD);
     const user = await prisma.user.upsert({
       where: { email },
       update: {
         storeId: store.id,
         name,
         role,
+        passwordHash,
         isActive: true,
         mustChangePassword: true,
       },
@@ -525,7 +530,7 @@ async function main() {
         name,
         email,
         role,
-        passwordHash: hashPassword(DEV_PASSWORD),
+        passwordHash,
         isActive: true,
         mustChangePassword: true,
       },

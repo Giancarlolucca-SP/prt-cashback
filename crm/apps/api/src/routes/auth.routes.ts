@@ -3,8 +3,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { canUser, listUserPermissions } from "../auth/rbac.js";
 import { createSessionToken, getBearerToken, getSessionUser, hashSessionToken } from "../auth/session.js";
-import { verifyPassword } from "../auth/password.js";
+import { hashPassword, passwordNeedsRehash, verifyPassword } from "../auth/password.js";
 import { prisma } from "../lib/db.js";
+
+const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=19456,t=2,p=1$FW25cqdLasf0lCKIBzAsuA$kkuS7PdRLsh6EKZpqnZhC0SXj5hKJxDXNn7QKn2VPyc";
 
 const loginSchema = z.object({
   email: z.string().email().transform((value) => value.toLowerCase().trim()),
@@ -71,6 +74,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     });
 
     if (!user) {
+      await verifyPassword(password, DUMMY_PASSWORD_HASH);
       await auditAuthEvent({
         action: "login_failed",
         entityType: "user",
@@ -82,6 +86,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     }
 
     if (!user.isActive || user.deletedAt) {
+      await verifyPassword(password, user.passwordHash);
       await auditAuthEvent({
         storeId: user.storeId,
         actorId: user.id,
@@ -92,10 +97,10 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         result: "DENIED",
         metadata: { reason: "inactive_user" },
       });
-      return reply.code(403).send({ error: "inactive_user" });
+      return reply.code(401).send({ error: "invalid_credentials" });
     }
 
-    if (!verifyPassword(password, user.passwordHash)) {
+    if (!(await verifyPassword(password, user.passwordHash))) {
       await auditAuthEvent({
         storeId: user.storeId,
         actorId: user.id,
@@ -110,6 +115,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     }
 
     const token = createSessionToken();
+    const passwordHash = passwordNeedsRehash(user.passwordHash) ? await hashPassword(password) : user.passwordHash;
     await prisma.userSession.create({
       data: {
         userId: user.id,
@@ -120,7 +126,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     });
     await prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      data: { lastLoginAt: new Date(), passwordHash },
     });
     await auditAuthEvent({
       storeId: user.storeId,

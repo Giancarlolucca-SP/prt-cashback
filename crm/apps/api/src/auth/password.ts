@@ -1,4 +1,5 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { scryptSync, timingSafeEqual } from "node:crypto";
+import argon2 from "argon2";
 
 const SCRYPT_PARAMS = {
   cost: 16384,
@@ -7,25 +8,29 @@ const SCRYPT_PARAMS = {
   keyLength: 64,
 };
 
-export function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, SCRYPT_PARAMS.keyLength, {
-    N: SCRYPT_PARAMS.cost,
-    r: SCRYPT_PARAMS.blockSize,
-    p: SCRYPT_PARAMS.parallelization,
-  }).toString("hex");
+const ARGON2ID_PARAMS = {
+  memoryCost: 19456,
+  parallelism: 1,
+  timeCost: 2,
+};
 
-  return `scrypt:${SCRYPT_PARAMS.cost}:${SCRYPT_PARAMS.blockSize}:${SCRYPT_PARAMS.parallelization}:${salt}:${hash}`;
+export async function hashPassword(password: string) {
+  return argon2.hash(password, {
+    memoryCost: ARGON2ID_PARAMS.memoryCost,
+    parallelism: ARGON2ID_PARAMS.parallelism,
+    timeCost: ARGON2ID_PARAMS.timeCost,
+    type: argon2.argon2id,
+  });
 }
 
-export function verifyPassword(password: string, storedHash: string) {
-  const [algorithm, cost, blockSize, parallelization, salt, expectedHash] = storedHash.split(":");
+function verifyLegacyScryptPassword(password: string, storedHash: string) {
+  const [algorithm, cost, blockSize, parallelization, legacySalt, expectedHash] = storedHash.split(":");
 
-  if (algorithm !== "scrypt" || !cost || !blockSize || !parallelization || !salt || !expectedHash) {
+  if (algorithm !== "scrypt" || !cost || !blockSize || !parallelization || !legacySalt || !expectedHash) {
     return false;
   }
 
-  const actual = scryptSync(password, salt, Buffer.from(expectedHash, "hex").length, {
+  const actual = scryptSync(password, legacySalt, Buffer.from(expectedHash, "hex").length, {
     N: Number(cost),
     r: Number(blockSize),
     p: Number(parallelization),
@@ -33,4 +38,16 @@ export function verifyPassword(password: string, storedHash: string) {
   const expected = Buffer.from(expectedHash, "hex");
 
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+export async function verifyPassword(password: string, storedHash: string) {
+  if (storedHash.startsWith("$argon2id$")) {
+    return argon2.verify(storedHash, password);
+  }
+
+  return verifyLegacyScryptPassword(password, storedHash);
+}
+
+export function passwordNeedsRehash(storedHash: string) {
+  return !storedHash.startsWith("$argon2id$");
 }

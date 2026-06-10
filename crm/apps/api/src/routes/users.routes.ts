@@ -174,6 +174,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
     const input = createUserSchema.parse(request.body);
     const existing = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } });
     if (existing) throw new ApiError("CONFLICT", "Ja existe usuario com este e-mail.");
+    const passwordHash = await hashPassword(input.password);
 
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
@@ -182,7 +183,7 @@ export async function registerUserRoutes(app: FastifyInstance) {
           name: input.name,
           email: input.email,
           role: input.role,
-          passwordHash: hashPassword(input.password),
+          passwordHash,
           isActive: input.isActive,
           mustChangePassword: input.mustChangePassword,
         },
