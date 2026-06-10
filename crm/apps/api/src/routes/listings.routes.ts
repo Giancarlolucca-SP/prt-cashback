@@ -6,6 +6,7 @@ import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const listingStatusSchema = z.enum(["DRAFT", "PENDING", "PUBLISHED", "PAUSED", "SOLD", "ERROR"]);
 
@@ -19,7 +20,12 @@ const listingsQuerySchema = z.object({
 const createListingSchema = z.object({
   vehicleId: z.string().uuid(),
   title: z.string().trim().min(2).max(180),
-  description: z.string().trim().max(4000).optional(),
+  description: z
+    .string()
+    .trim()
+    .max(4000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Descricao do anuncio") })
+    .optional(),
   askingPrice: z.number().nonnegative().optional(),
   status: listingStatusSchema.default("DRAFT"),
 });

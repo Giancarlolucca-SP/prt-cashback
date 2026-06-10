@@ -6,6 +6,7 @@ import { ApiError } from "../api/errors.js";
 import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const customerBaseSchema = z.object({
   type: z.enum(["PERSON", "COMPANY"]).default("PERSON"),
@@ -15,7 +16,12 @@ const customerBaseSchema = z.object({
   phone: z.string().trim().min(8).max(32).optional(),
   birthDate: z.coerce.date().optional(),
   origin: z.string().trim().min(2).max(80).default("manual"),
-  notes: z.string().trim().max(1000).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do cliente") })
+    .optional(),
 });
 
 const createCustomerSchema = customerBaseSchema.refine((input) => Boolean(input.email || input.phone), {
@@ -67,7 +73,12 @@ const createMinimalLeadSchema = z.object({
   email: z.string().email().optional(),
   interest: z.string().trim().max(180).optional(),
   name: z.string().trim().min(2).max(160),
-  notes: z.string().trim().max(500).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do lead") })
+    .optional(),
   origin: z.string().trim().min(2).max(80).default("manual"),
   phone: z.string().trim().min(8).max(32).optional(),
 }).refine((input) => Boolean(input.email || input.phone), {

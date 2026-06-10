@@ -5,6 +5,7 @@ import { requireAuth, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const notificationsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -17,7 +18,12 @@ const notificationsQuerySchema = z.object({
 const notificationSchema = z.object({
   userId: z.string().uuid().optional(),
   title: z.string().trim().min(2).max(160),
-  body: z.string().trim().max(1000).optional(),
+  body: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Notificacao") })
+    .optional(),
   entityType: z.string().trim().max(80).optional(),
   entityId: z.string().uuid().optional(),
 });

@@ -5,6 +5,7 @@ import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const appointmentStatusSchema = z.enum(["SCHEDULED", "CONFIRMED", "DONE", "CANCELLED", "NO_SHOW"]);
 
@@ -28,7 +29,12 @@ const appointmentPayloadSchema = z.object({
   title: z.string().trim().min(2).max(180),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date().optional(),
-  notes: z.string().trim().max(1000).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do agendamento") })
+    .optional(),
 });
 
 const createAppointmentSchema = appointmentPayloadSchema.refine((input) => !input.endsAt || input.endsAt > input.startsAt, {

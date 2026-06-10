@@ -6,6 +6,7 @@ import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const recordStatusSchema = z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]);
 const messageDirectionSchema = z.enum(["INBOUND", "OUTBOUND", "INTERNAL"]);
@@ -61,7 +62,12 @@ const messageSchema = z.object({
   direction: messageDirectionSchema,
   sender: z.string().trim().max(160).optional(),
   recipient: z.string().trim().max(160).optional(),
-  body: z.string().trim().max(8000).optional(),
+  body: z
+    .string()
+    .trim()
+    .max(8000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Mensagem") })
+    .optional(),
   metadata: z.record(z.unknown()).optional(),
   sentAt: z.coerce.date().optional(),
   receivedAt: z.coerce.date().optional(),
@@ -73,7 +79,12 @@ const emailMessageSchema = z.object({
   subject: z.string().trim().max(180).optional(),
   fromAddress: z.string().email().optional(),
   toAddresses: z.array(z.string().email()).default([]),
-  body: z.string().trim().max(16000).optional(),
+  body: z
+    .string()
+    .trim()
+    .max(16000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("E-mail") })
+    .optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 

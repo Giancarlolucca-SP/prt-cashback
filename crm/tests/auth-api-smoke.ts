@@ -713,6 +713,22 @@ try {
   assert.equal(sendMessage.statusCode, 201);
   assert.equal(sendMessage.json().data.direction, "OUTBOUND");
 
+  const blockedTrackerMessage = await app.inject({
+    method: "POST",
+    url: `/communications/threads/${threadId}/messages`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      direction: "INBOUND",
+      sender: "5511988887777",
+      recipient: "5511999999999",
+      body: '<img src="https://tracker.example/pixel.png" width="1" height="1">',
+    },
+  });
+  assert.equal(blockedTrackerMessage.statusCode, 400);
+  assert.equal(blockedTrackerMessage.json().error.code, "VALIDATION_ERROR");
+
   const sendEmail = await app.inject({
     method: "POST",
     url: "/communications/emails",

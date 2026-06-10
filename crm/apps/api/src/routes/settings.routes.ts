@@ -5,6 +5,7 @@ import { ApiError } from "../api/errors.js";
 import { requirePermission } from "../api/auth-guards.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const recordStatusSchema = z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]);
 const keyParamsSchema = z.object({ key: z.string().trim().min(2).max(120) });
@@ -59,7 +60,11 @@ const categorySchema = z.object({
 const documentTemplateSchema = z.object({
   name: z.string().trim().min(2).max(120),
   module: z.string().trim().min(2).max(80),
-  content: z.string().trim().min(2),
+  content: z
+    .string()
+    .trim()
+    .min(2)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Template de documento") }),
   snapshot: z.record(z.unknown()).optional(),
   status: recordStatusSchema.default("ACTIVE"),
 });
@@ -67,7 +72,11 @@ const documentTemplateSchema = z.object({
 const messageTemplateSchema = z.object({
   name: z.string().trim().min(2).max(120),
   channel: z.string().trim().min(2).max(80),
-  content: z.string().trim().min(2),
+  content: z
+    .string()
+    .trim()
+    .min(2)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Template de mensagem") }),
   variables: z.record(z.unknown()).optional(),
   status: recordStatusSchema.default("ACTIVE"),
 });
