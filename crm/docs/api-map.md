@@ -55,6 +55,7 @@ Endpoints principais:
 
 - `GET/POST /customers`
   - `GET /customers` aceita filtros `origin`, `responsible_user_id`, `created_by_user_id`, `birth_month`, `purchase_done` e `visit_done`.
+  - Respostas de clientes expõem `primaryInterest`, derivado do lead vinculado mais recente com `interest` preenchido.
 - `POST /customers/minimal-leads`
 - `GET /customers/kanban`
 - `GET/PATCH/DELETE /customers/:id`

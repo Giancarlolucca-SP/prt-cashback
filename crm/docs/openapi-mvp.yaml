@@ -85,14 +85,14 @@ paths:
         "200": { $ref: "#/components/responses/Ok" }
 
   /customers:
-    get: { tags: [Customers], summary: Lista clientes com filtros por origem, responsavel, aniversario, compra e visita., responses: { "200": { $ref: "#/components/responses/List" } } }
+    get: { tags: [Customers], summary: Lista clientes com filtros por origem, responsavel, aniversario, compra, visita e interesse principal derivado de leads., responses: { "200": { $ref: "#/components/responses/List" } } }
     post: { tags: [Customers], summary: Cria cliente., responses: { "201": { $ref: "#/components/responses/Created" } } }
   /customers/minimal-leads:
     post: { tags: [Customers], summary: Cria lead minimo vinculado a cliente para SDR/vendedor autorizado., responses: { "201": { $ref: "#/components/responses/Created" } } }
   /customers/kanban:
     get: { tags: [Customers], summary: Lista clientes em colunas operacionais de Kanban., responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /customers/{id}:
-    get: { tags: [Customers], summary: Detalha cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    get: { tags: [Customers], summary: Detalha cliente com interesse principal derivado de leads., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Customers], summary: Atualiza cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     delete: { tags: [Customers], summary: Arquiva cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /customers/{id}/history:

@@ -87,6 +87,7 @@ function sanitizeCustomer(customer: {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  primaryInterest?: string | null;
 }) {
   return {
     id: customer.id,
@@ -97,6 +98,7 @@ function sanitizeCustomer(customer: {
     phone: customer.phone,
     birthDate: customer.birthDate?.toISOString() ?? null,
     origin: customer.origin,
+    primaryInterest: customer.primaryInterest ?? null,
     status: customer.status,
     createdAt: customer.createdAt.toISOString(),
     updatedAt: customer.updatedAt.toISOString(),
@@ -346,6 +348,44 @@ async function latestCustomerKanbanStatuses(storeId: string, customerIds: string
   return statuses;
 }
 
+async function primaryInterestsByCustomer(storeId: string, customerIds: string[]) {
+  if (customerIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const leads = await prisma.lead.findMany({
+    where: {
+      storeId,
+      customerId: { in: customerIds },
+      deletedAt: null,
+      interest: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      customerId: true,
+      interest: true,
+    },
+  });
+  const interests = new Map<string, string>();
+
+  for (const lead of leads) {
+    if (!lead.customerId || !lead.interest || interests.has(lead.customerId)) {
+      continue;
+    }
+
+    interests.set(lead.customerId, lead.interest);
+  }
+
+  return interests;
+}
+
+function withPrimaryInterest<T extends { id: string }>(customer: T, interests: Map<string, string>) {
+  return {
+    ...customer,
+    primaryInterest: interests.get(customer.id) ?? null,
+  };
+}
+
 export async function registerCustomerRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const session = await requirePermission(request, {
@@ -369,8 +409,12 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       }),
       prisma.customer.count({ where }),
     ]);
+    const interests = await primaryInterestsByCustomer(
+      session.user.storeId,
+      items.map((customer) => customer.id),
+    );
 
-    return listResponse(items.map(sanitizeCustomer), query, total);
+    return listResponse(items.map((customer) => sanitizeCustomer(withPrimaryInterest(customer, interests))), query, total);
   });
 
   app.get("/kanban", async (request) => {
@@ -396,12 +440,16 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       session.user.storeId,
       customers.map((customer) => customer.id),
     );
+    const interests = await primaryInterestsByCustomer(
+      session.user.storeId,
+      customers.map((customer) => customer.id),
+    );
     const columns = customerKanbanColumns.map((status) => ({
       status,
       items: customers
         .filter((customer) => (statuses.get(customer.id) ?? "NEW_LEAD") === status)
         .map((customer) => ({
-          ...sanitizeCustomer(customer),
+          ...sanitizeCustomer(withPrimaryInterest(customer, interests)),
           operationalStatus: statuses.get(customer.id) ?? "NEW_LEAD",
         })),
     }));
@@ -536,7 +584,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
 
     return reply.code(201).send({
       data: {
-        customer: sanitizeCustomer(result.customer),
+        customer: sanitizeCustomer({ ...result.customer, primaryInterest: result.lead.interest }),
         lead: {
           id: result.lead.id,
           customerId: result.lead.customerId,
@@ -571,7 +619,9 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
     }
 
-    return { data: sanitizeCustomer(customer) };
+    const interests = await primaryInterestsByCustomer(session.user.storeId, [customer.id]);
+
+    return { data: sanitizeCustomer(withPrimaryInterest(customer, interests)) };
   });
 
   app.get("/:id/history", async (request) => {
@@ -618,9 +668,10 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         take: 20,
       }),
     ]);
+    const interests = await primaryInterestsByCustomer(session.user.storeId, [customer.id]);
 
     return {
-      customer: sanitizeCustomer(customer),
+      customer: sanitizeCustomer(withPrimaryInterest(customer, interests)),
       sales: sales.map(sanitizeCustomerSale),
       purchaseLeads: purchaseLeads.map(sanitizeCustomerPurchaseLead),
       evaluations: evaluations.map(sanitizeCustomerEvaluation),

@@ -469,6 +469,33 @@ try {
   assert.equal(getLead.statusCode, 200);
   assert.equal(getLead.json().data.interest, `Honda ${leadSearchToken} Touring 2021`);
 
+  const customerWithPrimaryInterest = await app.inject({
+    method: "GET",
+    url: `/customers/${createdCustomerId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(customerWithPrimaryInterest.statusCode, 200);
+  assert.equal(customerWithPrimaryInterest.json().data.primaryInterest, `Honda ${leadSearchToken} Touring 2021`);
+
+  const listCustomerPrimaryInterest = await app.inject({
+    method: "GET",
+    url: `/customers?page=1&page_size=5&search=${encodeURIComponent("Cliente Contrato API")}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCustomerPrimaryInterest.statusCode, 200);
+  assert.ok(
+    listCustomerPrimaryInterest
+      .json()
+      .items.some(
+        (customer: { id: string; primaryInterest: string | null }) =>
+          customer.id === createdCustomerId && customer.primaryInterest === `Honda ${leadSearchToken} Touring 2021`,
+      ),
+  );
+
   const updateLead = await app.inject({
     method: "PATCH",
     url: `/leads/${createdLeadId}`,

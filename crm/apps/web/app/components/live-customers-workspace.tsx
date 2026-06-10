@@ -27,6 +27,7 @@ type Customer = {
   phone: string | null;
   birthDate: string | null;
   origin: string | null;
+  primaryInterest: string | null;
   status: CustomerStatus;
   createdAt: string;
   updatedAt: string;
@@ -141,6 +142,7 @@ const fallbackCustomers: Customer[] = [
     phone: "(11) 99999-0001",
     birthDate: new Date("1990-06-15T00:00:00.000Z").toISOString(),
     origin: "WhatsApp",
+    primaryInterest: "Corolla XEI 2021",
     status: "ACTIVE",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -154,6 +156,7 @@ const fallbackCustomers: Customer[] = [
     phone: "(11) 99999-0002",
     birthDate: null,
     origin: "Loja",
+    primaryInterest: "HR-V Touring consignado",
     status: "ACTIVE",
     createdAt: new Date(Date.now() - 12 * 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
@@ -167,6 +170,7 @@ const fallbackCustomers: Customer[] = [
     phone: "(11) 99999-0003",
     birthDate: null,
     origin: "Marketplace",
+    primaryInterest: "Tracker Premier",
     status: "INACTIVE",
     createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 18 * 86400000).toISOString(),
@@ -876,7 +880,9 @@ export function LiveCustomersWorkspace() {
               {column.items.slice(0, 8).map((customer) => (
                 <article className="module-kanban-card" key={customer.id}>
                   <strong>{customer.name}</strong>
-                  <span>{customer.phone || customer.email || "sem contato"} | {customer.origin || "origem nao informada"}</span>
+                  <span>
+                    {customer.phone || customer.email || "sem contato"} | {customer.primaryInterest || customer.origin || "interesse nao informado"}
+                  </span>
                   <select
                     className="kanban-stage-select"
                     disabled={!canMoveCustomers || movingId === customer.id}
@@ -928,6 +934,7 @@ export function LiveCustomersWorkspace() {
                   <span>{customer.phone ?? "Telefone pendente"}</span>
                   <span>{customer.email ?? "E-mail pendente"}</span>
                   <span>{customer.origin ?? "Origem nao informada"}</span>
+                  <span>{customer.primaryInterest ?? "Interesse principal pendente"}</span>
                   <span>{birthMonthLabel(customer.birthDate)}</span>
                 </div>
                 <div className="blueprint-value">
