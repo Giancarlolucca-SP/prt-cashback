@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
 export type ApiErrorCode =
@@ -58,6 +59,17 @@ export function apiErrorHandler(error: FastifyError | ApiError | ZodError, reque
         code: error.code,
         message: error.message,
         details: error.details,
+        correlationId: request.id,
+      },
+    });
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return reply.code(409).send({
+      error: {
+        code: "CONFLICT",
+        message: "Registro duplicado para uma restricao unica.",
+        details: { target: error.meta?.target },
         correlationId: request.id,
       },
     });

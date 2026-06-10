@@ -256,6 +256,43 @@ try {
   assert.equal(duplicatedCustomer.statusCode, 409);
   assert.equal(duplicatedCustomer.json().error.code, "CONFLICT");
 
+  const concurrentDocument = `QA-RACE-${Date.now()}`;
+  const concurrentCustomerPayload = {
+    document: concurrentDocument,
+    name: "Cliente Concorrente API",
+    phone: "11999990002",
+  };
+  const concurrentCustomers = await Promise.all([
+    app.inject({
+      method: "POST",
+      url: "/customers",
+      headers: {
+        authorization: `Bearer ${ownerBody.token}`,
+      },
+      payload: concurrentCustomerPayload,
+    }),
+    app.inject({
+      method: "POST",
+      url: "/customers",
+      headers: {
+        authorization: `Bearer ${ownerBody.token}`,
+      },
+      payload: concurrentCustomerPayload,
+    }),
+  ]);
+  assert.deepEqual(
+    concurrentCustomers.map((response) => response.statusCode).sort(),
+    [201, 409],
+  );
+  const concurrentCustomerCount = await prisma.customer.count({
+    where: {
+      storeId: ownerBody.user.storeId,
+      document: concurrentDocument,
+      deletedAt: null,
+    },
+  });
+  assert.equal(concurrentCustomerCount, 1);
+
   const listCustomers = await app.inject({
     method: "GET",
     url: "/customers?page=1&page_size=5&search=Contrato",
@@ -2762,6 +2799,47 @@ try {
   assert.equal(duplicateJob.statusCode, 200);
   assert.equal(duplicateJob.json().idempotentHit, true);
   assert.equal(duplicateJob.json().data.id, enqueueJob.json().data.id);
+
+  const concurrentJobKey = `qa-job-race-${Date.now()}`;
+  const concurrentJobs = await Promise.all([
+    app.inject({
+      method: "POST",
+      url: "/jobs/enqueue",
+      headers: {
+        authorization: `Bearer ${ownerBody.token}`,
+      },
+      payload: {
+        jobType: "qa.concurrent",
+        entityType: "customer",
+        entityId: createdCustomerId,
+        idempotencyKey: concurrentJobKey,
+        payload: { source: "race-a" },
+      },
+    }),
+    app.inject({
+      method: "POST",
+      url: "/jobs/enqueue",
+      headers: {
+        authorization: `Bearer ${ownerBody.token}`,
+      },
+      payload: {
+        jobType: "qa.concurrent",
+        entityType: "customer",
+        entityId: createdCustomerId,
+        idempotencyKey: concurrentJobKey,
+        payload: { source: "race-b" },
+      },
+    }),
+  ]);
+  assert.deepEqual(
+    concurrentJobs.map((response) => response.statusCode).sort(),
+    [200, 202],
+  );
+  assert.equal(concurrentJobs[0].json().data.id, concurrentJobs[1].json().data.id);
+  const concurrentJobCount = await prisma.backgroundJob.count({
+    where: { idempotencyKey: concurrentJobKey },
+  });
+  assert.equal(concurrentJobCount, 1);
 
   const listJobs = await app.inject({
     method: "GET",

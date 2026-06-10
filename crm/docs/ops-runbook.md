@@ -82,6 +82,7 @@ Antes de restaurar em staging/producao, confirmar ambiente, arquivo, data do bac
 - SQL deve usar Prisma Client com filtros estruturados. SQL raw so e permitido com tagged template parametrizado; `queryRawUnsafe`, `executeRawUnsafe` e `Prisma.raw` nao devem ser usados.
 - Uploads aceitam somente buckets, MIME types e extensoes permitidas; extensoes executaveis ou nomes duplos perigosos sao bloqueados. O recurso vinculado deve existir e estar no escopo do usuario antes de persistir metadados.
 - Antes de producao real, ativar verificacao de conteudo/magic bytes no upload binario e antivirus/quarentena antes de liberar download para documentos externos.
+- Requisicoes simultaneas devem ser testadas em operacoes criticas. Duplicidade por constraint unica retorna `409`; fluxos com `idempotencyKey` devem retornar o recurso existente, nao duplicar trabalho.
 
 Perfis iniciais de rate limiting:
 

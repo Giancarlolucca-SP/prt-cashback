@@ -1,4 +1,5 @@
-import type { JobStatus, Prisma } from "@prisma/client";
+import type { BackgroundJob, JobStatus, Prisma } from "@prisma/client";
+import { Prisma as PrismaRuntime } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 
 export type EnqueueJobInput = {
@@ -23,18 +24,33 @@ export async function enqueueJob(input: EnqueueJobInput) {
     }
   }
 
-  const job = await prisma.backgroundJob.create({
-    data: {
-      storeId: input.storeId,
-      jobType: input.jobType,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      idempotencyKey: input.idempotencyKey,
-      payload: input.payload,
-      maxAttempts: input.maxAttempts ?? 3,
-      scheduledAt: input.scheduledAt ?? new Date(),
-    },
-  });
+  let job: BackgroundJob;
+  try {
+    job = await prisma.backgroundJob.create({
+      data: {
+        storeId: input.storeId,
+        jobType: input.jobType,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        idempotencyKey: input.idempotencyKey,
+        payload: input.payload,
+        maxAttempts: input.maxAttempts ?? 3,
+        scheduledAt: input.scheduledAt ?? new Date(),
+      },
+    });
+  } catch (error) {
+    if (input.idempotencyKey && error instanceof PrismaRuntime.PrismaClientKnownRequestError && error.code === "P2002") {
+      const existing = await prisma.backgroundJob.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+
+      if (existing) {
+        return { job: existing, created: false };
+      }
+    }
+
+    throw error;
+  }
 
   await prisma.jobExecutionLog.create({
     data: {
