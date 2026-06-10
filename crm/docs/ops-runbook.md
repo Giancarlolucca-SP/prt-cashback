@@ -76,6 +76,16 @@ Antes de restaurar em staging/producao, confirmar ambiente, arquivo, data do bac
 - Job logs registram falhas e tentativas de automacao.
 - Backup status logs registram execucao, falha ou restore.
 - Logs tecnicos nao devem conter senha, token, CPF completo ou conteudo de documento.
+- Rate limit registra eventos de seguranca quando ha lockout ou limite excedido.
+- Endpoints-isca de checagem de usuario registram eventos de seguranca e nunca confirmam existencia de conta.
+
+Perfis iniciais de rate limiting:
+
+- `auth_login`: login, lockout de 15 minutos, limite configuravel por `RATE_LIMIT_AUTH_LOGIN_MAX`.
+- `honeypot_probe`: falsas checagens de usuario, lockout de 60 minutos, limite configuravel por `RATE_LIMIT_HONEYPOT_MAX`.
+- `webhook`: webhooks externos, lockout de 5 minutos, limite configuravel por `RATE_LIMIT_WEBHOOK_MAX`.
+- `sensitive_endpoint`: users, settings, finance, files, jobs, ops, audit e compliance, lockout de 10 minutos, limite configuravel por `RATE_LIMIT_SENSITIVE_MAX`.
+- `default`: demais rotas, lockout curto de 1 minuto, limite configuravel por `RATE_LIMIT_DEFAULT_MAX`.
 
 Alertas minimos:
 
@@ -85,6 +95,8 @@ Alertas minimos:
 - Jobs presos em execucao por mais de 15 minutos.
 - Backup falho nos ultimos 7 dias.
 - Storage ou integracao critica sem configuracao.
+- Eventos repetidos de `rate_limit`.
+- Eventos de `honeypot_user_enumeration_probe`.
 
 ## Deploy Seguro
 

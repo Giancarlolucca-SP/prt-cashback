@@ -28,10 +28,12 @@ import { registerOpsRoutes } from "./routes/ops.routes.js";
 import { registerPurchaseRoutes } from "./routes/purchases.routes.js";
 import { registerRepasseRoutes } from "./routes/repasse.routes.js";
 import { registerSaleRoutes } from "./routes/sales.routes.js";
+import { registerSecurityHoneypotRoutes } from "./routes/security-honeypot.routes.js";
 import { registerServiceRoutes } from "./routes/services.routes.js";
 import { registerSettingRoutes } from "./routes/settings.routes.js";
 import { registerUserRoutes } from "./routes/users.routes.js";
 import { registerWebhookRoutes } from "./routes/webhooks.routes.js";
+import { registerRateLimit } from "./security/rate-limit.js";
 
 export function buildApp() {
   const app = Fastify({
@@ -46,6 +48,8 @@ export function buildApp() {
     credentials: true
   });
   app.setErrorHandler(apiErrorHandler);
+  registerRateLimit(app);
+  app.register(registerSecurityHoneypotRoutes);
   app.register(registerHealthRoutes, { prefix: "/health" });
   app.register(registerAuthRoutes, { prefix: "/auth" });
   app.register(registerAiRoutes, { prefix: "/ai" });
