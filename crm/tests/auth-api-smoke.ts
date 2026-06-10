@@ -34,6 +34,16 @@ try {
   assert.equal(unknownUserLogin.statusCode, 401);
   assert.deepEqual(unknownUserLogin.json(), invalidLogin.json());
 
+  const oversizedPasswordLogin = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: {
+      email: "vendedor@gt3.local",
+      password: "x".repeat(121),
+    },
+  });
+  assert.equal(oversizedPasswordLogin.statusCode, 400);
+
   const sellerLogin = await app.inject({
     method: "POST",
     url: "/auth/login",
@@ -83,6 +93,22 @@ try {
   });
   assert.equal(ownerLogin.statusCode, 200);
   const ownerBody = ownerLogin.json() as { token: string; user: { storeId: string } };
+
+  const oversizedPayload = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+      "content-type": "application/json",
+    },
+    payload: JSON.stringify({
+      name: "Cliente Payload Grande",
+      phone: "11999990099",
+      notes: "x".repeat(300 * 1024),
+    }),
+  });
+  assert.equal(oversizedPayload.statusCode, 413);
+  assert.equal(oversizedPayload.json().error.code, "PAYLOAD_TOO_LARGE");
 
   const ownerFinanceCheck = await app.inject({
     method: "POST",

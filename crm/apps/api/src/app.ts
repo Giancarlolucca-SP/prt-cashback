@@ -35,8 +35,14 @@ import { registerUserRoutes } from "./routes/users.routes.js";
 import { registerWebhookRoutes } from "./routes/webhooks.routes.js";
 import { registerRateLimit } from "./security/rate-limit.js";
 
+function apiBodyLimitBytes() {
+  const value = Number(process.env.API_BODY_LIMIT_BYTES);
+  return Number.isInteger(value) && value > 0 ? value : 256 * 1024;
+}
+
 export function buildApp() {
   const app = Fastify({
+    bodyLimit: apiBodyLimitBytes(),
     logger: {
       level: process.env.LOG_LEVEL || "info"
     }

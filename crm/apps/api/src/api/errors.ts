@@ -75,6 +75,18 @@ export function apiErrorHandler(error: FastifyError | ApiError | ZodError, reque
     });
   }
 
+  const statusCode = "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : null;
+  if (statusCode && statusCode >= 400 && statusCode < 500) {
+    const code = statusCode === 413 ? "PAYLOAD_TOO_LARGE" : "VALIDATION_ERROR";
+    return reply.code(statusCode).send({
+      error: {
+        code,
+        message: statusCode === 413 ? "Payload excede o tamanho maximo permitido." : error.message,
+        correlationId: request.id,
+      },
+    });
+  }
+
   request.log.error(error);
   return reply.code(500).send({
     error: {

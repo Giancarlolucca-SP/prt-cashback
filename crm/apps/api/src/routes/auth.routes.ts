@@ -10,17 +10,17 @@ const DUMMY_PASSWORD_HASH =
   "$argon2id$v=19$m=19456,t=2,p=1$FW25cqdLasf0lCKIBzAsuA$kkuS7PdRLsh6EKZpqnZhC0SXj5hKJxDXNn7QKn2VPyc";
 
 const loginSchema = z.object({
-  email: z.string().email().transform((value) => value.toLowerCase().trim()),
-  password: z.string().min(1),
+  email: z.string().email().max(180).transform((value) => value.toLowerCase().trim()),
+  password: z.string().min(1).max(120),
 });
 
 const permissionCheckSchema = z.object({
-  module: z.string().min(1),
-  action: z.string().min(1),
+  module: z.string().min(1).max(80),
+  action: z.string().min(1).max(80),
   scope: z
     .enum(["ALL", "OWN_PORTFOLIO", "OWN_LEAD", "OWN_SALE", "LINKED_VEHICLE", "STORE", "NONE"])
     .optional(),
-  sensitiveArea: z.string().min(1).nullable().optional(),
+  sensitiveArea: z.string().min(1).max(80).nullable().optional(),
 });
 
 function publicUser(user: User & { store: Store }) {

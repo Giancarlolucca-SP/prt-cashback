@@ -84,6 +84,7 @@ Antes de restaurar em staging/producao, confirmar ambiente, arquivo, data do bac
 - Antes de producao real, ativar verificacao de conteudo/magic bytes no upload binario e antivirus/quarentena antes de liberar download para documentos externos.
 - Requisicoes simultaneas devem ser testadas em operacoes criticas. Duplicidade por constraint unica retorna `409`; fluxos com `idempotencyKey` devem retornar o recurso existente, nao duplicar trabalho.
 - Conteudo informado por usuarios nao pode conter recursos remotos carregaveis, como `<img src>`, `<iframe src>`, `<script src>`, CSS `url(http...)` ou markdown image remoto. O frontend usa CSP para bloquear imagens, iframes, midias e objetos remotos por padrao.
+- Payload HTTP tem limite global configuravel por `API_BODY_LIMIT_BYTES` e default de 262144 bytes. Campos de entrada devem ter validacao server-side de tamanho nos schemas Zod; payload acima do limite retorna `413`.
 
 Perfis iniciais de rate limiting:
 
