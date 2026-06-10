@@ -51,3 +51,33 @@ export async function requirePermission(request: FastifyRequest, permission: Rou
 
   return session;
 }
+
+export async function denyOwnershipAccess(input: {
+  action: string;
+  entityId: string;
+  entityType: string;
+  message: string;
+  module: string;
+  request: FastifyRequest;
+  session: AuthenticatedContext;
+}): Promise<never> {
+  await prisma.auditLog.create({
+    data: {
+      storeId: input.session.user.storeId,
+      actorId: input.session.user.id,
+      actorRole: input.session.user.role,
+      module: input.module,
+      action: "ownership_not_found",
+      entityType: input.entityType,
+      entityId: input.entityId,
+      result: "DENIED",
+      metadata: {
+        attemptedAction: input.action,
+        method: input.request.method,
+        path: input.request.url,
+      },
+    },
+  });
+
+  throw new ApiError("NOT_FOUND", input.message);
+}

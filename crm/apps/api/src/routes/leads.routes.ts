@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ApiError } from "../api/errors.js";
-import { requirePermission } from "../api/auth-guards.js";
+import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
@@ -75,6 +75,14 @@ function sanitizeLead(lead: LeadRecord) {
   };
 }
 
+function leadScopeWhere(user: { id: string; role: string }) {
+  if (user.role === "SELLER" || user.role === "SDR") {
+    return { assignedUserId: user.id };
+  }
+
+  return {};
+}
+
 async function ensureCustomerInStore(storeId: string, customerId?: string) {
   if (!customerId) {
     return;
@@ -128,6 +136,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
     const where = {
       storeId: session.user.storeId,
       deletedAt: null,
+      ...leadScopeWhere(session.user),
       ...(query.status ? { status: query.status } : {}),
       ...(query.customer_id ? { customerId: query.customer_id } : {}),
       ...(query.assigned_user_id ? { assignedUserId: query.assigned_user_id } : {}),
@@ -169,6 +178,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
         id: params.id,
         storeId: session.user.storeId,
         deletedAt: null,
+        ...leadScopeWhere(session.user),
       },
     });
 
@@ -277,11 +287,20 @@ export async function registerLeadRoutes(app: FastifyInstance) {
         id: params.id,
         storeId: session.user.storeId,
         deletedAt: null,
+        ...leadScopeWhere(session.user),
       },
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Lead nao encontrado.");
+      return denyOwnershipAccess({
+        action: "update",
+        entityId: params.id,
+        entityType: "lead",
+        message: "Lead nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
     }
 
     await ensureCustomerInStore(session.user.storeId, input.customerId);
@@ -330,11 +349,20 @@ export async function registerLeadRoutes(app: FastifyInstance) {
         id: params.id,
         storeId: session.user.storeId,
         deletedAt: null,
+        ...leadScopeWhere(session.user),
       },
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Lead nao encontrado.");
+      return denyOwnershipAccess({
+        action: "stage_changed",
+        entityId: params.id,
+        entityType: "lead",
+        message: "Lead nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
     }
 
     if (current.status === input.toStage) {

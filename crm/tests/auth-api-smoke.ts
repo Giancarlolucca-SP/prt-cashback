@@ -2344,6 +2344,68 @@ try {
   });
   assert.equal(sellerMoveOtherCustomer.statusCode, 404);
 
+  const sellerUpdateOtherCustomer = await app.inject({
+    method: "PATCH",
+    url: `/customers/${createdCustomerId}`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      email: "tentativa-fora-carteira@qa.local",
+    },
+  });
+  assert.equal(sellerUpdateOtherCustomer.statusCode, 403);
+
+  const sellerUpdateOtherLead = await app.inject({
+    method: "PATCH",
+    url: `/leads/${createdLeadId}`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      temperature: 42,
+    },
+  });
+  assert.equal(sellerUpdateOtherLead.statusCode, 404);
+
+  const sellerMoveOtherLeadStage = await app.inject({
+    method: "POST",
+    url: `/leads/${createdLeadId}/stage`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      toStage: "NEGOTIATION",
+      reason: "Tentativa indevida fora da carteira.",
+    },
+  });
+  assert.equal(sellerMoveOtherLeadStage.statusCode, 404);
+
+  const sellerUpdateOtherAppointment = await app.inject({
+    method: "PATCH",
+    url: `/appointments/${createdAppointmentId}`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      notes: "Tentativa indevida fora da carteira.",
+    },
+  });
+  assert.equal(sellerUpdateOtherAppointment.statusCode, 404);
+
+  const sellerChangeOtherAppointmentStatus = await app.inject({
+    method: "POST",
+    url: `/appointments/${createdAppointmentId}/status`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      status: "NO_SHOW",
+      reason: "Tentativa indevida fora da carteira.",
+    },
+  });
+  assert.equal(sellerChangeOtherAppointmentStatus.statusCode, 404);
+
   const sdrLogin = await app.inject({
     method: "POST",
     url: "/auth/login",

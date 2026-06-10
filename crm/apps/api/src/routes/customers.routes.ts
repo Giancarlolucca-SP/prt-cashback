@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { paginationQuerySchema, getPagination, listResponse } from "../api/pagination.js";
 import { ApiError } from "../api/errors.js";
-import { requirePermission } from "../api/auth-guards.js";
+import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 
@@ -698,7 +698,15 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
+      return denyOwnershipAccess({
+        action: "update_status",
+        entityId: params.id,
+        entityType: "customer",
+        message: "Cliente nao encontrado.",
+        module: "customers",
+        request,
+        session,
+      });
     }
 
     const statuses = await latestCustomerKanbanStatuses(session.user.storeId, [current.id]);
@@ -871,7 +879,15 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
+      return denyOwnershipAccess({
+        action: "update",
+        entityId: params.id,
+        entityType: "customer",
+        message: "Cliente nao encontrado.",
+        module: "customers",
+        request,
+        session,
+      });
     }
 
     if (input.document && input.document !== current.document) {
@@ -962,7 +978,15 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
+      return denyOwnershipAccess({
+        action: "delete",
+        entityId: params.id,
+        entityType: "customer",
+        message: "Cliente nao encontrado.",
+        module: "customers",
+        request,
+        session,
+      });
     }
 
     const customer = await prisma.$transaction(async (tx) => {

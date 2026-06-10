@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ApiError } from "../api/errors.js";
-import { requirePermission } from "../api/auth-guards.js";
+import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
@@ -89,6 +89,14 @@ function sanitizeAppointment(appointment: AppointmentRecord) {
   };
 }
 
+function appointmentScopeWhere(user: { id: string; role: string }) {
+  if (user.role === "SELLER" || user.role === "SDR") {
+    return { assignedUserId: user.id };
+  }
+
+  return {};
+}
+
 async function ensureCustomerInStore(storeId: string, customerId?: string) {
   if (!customerId) return;
 
@@ -155,6 +163,7 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
     const where = {
       storeId: session.user.storeId,
       deletedAt: null,
+      ...appointmentScopeWhere(session.user),
       ...(query.status ? { status: query.status } : {}),
       ...(query.customer_id ? { customerId: query.customer_id } : {}),
       ...(query.lead_id ? { leadId: query.lead_id } : {}),
@@ -192,7 +201,7 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
     const params = appointmentParamsSchema.parse(request.params);
 
     const appointment = await prisma.appointment.findFirst({
-      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null, ...appointmentScopeWhere(session.user) },
     });
 
     if (!appointment) {
@@ -278,11 +287,19 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
     const input = updateAppointmentSchema.parse(request.body);
 
     const current = await prisma.appointment.findFirst({
-      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null, ...appointmentScopeWhere(session.user) },
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Agendamento nao encontrado.");
+      return denyOwnershipAccess({
+        action: "update",
+        entityId: params.id,
+        entityType: "appointment",
+        message: "Agendamento nao encontrado.",
+        module: "appointments",
+        request,
+        session,
+      });
     }
 
     await ensureCustomerInStore(session.user.storeId, input.customerId);
@@ -327,11 +344,19 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
     const input = updateAppointmentStatusSchema.parse(request.body);
 
     const current = await prisma.appointment.findFirst({
-      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null, ...appointmentScopeWhere(session.user) },
     });
 
     if (!current) {
-      throw new ApiError("NOT_FOUND", "Agendamento nao encontrado.");
+      return denyOwnershipAccess({
+        action: "status_changed",
+        entityId: params.id,
+        entityType: "appointment",
+        message: "Agendamento nao encontrado.",
+        module: "appointments",
+        request,
+        session,
+      });
     }
 
     const appointment = await prisma.$transaction(async (tx) => {
