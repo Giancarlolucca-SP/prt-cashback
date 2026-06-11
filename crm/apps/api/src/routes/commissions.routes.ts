@@ -21,10 +21,20 @@ const commissionsQuerySchema = z.object({
 const calculateCommissionSchema = z.object({
   saleId: z.string().uuid(),
   userId: z.string().uuid().optional(),
-  basis: commissionBasisSchema.default("GROSS_MARGIN_PERCENT"),
-  value: z.number().positive(),
+  ruleId: z.string().uuid().optional(),
   ruleName: z.string().trim().min(2).max(120).optional(),
+}).strict().refine((input) => Boolean(input.ruleId || input.ruleName), {
+  message: "Informe uma regra de comissao configurada.",
+  path: ["ruleId"],
 });
+
+const createCommissionRuleSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  appliesTo: z.enum(["sale"]).default("sale"),
+  basis: commissionBasisSchema,
+  value: z.number().positive(),
+  snapshot: z.record(z.unknown()).optional(),
+}).strict();
 
 const commissionParamsSchema = z.object({
   id: z.string().uuid(),
@@ -55,6 +65,19 @@ type CommissionRecord = {
   updatedAt: Date;
 };
 
+type CommissionRuleRecord = {
+  id: string;
+  name: string;
+  appliesTo: string;
+  basis: string;
+  value: { toString(): string } | null;
+  version: number;
+  snapshot: unknown;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 function sanitizeCommission(commission: CommissionRecord) {
   return {
     id: commission.id,
@@ -69,6 +92,21 @@ function sanitizeCommission(commission: CommissionRecord) {
     paidAt: commission.paidAt?.toISOString() ?? null,
     createdAt: commission.createdAt.toISOString(),
     updatedAt: commission.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeCommissionRule(rule: CommissionRuleRecord) {
+  return {
+    id: rule.id,
+    name: rule.name,
+    appliesTo: rule.appliesTo,
+    basis: rule.basis,
+    value: rule.value?.toString() ?? null,
+    version: rule.version,
+    snapshot: rule.snapshot,
+    status: rule.status,
+    createdAt: rule.createdAt.toISOString(),
+    updatedAt: rule.updatedAt.toISOString(),
   };
 }
 
@@ -165,6 +203,75 @@ export async function registerCommissionRoutes(app: FastifyInstance) {
     return listResponse(items.map(sanitizeCommission), query, total);
   });
 
+  app.post("/rules", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "commissions",
+      action: "manage",
+      scope: "ALL",
+      sensitiveArea: "financial",
+    });
+    const input = createCommissionRuleSchema.parse(request.body);
+
+    const rule = await prisma.$transaction(async (tx) => {
+      const latest = await tx.commissionRule.findFirst({
+        where: {
+          storeId: session.user.storeId,
+          name: input.name,
+          appliesTo: input.appliesTo,
+          deletedAt: null,
+        },
+        orderBy: { version: "desc" },
+      });
+
+      const created = await tx.commissionRule.create({
+        data: {
+          storeId: session.user.storeId,
+          name: input.name,
+          appliesTo: input.appliesTo,
+          basis: input.basis,
+          value: input.value,
+          version: (latest?.version ?? 0) + 1,
+          snapshot: {
+            ...(input.snapshot ?? {}),
+            source: "configured_rule",
+            basis: input.basis,
+            value: input.value,
+          } as Prisma.InputJsonObject,
+        },
+      });
+
+      if (latest?.status === "ACTIVE") {
+        await tx.commissionRule.update({
+          where: { id: latest.id },
+          data: { status: "INACTIVE" },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commissions",
+          action: "rule_configured",
+          entityType: "commission_rule",
+          entityId: created.id,
+          result: "SUCCESS",
+          metadata: {
+            name: created.name,
+            appliesTo: created.appliesTo,
+            basis: created.basis,
+            version: created.version,
+          },
+        },
+      });
+
+      return created;
+    });
+
+    return reply.code(201).send({ data: sanitizeCommissionRule(rule) });
+  });
+
   app.post("/calculate", async (request, reply) => {
     const session = await requirePermission(request, {
       module: "commissions",
@@ -189,41 +296,42 @@ export async function registerCommissionRoutes(app: FastifyInstance) {
       throw new ApiError("BUSINESS_RULE_ERROR", "Venda sem vendedor responsavel para calcular comissao.");
     }
 
-    const salePrice = Number(sale.salePrice?.toString() ?? 0);
-    const grossMargin = Number(sale.grossMargin?.toString() ?? 0);
-    const amount = calculateAmount({ basis: input.basis, value: input.value, salePrice, grossMargin });
-
     const commission = await prisma.$transaction(async (tx) => {
-      const existingRule = input.ruleName
+      const rule = input.ruleId
         ? await tx.commissionRule.findFirst({
+            where: {
+              id: input.ruleId,
+              storeId: session.user.storeId,
+              appliesTo: "sale",
+              status: "ACTIVE",
+              deletedAt: null,
+            },
+          })
+        : await tx.commissionRule.findFirst({
             where: {
               storeId: session.user.storeId,
               name: input.ruleName,
               appliesTo: "sale",
-              basis: input.basis,
               status: "ACTIVE",
+              deletedAt: null,
             },
             orderBy: { version: "desc" },
-          })
-        : null;
+          });
 
-      const rule =
-        existingRule ??
-        (input.ruleName
-          ? await tx.commissionRule.create({
-              data: {
-                storeId: session.user.storeId,
-                name: input.ruleName,
-                appliesTo: "sale",
-                basis: input.basis,
-                value: input.value,
-                snapshot: {
-                  basis: input.basis,
-                  value: input.value,
-                },
-              },
-            })
-          : null);
+      if (!rule || !rule.value) {
+        throw new ApiError("BUSINESS_RULE_ERROR", "Regra de comissao ativa nao encontrada.");
+      }
+
+      const salePrice = Number(sale.salePrice?.toString() ?? 0);
+      const grossMargin = Number(sale.grossMargin?.toString() ?? 0);
+      const ruleValue = Number(rule.value.toString());
+      const ruleBasis = commissionBasisSchema.parse(rule.basis);
+      const amount = calculateAmount({
+        basis: ruleBasis,
+        value: ruleValue,
+        salePrice,
+        grossMargin,
+      });
 
       const created = await tx.commissionCalculation.create({
         data: {
@@ -234,12 +342,13 @@ export async function registerCommissionRoutes(app: FastifyInstance) {
           amount,
           status: "PENDING",
           snapshot: {
-            basis: input.basis,
-            value: input.value,
+            basis: ruleBasis,
+            value: ruleValue,
             salePrice,
             grossMargin,
             saleStatus: sale.status,
-            ruleName: input.ruleName ?? null,
+            ruleName: rule.name,
+            ruleVersion: rule.version,
           } as Prisma.InputJsonObject,
         },
       });
@@ -258,7 +367,9 @@ export async function registerCommissionRoutes(app: FastifyInstance) {
             saleId: sale.id,
             userId,
             amount: created.amount.toString(),
-            basis: input.basis,
+            basis: ruleBasis,
+            ruleId: rule.id,
+            ruleVersion: rule.version,
           },
         },
       });

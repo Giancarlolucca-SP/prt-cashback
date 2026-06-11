@@ -2030,7 +2030,7 @@ try {
   assert.equal(sellerCommissionsGlobal.statusCode, 403);
   assert.equal(sellerCommissionsGlobal.json().error.code, "FORBIDDEN");
 
-  const calculateCommission = await app.inject({
+  const adHocCommissionRule = await app.inject({
     method: "POST",
     url: "/commissions/calculate",
     headers: {
@@ -2041,12 +2041,47 @@ try {
       userId: sellerUserId,
       basis: "GROSS_MARGIN_PERCENT",
       value: 10,
-      ruleName: "QA 10% margem bruta",
+    },
+  });
+  assert.equal(adHocCommissionRule.statusCode, 400);
+  assert.equal(adHocCommissionRule.json().error.code, "VALIDATION_ERROR");
+
+  const createCommissionRule = await app.inject({
+    method: "POST",
+    url: "/commissions/rules",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: "QA 10% margem bruta",
+      basis: "GROSS_MARGIN_PERCENT",
+      value: 10,
+      snapshot: {
+        source: "smoke-test",
+      },
+    },
+  });
+  assert.equal(createCommissionRule.statusCode, 201);
+  assert.equal(createCommissionRule.json().data.basis, "GROSS_MARGIN_PERCENT");
+  assert.equal(createCommissionRule.json().data.value, "10");
+  const commissionRuleId = createCommissionRule.json().data.id as string;
+
+  const calculateCommission = await app.inject({
+    method: "POST",
+    url: "/commissions/calculate",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      saleId,
+      userId: sellerUserId,
+      ruleId: commissionRuleId,
     },
   });
   assert.equal(calculateCommission.statusCode, 201);
   assert.equal(calculateCommission.json().data.userId, sellerUserId);
   assert.equal(calculateCommission.json().data.amount, "2215");
+  assert.equal(calculateCommission.json().data.ruleId, commissionRuleId);
   const commissionId = calculateCommission.json().data.id as string;
 
   const sellerOwnCommissions = await app.inject({
