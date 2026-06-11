@@ -124,7 +124,13 @@ export function DashboardCharts() {
   }, [canReadDashboard, period, token]);
 
   const activeSourceData = useMemo(() => {
-    const entries = Object.entries(funnel.leadsBySource ?? {});
+    const grouped = new Map<string, number>();
+    for (const [name, value] of Object.entries(funnel.leadsBySource ?? {})) {
+      const label = humanize(name);
+      grouped.set(label, (grouped.get(label) ?? 0) + value);
+    }
+
+    const entries = [...grouped.entries()];
     const total = sum(entries.map(([, value]) => value));
 
     if (total === 0) {
@@ -133,7 +139,7 @@ export function DashboardCharts() {
 
     return entries
       .map(([name, value]) => ({
-        name: humanize(name),
+        name,
         value: Math.round((value / total) * 100),
       }))
       .sort((a, b) => b.value - a.value)

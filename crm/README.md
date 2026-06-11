@@ -98,6 +98,12 @@ Para validar perfis seedados, permissoes criticas de RBAC, endpoints sensiveis e
 npm run qa:functional:local
 ```
 
+Para validar layout desktop/mobile, erros de console acionaveis e capturar screenshots locais:
+
+```bash
+npm run qa:visual:local
+```
+
 Atalho completo, incluindo QA tecnico e smoke local:
 
 ```bash

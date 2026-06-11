@@ -371,7 +371,7 @@ export function LiveKanbansWorkspace() {
                     <span>{column.count}</span>
                   </header>
                   <div>
-                    {column.cards.length > 0 ? column.cards.map((card) => <p key={card}>{card}</p>) : <p>Sem cards agora</p>}
+                    {column.cards.length > 0 ? column.cards.map((card, cardIndex) => <p key={`${board.title}-${column.name}-${cardIndex}-${card}`}>{card}</p>) : <p>Sem cards agora</p>}
                   </div>
                   {index < board.columns.length - 1 ? <ArrowRight aria-hidden="true" size={15} /> : null}
                 </section>

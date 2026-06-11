@@ -452,7 +452,7 @@ export function LiveSettingsWorkspace() {
           ].map((column) => (
             <section className="module-kanban-column" key={column.title}>
               <header><strong>{column.title}</strong><span>{column.total}</span></header>
-              {column.cards.map((card) => <article className="module-kanban-card" key={card}><strong>{card}</strong><span>configuracao auditavel</span><em>ativo</em></article>)}
+              {column.cards.map((card, index) => <article className="module-kanban-card" key={`${column.title}-${index}-${card}`}><strong>{card}</strong><span>configuracao auditavel</span><em>ativo</em></article>)}
               {column.cards.length === 0 ? <article className="module-kanban-card"><strong>Sem itens</strong><span>Nenhuma configuracao nesta area</span><em>0</em></article> : null}
             </section>
           ))}

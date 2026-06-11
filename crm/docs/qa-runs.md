@@ -106,3 +106,37 @@ Observacoes:
 
 - Esta rodada nao substitui a inspecao visual de layout, tema, modais e estados vazios.
 - Proxima etapa recomendada: QA visual/manual nas telas principais com os perfis do checklist.
+
+## 2026-06-11 - QA visual automatizado desktop/mobile
+
+Contexto:
+
+- Etapa BMAP: QA visual assistido e repetivel.
+- Foco: detectar regressao visual basica, overflow horizontal, erros acionaveis de console e gerar screenshots locais.
+- Escopo: apenas projeto novo `crm/`, com API e Web ja rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:visual:local` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+
+Resultado:
+
+- Rotas verificadas: 9.
+- Viewports: desktop `1440x900` e mobile `390x844`.
+- Screenshots gerados em `.qa-screenshots/` e ignorados pelo Git.
+- Sem overflow horizontal detectado nas rotas verificadas.
+- Sem erros acionaveis de console apos correcoes.
+
+Correcoes feitas durante a rodada:
+
+- Agregadas fontes de leads com o mesmo nome humanizado no grafico de distribuicao, evitando fatias duplicadas com chave igual.
+- Corrigidas chaves React em cards de configuracoes, blueprint generico e kanban consolidado para tolerar nomes repetidos vindos da massa seed/teste.
+
+Observacoes:
+
+- O script ignora ruidos conhecidos do Next/React em modo development, como avisos de `unsafe-eval`.
+- A inspecao humana ainda deve revisar detalhes finos de usabilidade, texto e fluxo de modais.

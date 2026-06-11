@@ -24,6 +24,7 @@
     "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
     "qa:local": "npm run qa && npm run smoke:local",
     "qa:functional:local": "node scripts/qa-functional-local.mjs",
+    "qa:visual:local": "node scripts/qa-visual-local.mjs",
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "smoke:local": "node scripts/smoke-local.mjs",
     "test": "node --test tests/*.test.mjs",
@@ -51,6 +52,7 @@
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "playwright-core": "^1.60.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"

@@ -101,8 +101,8 @@ export function ModuleBlueprint({
                 <strong>{column.title}</strong>
                 <span>{column.cards.length}</span>
               </header>
-              {column.cards.map((card) => (
-                <div className="module-kanban-card" key={card}>
+              {column.cards.map((card, index) => (
+                <div className="module-kanban-card" key={`${column.title}-${index}-${card}`}>
                   <strong>{card}</strong>
                   <span>Vinculo, responsavel e prazo rastreados</span>
                   <em>auditavel</em>

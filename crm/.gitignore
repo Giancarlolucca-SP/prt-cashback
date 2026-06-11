@@ -4,6 +4,7 @@ dist/
 coverage/
 *.log
 .dev-logs/
+.qa-screenshots/
 backups/
 
 .env
