@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+import { copyFileSync, existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const isWindows = process.platform === "win32";
+
+function run(command, args, options = {}) {
+  const display = [command, ...args].join(" ");
+  console.log(`\n> ${display}`);
+  execFileSync(command, args, {
+    cwd: root,
+    stdio: "inherit",
+    shell: isWindows,
+    ...options,
+  });
+}
+
+function tryRun(command, args, options = {}) {
+  try {
+    run(command, args, options);
+    return true;
+  } catch (error) {
+    console.warn(`\nAviso: comando falhou: ${[command, ...args].join(" ")}`);
+    if (error?.status !== undefined) {
+      console.warn(`Codigo de saida: ${error.status}`);
+    }
+    return false;
+  }
+}
+
+console.log("Setup do CRM Automotivo MVP");
+console.log("Este comando prepara dependencias, ambiente local, banco e seed demo.");
+
+const envPath = resolve(root, ".env");
+const envExamplePath = resolve(root, ".env.example");
+if (!existsSync(envPath)) {
+  copyFileSync(envExamplePath, envPath);
+  console.log("\n.env criado a partir de .env.example.");
+} else {
+  console.log("\n.env ja existe; mantendo configuracao local.");
+}
+
+run("npm", ["install"]);
+
+const skipDocker = process.env.SETUP_SKIP_DOCKER === "true";
+if (skipDocker) {
+  console.log("\nSETUP_SKIP_DOCKER=true; pulando Docker Compose.");
+} else {
+  const dockerOk = tryRun("docker", ["compose", "up", "-d"]);
+  if (!dockerOk) {
+    console.warn("\nDocker Compose nao subiu. Se Docker/WSL estiver indisponivel, configure .env com PostgreSQL local ou Supabase Postgres de development.");
+    console.warn("Depois rode novamente: SETUP_SKIP_DOCKER=true npm run setup");
+  }
+}
+
+run("npm", ["run", "dev:check"]);
+run("npm", ["run", "db:generate"]);
+run("npm", ["run", "db:migrate"]);
+run("npm", ["run", "db:seed"]);
+
+console.log("\nSetup concluido.");
+console.log("API: npm run dev:api -> http://localhost:3333");
+console.log("Web: npm run dev:web -> http://localhost:3000");
+console.log("Mailpit: http://localhost:8025");

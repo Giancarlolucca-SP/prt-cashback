@@ -1,6 +1,10 @@
 # CRM Automotivo MVP
 
-Base tecnica isolada para o CRM automotivo definida na Sprint 11.
+O CRM Automotivo MVP organiza a operacao interna de uma loja de veiculos em um fluxo unico: captacao de leads, atendimento, agenda, estoque, compras, vendas, documentos, financeiro, servicos, anuncios, automacoes e auditoria.
+
+O problema central que ele resolve e tirar a loja de controles espalhados em conversas, planilhas, arquivos soltos e memoria operacional. A equipe passa a enxergar quem e responsavel por cada cliente, veiculo, venda, documento, custo, comissao, pendencia e proxima acao, com permissao por perfil e rastreabilidade.
+
+Esta pasta contem a base tecnica isolada do CRM definida na Sprint 11.
 
 ## Decisao de isolamento
 
@@ -34,15 +38,32 @@ Essa decisao evita misturar dominios, rotas, banco, telas e regras de negocio at
 
 ## Primeiros comandos
 
+Para preparar o ambiente do zero:
+
 ```bash
 cd crm
-npm install
-cp .env.example .env
-docker compose up -d
-npm run dev:check
-npm run db:generate
-npm run db:migrate
-npm run db:seed
+npm run setup
+```
+
+O setup cria `.env` quando ainda nao existe, instala dependencias, sobe Docker Compose, gera Prisma, roda migrations e aplica o seed demo. Ele nao sobrescreve `.env` existente.
+
+Se Docker/WSL estiver indisponivel, configure `.env` com PostgreSQL local ou Supabase Postgres de development e rode:
+
+```bash
+SETUP_SKIP_DOCKER=true npm run setup
+```
+
+No PowerShell:
+
+```powershell
+$env:SETUP_SKIP_DOCKER="true"
+npm run setup
+Remove-Item Env:\SETUP_SKIP_DOCKER
+```
+
+Depois do setup, suba API e Web em terminais separados:
+
+```bash
 npm run dev:api
 npm run dev:web
 ```

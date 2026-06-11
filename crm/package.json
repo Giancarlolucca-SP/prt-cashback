@@ -5,6 +5,7 @@
   "description": "Base tecnica do MVP do CRM automotivo conforme Sprint 11 BMAP.",
   "type": "module",
   "scripts": {
+    "setup": "node bin/setup",
     "dev:check": "node scripts/dev-check.mjs",
     "dev:check:web": "node scripts/dev-check.mjs web",
     "dev:check:api": "node scripts/dev-check.mjs api",
