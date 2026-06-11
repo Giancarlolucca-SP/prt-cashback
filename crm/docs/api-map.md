@@ -3,6 +3,7 @@
 Este documento resume a superficie backend implementada no MVP. Todas as rotas usam JSON e retornam erros padronizados pelo handler da API.
 
 Contrato OpenAPI inicial: `docs/openapi-mvp.yaml`.
+Matriz explicita de RBAC: `docs/access-control-matrix.md`.
 
 ## Validacao
 
