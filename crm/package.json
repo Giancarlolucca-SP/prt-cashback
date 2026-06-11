@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "setup": "node bin/setup",
+    "lint": "tsc --noEmit -p tsconfig.json",
     "dev:check": "node scripts/dev-check.mjs",
     "dev:check:web": "node scripts/dev-check.mjs web",
     "dev:check:api": "node scripts/dev-check.mjs api",
@@ -15,12 +16,14 @@
     "build:api": "tsc -p apps/api/tsconfig.json",
     "db:generate": "prisma generate --schema packages/db/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema packages/db/prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema packages/db/prisma/schema.prisma",
     "db:seed": "node packages/db/prisma/seed.mjs",
     "db:backup": "node scripts/db-backup.mjs",
     "db:restore": "node scripts/db-restore.mjs",
     "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
     "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
     "qa:local": "npm run qa && npm run smoke:local",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
     "smoke:local": "node scripts/smoke-local.mjs",
     "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"

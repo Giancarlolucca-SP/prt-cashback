@@ -1,0 +1,124 @@
+name: CRM CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  qa:
+    name: CRM lint, tests and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: crm_automotivo
+          POSTGRES_USER: crm_user
+          POSTGRES_PASSWORD: crm_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U crm_user -d crm_automotivo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: crm
+
+    env:
+      NODE_ENV: test
+      APP_ENV: test
+      API_PORT: 3333
+      WEB_PORT: 3000
+      DATABASE_URL: postgresql://crm_user:crm_password@localhost:5433/crm_automotivo?schema=public
+      DIRECT_URL: postgresql://crm_user:crm_password@localhost:5433/crm_automotivo?schema=public
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+      SUPABASE_STORAGE_BUCKET_CUSTOMER_DOCUMENTS: customer-documents
+      SUPABASE_STORAGE_BUCKET_VEHICLE_DOCUMENTS: vehicle-documents
+      SUPABASE_STORAGE_BUCKET_SALE_DOCUMENTS: sale-documents
+      SUPABASE_STORAGE_BUCKET_SERVICE_DOCUMENTS: service-documents
+      SUPABASE_STORAGE_BUCKET_SYSTEM_GENERATED: system-generated
+      JOB_SCHEMA: pgboss
+      WEBHOOK_SHARED_SECRET: ci-webhook-secret
+      EVOLUTION_API_URL: http://localhost:8080
+      EVOLUTION_API_KEY: ci-placeholder
+      SMTP_HOST: localhost
+      SMTP_PORT: 1025
+      OPENAI_API_KEY: ci-placeholder
+      OCR_PROVIDER: manual
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crm/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run migrations
+        run: npm run db:deploy
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Automated tests
+        run: npm test
+
+      - name: Build API
+        run: npm run build:api
+
+      - name: Build Web
+        run: npm run build:web
+
+  security:
+    name: CRM dependency and code security scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: crm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crm/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm run security:audit
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
