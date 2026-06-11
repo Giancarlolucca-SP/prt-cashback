@@ -34,6 +34,7 @@ Essa decisao evita misturar dominios, rotas, banco, telas e regras de negocio at
 - [OpenAPI inicial](docs/openapi-mvp.yaml)
 - [Runbook operacional](docs/ops-runbook.md)
 - [Checklist de QA funcional](docs/qa-functional-checklist.md)
+- [Registro de rodadas de QA](docs/qa-runs.md)
 - [Decisoes de arquitetura](docs/architecture-decisions.md)
 
 ## Primeiros comandos
