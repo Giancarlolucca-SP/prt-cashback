@@ -19,7 +19,7 @@ const contentPatterns = [
   { name: "Stripe live key", pattern: /sk_live_[0-9A-Za-z]+/ },
   { name: "Stripe concrete test key", pattern: /sk_test_[0-9A-Za-z]{10,}/ },
   { name: "SendGrid key", pattern: /SG\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/ },
-  { name: "hardcoded Evolution API key", pattern: /postocash-evo-2026/ },
+  { name: "hardcoded Evolution API key", pattern: new RegExp(["postocash", "evo", "2026"].join("-")) },
   {
     name: "database URL with embedded credentials",
     pattern: /postgres(?:ql)?:\/\/(?!crm_user:crm_password@localhost)(?!USER:PASSWORD@localhost)[^<\s"'`:@]+:[^<\s"'`@]+@[^<\s"'`]+/i,
@@ -34,7 +34,7 @@ for (const file of trackedFiles) {
     continue;
   }
 
-  if (/\.(png|jpg|jpeg|webp|ico|pdf|lock)$/i.test(file)) {
+  if (/\.(png|jpg|jpeg|webp|ico|pdf)$/i.test(file)) {
     continue;
   }
 
