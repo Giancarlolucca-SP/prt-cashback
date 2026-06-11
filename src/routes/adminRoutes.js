@@ -52,12 +52,12 @@ router.get('/whatsapp-status', authenticate, async (req, res) => {
     });
   } catch (err) {
     const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
+    console.error('[ADMIN/WHATSAPP_STATUS] Evolution status check failed:', err.message);
     return res.status(503).json({
       connected:    false,
       instanceName: EVOLUTION_INSTANCE,
       phone:        null,
       status:       isTimeout ? 'timeout' : 'unreachable',
-      error:        err.message,
     });
   }
 });

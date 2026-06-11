@@ -67,6 +67,15 @@ jobs:
           cache: npm
           cache-dependency-path: crm/package-lock.json
 
+      - name: Legacy syntax smoke
+        working-directory: .
+        run: |
+          node --check scripts/secret-scan.mjs
+          node --check scripts/seed-operator.js
+          node --check scripts/db-check.js
+          node --check src/routes/adminRoutes.js
+          node --check src/services/whatsappService.js
+
       - name: Install dependencies
         run: npm ci
 

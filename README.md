@@ -157,6 +157,16 @@ npx expo start --tunnel
 | Admin posto demo | admin.local@example.test | Definir via seed local |
 | Admin geral demo | admin.global@example.test | Definir via seed local |
 
+Para criar ou atualizar um operador local sem commitar senha:
+
+```powershell
+$env:SEED_OPERATOR_EMAIL="admin.local@example.test"
+$env:SEED_OPERATOR_PASSWORD="<SENHA_LOCAL_FORTE>"
+node scripts/seed-operator.js
+Remove-Item Env:\SEED_OPERATOR_EMAIL
+Remove-Item Env:\SEED_OPERATOR_PASSWORD
+```
+
 | Cliente | CPF | Saldo |
 |---------|-----|-------|
 | João Silva | 529.982.247-25 | R$ 25,00 |
