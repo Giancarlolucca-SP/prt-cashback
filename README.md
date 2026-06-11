@@ -93,16 +93,16 @@ cp .env.example .env
 Edite `.env` com suas credenciais:
 
 ```env
-DATABASE_URL="postgresql://..."
-JWT_SECRET="chave_secreta_forte_aqui"
+DATABASE_URL="<DATABASE_URL_LOCAL_OU_SANDBOX>"
+JWT_SECRET="<JWT_SECRET_LOCAL_FORTE>"
 SUPABASE_URL="https://seu-projeto.supabase.co"
-SUPABASE_SERVICE_KEY="sua_service_key"
-SUPABASE_ANON_KEY="sua_anon_key"
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_PUBLISHABLE_KEY="pk_test_..."
-STRIPE_PRICE_ID="price_..."
+SUPABASE_SERVICE_KEY="<SUPABASE_SERVICE_KEY_LOCAL>"
+SUPABASE_ANON_KEY="<SUPABASE_ANON_KEY_LOCAL>"
+STRIPE_SECRET_KEY="<STRIPE_SECRET_KEY_DE_TESTE>"
+STRIPE_PUBLISHABLE_KEY="<STRIPE_PUBLISHABLE_KEY_DE_TESTE>"
+STRIPE_PRICE_ID="<STRIPE_PRICE_ID_DE_TESTE>"
 ZAPI_INSTANCE_ID="seu_instance_id"
-ZAPI_TOKEN="seu_token"
+ZAPI_TOKEN="<ZAPI_TOKEN_LOCAL>"
 ```
 
 ### 3. Gerar client Prisma e aplicar schema
@@ -154,8 +154,8 @@ npx expo start --tunnel
 
 | Perfil | E-mail | Senha |
 |--------|--------|-------|
-| Admin posto (Dilma) | admin@autoposto.com | Admin@1234 |
-| Admin geral | admin@posto.com | admin123 |
+| Admin posto demo | admin.local@example.test | Definir via seed local |
+| Admin geral demo | admin.global@example.test | Definir via seed local |
 
 | Cliente | CPF | Saldo |
 |---------|-----|-------|
@@ -175,7 +175,7 @@ npx expo start --tunnel
 ```bash
 curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@autoposto.com","password":"Admin@1234"}'
+  -d '{"email":"admin.local@example.test","password":"<SENHA_LOCAL>"}'
 ```
 
 **Resposta:**

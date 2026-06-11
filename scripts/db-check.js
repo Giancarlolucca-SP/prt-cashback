@@ -15,7 +15,7 @@ async function main() {
     );
   }
 
-  const target = '47248547000174';
+  const target = process.env.SEED_ESTABLISHMENT_CNPJ || '00000000000000';
   const found = establishments.find(e => e.cnpj.replace(/\D/g, '') === target);
 
   if (!found) {

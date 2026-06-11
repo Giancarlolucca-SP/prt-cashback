@@ -3,6 +3,8 @@ node_modules/
 .env.local
 .env.production
 .env.*.local
+.env.bak
+*.env.bak
 frontend/.env.production
 mobile/.env.production
 dist/
@@ -15,3 +17,30 @@ logos/
 landing/acessibilidade/
 landing/design/
 *.pdf
+
+# CRM automotivo MVP
+crm/node_modules/
+crm/.next/
+crm/dist/
+crm/coverage/
+crm/.env
+crm/.env.*
+!crm/.env.example
+
+# BMAP/BMAD - bastidores internos
+.bmap/
+.bmad/
+.bmap-logs/
+.bmap-prompts/
+.bmap-scripts/
+.bmap-workbench/
+.bmap-internal/
+_bmap-internal/
+_bmad-internal/
+**/drafts/
+**/scratch/
+**/internal-notes/
+**/*-raw-notes.md
+**/*-prompt-log.md
+**/*-agent-log.md
+**/*-working-copy.md

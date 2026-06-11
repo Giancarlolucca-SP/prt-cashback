@@ -1126,7 +1126,7 @@ const hash = await bcrypt.hash(password, salt)
 
 ### 8.3 Fluxo de Pagamento Stripe
 
-**Modo atual:** Test mode (chaves `sk_test_...`)  
+**Modo atual:** Test mode (chaves de teste configuradas via ambiente)
 **Produto Stripe:** "PostoCash — Sistema de Fidelidade"  
 **Preço:** Recorrente mensal (R$ 200/mês → equivalente USD no Stripe)
 
@@ -1168,7 +1168,7 @@ const hash = await bcrypt.hash(password, salt)
 
 **Provider:** Evolution API v2.3.7 (Baileys)  
 **Deploy:** Render (self-hosted)  
-**URL:** `https://postocash-evo-api.onrender.com`  
+**URL:** `<EVOLUTION_API_URL>`
 **Instância:** `postocash`  
 **API Key:** Configurada via env `EVOLUTION_API_KEY`
 
@@ -1274,7 +1274,7 @@ GET /admin/whatsapp-status
 | Backend API | `https://postocash-api.onrender.com` |
 | Portal Admin | `https://postocash-admin.vercel.app` |
 | Landing Page | `https://postocash.com.br` (Vercel) |
-| Evolution API | `https://postocash-evo-api.onrender.com` |
+| Evolution API | `<EVOLUTION_API_URL>` |
 | Supabase | `https://[project].supabase.co` |
 
 ### Variáveis de Ambiente Completas
@@ -1285,11 +1285,11 @@ PORT=3000
 NODE_ENV=production
 
 # ─── Banco de Dados ─────────────────────────────────────────
-DATABASE_URL="postgresql://user:pass@host:5432/db?schema=public"
-DIRECT_URL="postgresql://user:pass@host:5432/db"  # Sem pooler
+DATABASE_URL="<DATABASE_URL_PRODUCAO>"
+DIRECT_URL="<DIRECT_URL_PRODUCAO>"  # Sem pooler
 
 # ─── JWT ────────────────────────────────────────────────────
-JWT_SECRET="chave-secreta-longa-e-aleatoria"
+JWT_SECRET="<JWT_SECRET_FORTE>"
 JWT_EXPIRES_IN="8h"
 
 # ─── Supabase ───────────────────────────────────────────────
@@ -1299,15 +1299,15 @@ SUPABASE_ANON_KEY="eyJ..."            # Anon key (público)
 SUPABASE_STORAGE_BUCKET="selfies"
 
 # ─── Stripe ─────────────────────────────────────────────────
-STRIPE_PUBLISHABLE_KEY="pk_test_..."
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_PRICE_ID="price_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
+STRIPE_PUBLISHABLE_KEY="<STRIPE_PUBLISHABLE_KEY>"
+STRIPE_SECRET_KEY="<STRIPE_SECRET_KEY>"
+STRIPE_PRICE_ID="<STRIPE_PRICE_ID>"
+STRIPE_WEBHOOK_SECRET="<STRIPE_WEBHOOK_SECRET>"
 
 # ─── WhatsApp ───────────────────────────────────────────────
 WHATSAPP_PROVIDER="evolution"           # "evolution" ou "z-api"
-EVOLUTION_API_URL="https://postocash-evo-api.onrender.com"
-EVOLUTION_API_KEY="postocash-evo-2026"
+EVOLUTION_API_URL="<EVOLUTION_API_URL>"
+EVOLUTION_API_KEY="<EVOLUTION_API_KEY>"
 EVOLUTION_INSTANCE="postocash"
 
 # Z-API (legado/fallback)
@@ -1526,7 +1526,7 @@ npx prisma migrate deploy
 
 **Solução:** Usar a URL externa do Render PostgreSQL:
 ```
-postgresql://user:pass@dpg-xxx.ohio-postgres.render.com/db
+<DATABASE_URL_EXTERNA_RENDER>
 ```
 
 ---
@@ -1595,17 +1595,17 @@ NODE_ENV=development node src/server.js
 ```bash
 # 1. Verificar status da instância
 Invoke-WebRequest -Uri "http://localhost:8080/instance/fetchInstances" `
-  -Headers @{"apikey"="postocash-evo-2026"} -Method GET | Select-Object -ExpandProperty Content
+  -Headers @{"apikey"="<EVOLUTION_API_KEY>"} -Method GET | Select-Object -ExpandProperty Content
 
 # 2. Enviar mensagem de teste
 Invoke-WebRequest -Uri "http://localhost:8080/message/sendText/postocash2" `
-  -Headers @{"apikey"="postocash-evo-2026"; "Content-Type"="application/json"} `
+  -Headers @{"apikey"="<EVOLUTION_API_KEY>"; "Content-Type"="application/json"} `
   -Method POST `
-  -Body '{"number":"5511987788167","text":"Teste"}' | Select-Object -ExpandProperty Content
+  -Body '{"number":"<TELEFONE_TESTE>","text":"Teste"}' | Select-Object -ExpandProperty Content
 
 # 3. Verificar status das últimas mensagens
 Invoke-WebRequest -Uri "http://localhost:8080/chat/findMessages/postocash2" `
-  -Headers @{"apikey"="postocash-evo-2026"; "Content-Type"="application/json"} `
+  -Headers @{"apikey"="<EVOLUTION_API_KEY>"; "Content-Type"="application/json"} `
   -Method POST `
   -Body '{"where":{"fromMe":true},"limit":5}' | Select-Object -ExpandProperty Content
 

@@ -7,8 +7,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SERVER_URL=https://postocash-evolution.onrender.com
-      - AUTHENTICATION_API_KEY=postocash-evo-2026
+      - SERVER_URL=${EVOLUTION_SERVER_URL:-http://localhost:8080}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:?configure EVOLUTION_API_KEY in local .env}
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=${DATABASE_URL}

@@ -27,8 +27,8 @@ Adicione exatamente estas variáveis em **Environment → Add Environment Variab
 
 | Variável | Valor |
 |---|---|
-| `SERVER_URL` | `https://postocash-evolution.onrender.com` |
-| `AUTHENTICATION_API_KEY` | `postocash-evo-2026` |
+| `SERVER_URL` | `<EVOLUTION_SERVER_URL>` |
+| `AUTHENTICATION_API_KEY` | `<EVOLUTION_API_KEY>` |
 | `DATABASE_ENABLED` | `true` |
 | `DATABASE_PROVIDER` | `postgresql` |
 | `DATABASE_CONNECTION_URI` | *(sua DATABASE_URL do Supabase)* |
@@ -61,8 +61,8 @@ ou faça as chamadas diretamente:
 ### 4.1 Criar instância
 
 ```http
-POST https://postocash-evolution.onrender.com/instance/create
-apikey: postocash-evo-2026
+POST <EVOLUTION_SERVER_URL>/instance/create
+apikey: <EVOLUTION_API_KEY>
 Content-Type: application/json
 
 {
@@ -75,8 +75,8 @@ Content-Type: application/json
 ### 4.2 Obter QR Code
 
 ```http
-GET https://postocash-evolution.onrender.com/instance/connect/postocash
-apikey: postocash-evo-2026
+GET <EVOLUTION_SERVER_URL>/instance/connect/postocash
+apikey: <EVOLUTION_API_KEY>
 ```
 
 A resposta inclui `base64` com a imagem do QR Code.
@@ -91,8 +91,8 @@ A resposta inclui `base64` com a imagem do QR Code.
 ### 4.4 Verificar conexão
 
 ```http
-GET https://postocash-evolution.onrender.com/instance/fetchInstances
-apikey: postocash-evo-2026
+GET <EVOLUTION_SERVER_URL>/instance/fetchInstances
+apikey: <EVOLUTION_API_KEY>
 ```
 
 O campo `connectionStatus` deve ser `"open"`.
@@ -105,8 +105,8 @@ No serviço `postocash-api`, adicione/atualize:
 
 ```
 WHATSAPP_PROVIDER=evolution
-EVOLUTION_API_URL=https://postocash-evolution.onrender.com
-EVOLUTION_API_KEY=postocash-evo-2026
+EVOLUTION_API_URL=<EVOLUTION_SERVER_URL>
+EVOLUTION_API_KEY=<EVOLUTION_API_KEY>
 EVOLUTION_INSTANCE=postocash
 ```
 
