@@ -10,6 +10,7 @@ npm run db:seed
 npm run dev:api
 npm run dev:web
 npm run smoke:local
+npm run qa:functional:local
 ```
 
 URLs padrao:
@@ -116,6 +117,7 @@ Antes de considerar QA local aprovado:
 
 ```powershell
 npm run smoke:local
+npm run qa:functional:local
 npm test
 npm run typecheck
 npm run build:api

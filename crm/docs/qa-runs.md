@@ -70,3 +70,39 @@ Observacoes:
 
 - API e Web ficaram rodando localmente apos a validacao para permitir QA manual.
 - Docker deve ser revisitado antes de validar portabilidade completa. A rodada atual prova o fluxo local usando PostgreSQL local existente.
+
+## 2026-06-11 - QA funcional automatizado por perfil
+
+Contexto:
+
+- Etapa BMAP: reforco do QA funcional com roteiro repetivel.
+- Foco: validar todos os perfis seedados, permissoes criticas de RBAC, endpoints sensiveis e rotas Web principais.
+- Escopo: apenas projeto novo `crm/`, com API e Web ja rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:functional:local` | Passou |
+
+Resultado:
+
+- Readiness da API: ok.
+- Logins validados: Dono/Gestor, Admin, Administrativo, Vendedor, SDR, Avaliador e Servicos.
+- Permissoes RBAC validadas: 16.
+- Endpoints RBAC validados: 8.
+- Rotas Web principais validadas: 13.
+
+Cobertura automatizada desta rodada:
+
+- Vendedor sem acesso a financeiro global e auditoria.
+- SDR sem acesso a vendas.
+- Avaliador sem acesso a auditoria global.
+- Servicos com acesso a OS e sem acesso a auditoria.
+- Dono/Gestor com acesso a financeiro, auditoria e usuarios.
+- Administrativo com acesso a financeiro operacional e sem acesso a auditoria.
+
+Observacoes:
+
+- Esta rodada nao substitui a inspecao visual de layout, tema, modais e estados vazios.
+- Proxima etapa recomendada: QA visual/manual nas telas principais com os perfis do checklist.

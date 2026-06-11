@@ -92,6 +92,12 @@ Com API e Web rodando, valide o caminho funcional principal:
 npm run smoke:local
 ```
 
+Para validar perfis seedados, permissoes criticas de RBAC, endpoints sensiveis e rotas principais:
+
+```bash
+npm run qa:functional:local
+```
+
 Atalho completo, incluindo QA tecnico e smoke local:
 
 ```bash

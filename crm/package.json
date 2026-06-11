@@ -23,6 +23,7 @@
     "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
     "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
     "qa:local": "npm run qa && npm run smoke:local",
+    "qa:functional:local": "node scripts/qa-functional-local.mjs",
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "smoke:local": "node scripts/smoke-local.mjs",
     "test": "node --test tests/*.test.mjs",
