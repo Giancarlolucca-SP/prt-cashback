@@ -34,6 +34,14 @@ export async function getSessionUser(request: FastifyRequest) {
     return null;
   }
 
+  if (session.forceReauthAt && session.lastSeenAt < session.forceReauthAt) {
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() },
+    });
+    return null;
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     include: { store: true },

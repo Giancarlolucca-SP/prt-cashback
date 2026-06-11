@@ -221,7 +221,60 @@ export async function registerUserRoutes(app: FastifyInstance) {
     const params = userParamsSchema.parse(request.params);
     const input = updateUserSchema.parse(request.body);
     const current = await getUserOrThrow(session.user.storeId, params.id);
-    const user = await prisma.user.update({ where: { id: current.id }, data: input });
+    const shouldRevokeSessions =
+      input.isActive === false ||
+      (input.role !== undefined && input.role !== current.role) ||
+      (input.mustChangePassword === true && current.mustChangePassword === false);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({ where: { id: current.id }, data: input });
+
+      if (shouldRevokeSessions) {
+        const reauthAt = new Date();
+        await tx.userSession.updateMany({
+          where: { userId: current.id, revokedAt: null },
+          data: {
+            revokedAt: reauthAt,
+            forceReauthAt: reauthAt,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "auth",
+            action: "sessions_revoked",
+            entityType: "user",
+            entityId: current.id,
+            result: "SUCCESS",
+            metadata: {
+              reason: "sensitive_user_update",
+              changedFields: Object.keys(input),
+            },
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "users",
+          action: "user_updated",
+          entityType: "user",
+          entityId: updated.id,
+          result: "SUCCESS",
+          metadata: {
+            changedFields: Object.keys(input),
+            sessionsRevoked: shouldRevokeSessions,
+          },
+        },
+      });
+
+      return updated;
+    });
     await emitInternalEvent({
       name: "permission.changed",
       storeId: session.user.storeId,

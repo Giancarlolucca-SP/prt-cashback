@@ -3388,6 +3388,17 @@ try {
   assert.equal(transferResponsibility.statusCode, 201);
   assert.equal(transferResponsibility.json().data.toUserId, qaUserId);
 
+  const activeUserLogin = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: {
+      email: qaUserEmail,
+      password: "Gt3@2026qa",
+    },
+  });
+  assert.equal(activeUserLogin.statusCode, 200);
+  const activeUserToken = activeUserLogin.json().token as string;
+
   const updateUser = await app.inject({
     method: "PATCH",
     url: `/users/${qaUserId}`,
@@ -3400,6 +3411,15 @@ try {
   });
   assert.equal(updateUser.statusCode, 200);
   assert.equal(updateUser.json().data.isActive, false);
+
+  const revokedInactiveUserSession = await app.inject({
+    method: "GET",
+    url: "/auth/me",
+    headers: {
+      authorization: `Bearer ${activeUserToken}`,
+    },
+  });
+  assert.equal(revokedInactiveUserSession.statusCode, 401);
 
   const inactiveUserLogin = await app.inject({
     method: "POST",
