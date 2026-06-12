@@ -685,3 +685,35 @@ Observacoes:
 
 - `Appointment` continua sendo agenda operacional formal; `FollowUp` continua sendo contato comercial leve.
 - Proxima melhoria recomendada: permitir converter follow-up em appointment quando o contato virar visita, avaliacao ou entrega.
+
+## 2026-06-12 - Conversao de follow-up em appointment
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e agenda comercial.
+- Foco: transformar contato leve em compromisso operacional formal quando o cliente confirma visita.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Criado `POST /leads/follow-ups/:id/appointment`.
+- A rota exige permissao de appointments e leads, cria `Appointment`, conclui o `FollowUp`, atualiza `nextActionAt` do lead e grava auditoria cruzada.
+- Eventos internos emitidos: `appointment.created` e `lead.follow_up_converted`.
+- A tela `/agendamentos` ganhou acao `Virou visita` na agenda comercial.
+- O teste de contrato confirma criacao do appointment e conclusao do follow-up original.
+
+Observacoes:
+
+- A conversao usa o horario do follow-up como inicio e a UI cria uma visita de 1 hora por default.
+- Proxima melhoria recomendada: abrir modal de conversao para escolher tipo (`Visita`, `Avaliacao`, `Entrega`) e horario antes de criar o appointment.

@@ -294,6 +294,31 @@ export function LiveAppointmentsWorkspace() {
     }
   }
 
+  async function convertFollowUpToAppointment(followUp: LeadFollowUp) {
+    if (!token || !canManageAppointments || !canUpdateLeads || movingId) return;
+
+    const startsAt = new Date(followUp.dueAt);
+    const endsAt = new Date(startsAt.getTime() + 60 * 60000);
+
+    setMovingId(followUp.id);
+    try {
+      const response = await apiPost<{ appointment: Appointment; followUp: LeadFollowUp }>(`/leads/follow-ups/${followUp.id}/appointment`, token, {
+        endsAt: endsAt.toISOString(),
+        notes: followUp.notes ?? followUp.lead?.interest ?? undefined,
+        startsAt: startsAt.toISOString(),
+        title: followUp.lead?.title ?? "Visita de lead",
+        type: "Visita loja",
+      });
+      setAppointments((current) => [response.appointment, ...current.filter((item) => item.id !== response.appointment.id)].sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
+      setFollowUps((current) => current.filter((item) => item.id !== response.followUp.id));
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setStatus("error");
+    } finally {
+      setMovingId(null);
+    }
+  }
+
   const view = useMemo(() => {
     const confirmed = appointments.filter((item) => item.status === "CONFIRMED").length;
     const scheduled = appointments.filter((item) => item.status === "SCHEDULED").length;
@@ -534,6 +559,9 @@ export function LiveAppointmentsWorkspace() {
                 </div>
                 <div className="appointment-tags">
                   <span>{followUp.lead?.source ?? "Origem nao informada"}</span>
+                  <button disabled={!canManageAppointments || !canUpdateLeads || movingId === followUp.id} onClick={() => void convertFollowUpToAppointment(followUp)} type="button">
+                    {movingId === followUp.id ? "Salvando..." : "Virou visita"}
+                  </button>
                   <button disabled={!canUpdateLeads || movingId === followUp.id} onClick={() => void completeFollowUp(followUp)} type="button">
                     {movingId === followUp.id ? "Salvando..." : "Concluir"}
                   </button>

@@ -21,6 +21,7 @@ export type InternalEventName =
   | "customer.kanban_status_changed"
   | "lead.created"
   | "lead.follow_up_completed"
+  | "lead.follow_up_converted"
   | "lead.follow_up_scheduled"
   | "lead.stage_changed"
   | "appointment.created"

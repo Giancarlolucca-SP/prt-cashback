@@ -769,6 +769,54 @@ try {
       .items.some((followUp: { id: string; completedAt: string | null }) => followUp.id === createdFollowUp.id && followUp.completedAt),
   );
 
+  const convertibleFollowUpDueAt = "2026-06-09T17:00:00.000Z";
+  const scheduleConvertibleFollowUp = await app.inject({
+    method: "POST",
+    url: `/leads/${createdLeadId}/follow-ups`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      dueAt: convertibleFollowUpDueAt,
+      notes: "Converter follow-up em visita na loja",
+      type: "Confirmar visita",
+    },
+  });
+  assert.equal(scheduleConvertibleFollowUp.statusCode, 201);
+  const convertibleFollowUpId = scheduleConvertibleFollowUp.json().followUp.id as string;
+
+  const convertFollowUpToAppointment = await app.inject({
+    method: "POST",
+    url: `/leads/follow-ups/${convertibleFollowUpId}/appointment`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      endsAt: "2026-06-09T18:00:00.000Z",
+      notes: "Cliente confirmou visita presencial",
+      startsAt: convertibleFollowUpDueAt,
+      title: "Visita convertida de follow-up",
+      type: "Visita loja",
+    },
+  });
+  assert.equal(convertFollowUpToAppointment.statusCode, 201);
+  assert.equal(convertFollowUpToAppointment.json().appointment.leadId, createdLeadId);
+  assert.equal(convertFollowUpToAppointment.json().appointment.startsAt, convertibleFollowUpDueAt);
+  assert.ok(convertFollowUpToAppointment.json().followUp.completedAt);
+
+  const convertedFollowUp = await prisma.followUp.findUniqueOrThrow({
+    where: { id: convertibleFollowUpId },
+  });
+  assert.ok(convertedFollowUp.completedAt);
+
+  const convertedAppointment = await prisma.appointment.findFirst({
+    where: {
+      leadId: createdLeadId,
+      title: "Visita convertida de follow-up",
+    },
+  });
+  assert.ok(convertedAppointment);
+
   const appraiserLogin = await app.inject({
     method: "POST",
     url: "/auth/login",

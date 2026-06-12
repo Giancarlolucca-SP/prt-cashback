@@ -5,6 +5,7 @@ import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const leadStatusSchema = z.enum(["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "WON", "LOST", "COLD"]);
 const terminalLeadStatuses = new Set(["WON", "LOST", "COLD"]);
@@ -84,6 +85,24 @@ const completeLeadFollowUpSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
 });
 
+const convertLeadFollowUpToAppointmentSchema = z
+  .object({
+    endsAt: z.coerce.date().optional(),
+    notes: z
+      .string()
+      .trim()
+      .max(1000)
+      .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do agendamento") })
+      .optional(),
+    startsAt: z.coerce.date(),
+    title: z.string().trim().min(2).max(180).optional(),
+    type: z.string().trim().min(2).max(80).default("Visita loja"),
+  })
+  .refine((input) => !input.endsAt || input.endsAt > input.startsAt, {
+    message: "Horario final deve ser posterior ao horario inicial.",
+    path: ["endsAt"],
+  });
+
 type LeadRecord = {
   id: string;
   customerId: string | null;
@@ -106,6 +125,22 @@ type FollowUpRecord = {
   type: string;
   dueAt: Date;
   completedAt: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type AppointmentRecord = {
+  id: string;
+  customerId: string | null;
+  leadId: string | null;
+  vehicleId: string | null;
+  assignedUserId: string | null;
+  type: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  status: string;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -139,6 +174,24 @@ function sanitizeFollowUp(followUp: FollowUpRecord) {
     notes: followUp.notes,
     createdAt: followUp.createdAt.toISOString(),
     updatedAt: followUp.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeAppointment(appointment: AppointmentRecord) {
+  return {
+    id: appointment.id,
+    customerId: appointment.customerId,
+    leadId: appointment.leadId,
+    vehicleId: appointment.vehicleId,
+    assignedUserId: appointment.assignedUserId,
+    type: appointment.type,
+    title: appointment.title,
+    startsAt: appointment.startsAt.toISOString(),
+    endsAt: appointment.endsAt?.toISOString() ?? null,
+    status: appointment.status,
+    notes: appointment.notes,
+    createdAt: appointment.createdAt.toISOString(),
+    updatedAt: appointment.updatedAt.toISOString(),
   };
 }
 
@@ -442,6 +495,161 @@ export async function registerLeadRoutes(app: FastifyInstance) {
     });
 
     return { data: sanitizeFollowUp(followUp), unchanged: false };
+  });
+
+  app.post("/follow-ups/:id/appointment", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "appointments",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = followUpParamsSchema.parse(request.params);
+    const input = convertLeadFollowUpToAppointmentSchema.parse(request.body);
+
+    const current = await prisma.followUp.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        ...followUpScopeWhere(session.user),
+      },
+    });
+
+    if (!current || current.completedAt) {
+      return denyOwnershipAccess({
+        action: "follow_up_converted",
+        entityId: params.id,
+        entityType: "follow_up",
+        message: "Follow-up nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
+    }
+
+    const lead = current.leadId
+      ? await prisma.lead.findFirst({
+          where: {
+            id: current.leadId,
+            storeId: session.user.storeId,
+            deletedAt: null,
+            ...leadScopeWhere(session.user),
+          },
+        })
+      : null;
+
+    if (!lead) {
+      throw new ApiError("NOT_FOUND", "Lead vinculado ao follow-up nao encontrado.");
+    }
+
+    const assignedUserId = lead.assignedUserId ?? current.assignedUserId ?? session.user.id;
+    await ensureUserInStore(session.user.storeId, assignedUserId);
+
+    const completedAt = new Date();
+    const result = await prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: lead.customerId,
+          leadId: lead.id,
+          assignedUserId,
+          type: input.type,
+          title: input.title ?? lead.title,
+          startsAt: input.startsAt,
+          endsAt: input.endsAt,
+          notes: input.notes ?? current.notes,
+        },
+      });
+
+      const followUp = await tx.followUp.update({
+        where: { id: current.id },
+        data: {
+          completedAt,
+        },
+      });
+
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          nextActionAt: input.startsAt,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "appointments",
+          action: "create_from_follow_up",
+          entityType: "appointment",
+          entityId: appointment.id,
+          result: "SUCCESS",
+          metadata: {
+            followUpId: followUp.id,
+            leadId: lead.id,
+            startsAt: appointment.startsAt.toISOString(),
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "follow_up_converted",
+          entityType: "follow_up",
+          entityId: followUp.id,
+          result: "SUCCESS",
+          metadata: {
+            appointmentId: appointment.id,
+            completedAt: completedAt.toISOString(),
+            leadId: lead.id,
+          },
+        },
+      });
+
+      return { appointment, followUp };
+    });
+
+    await emitInternalEvent({
+      name: "appointment.created",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "appointment",
+      entityId: result.appointment.id,
+      payload: {
+        followUpId: result.followUp.id,
+        leadId: result.appointment.leadId,
+        startsAt: result.appointment.startsAt.toISOString(),
+      },
+    });
+
+    await emitInternalEvent({
+      name: "lead.follow_up_converted",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "follow_up",
+      entityId: result.followUp.id,
+      payload: {
+        appointmentId: result.appointment.id,
+        completedAt: result.followUp.completedAt?.toISOString() ?? completedAt.toISOString(),
+        leadId: lead.id,
+      },
+    });
+
+    return reply.code(201).send({
+      appointment: sanitizeAppointment(result.appointment),
+      followUp: sanitizeFollowUp(result.followUp),
+    });
   });
 
   app.get("/:id", async (request) => {

@@ -109,6 +109,8 @@ paths:
     get: { tags: [Leads], summary: Lista follow-ups comerciais pendentes por periodo., responses: { "200": { $ref: "#/components/responses/List" } } }
   /leads/follow-ups/{id}/complete:
     post: { tags: [Leads], summary: Conclui follow-up comercial, grava completedAt e auditoria., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /leads/follow-ups/{id}/appointment:
+    post: { tags: [Leads], summary: Converte follow-up pendente em appointment formal e conclui o follow-up., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "201": { $ref: "#/components/responses/Created" } } }
   /leads/{id}:
     get: { tags: [Leads], summary: Detalha lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Leads], summary: Atualiza lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
