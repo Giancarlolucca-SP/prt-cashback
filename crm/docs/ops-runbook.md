@@ -19,6 +19,36 @@ Cada ambiente deve ter `.env` proprio, banco proprio, segredos proprios e chaves
 Fluxo recomendado apos clonar, migrar banco ou alterar contratos de API:
 
 ```powershell
+npm run setup
+```
+
+O setup cria `.env` a partir de `.env.example` quando necessario, instala dependencias, sobe Docker Compose, aguarda PostgreSQL aceitar conexao TCP, roda Prisma migrate e aplica seed demo. Se Docker/WSL estiver indisponivel, configure `.env` para um PostgreSQL local ou Supabase Postgres de development e rode:
+
+```powershell
+$env:SETUP_SKIP_DOCKER="true"
+npm run setup
+Remove-Item Env:\SETUP_SKIP_DOCKER
+```
+
+Se API/Web ja estiverem rodando e a intencao for reexecutar setup sem validar portas, use temporariamente `SETUP_SKIP_DEV_CHECK=true`. Nao use essa flag em uma primeira instalacao sem antes confirmar que os processos ativos sao do proprio CRM.
+
+```powershell
+$env:SETUP_SKIP_DEV_CHECK="true"
+npm run setup
+Remove-Item Env:\SETUP_SKIP_DEV_CHECK
+```
+
+No Windows, a API em execucao pode bloquear o arquivo do Prisma Client em `node_modules/.prisma`. Para reexecutar setup com a API ativa e client ja gerado, use tambem `SETUP_SKIP_PRISMA_GENERATE=true`; o migrate sera executado com `--skip-generate`.
+
+```powershell
+$env:SETUP_SKIP_PRISMA_GENERATE="true"
+npm run setup
+Remove-Item Env:\SETUP_SKIP_PRISMA_GENERATE
+```
+
+Fluxo manual equivalente para ambientes ja preparados:
+
+```powershell
 npm run db:generate
 npm run db:migrate
 npm run db:seed

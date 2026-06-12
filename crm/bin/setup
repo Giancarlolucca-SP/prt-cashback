@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import net from "node:net";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isWindows = process.platform === "win32";
+const defaultDatabaseUrl = "postgresql://crm_user:crm_password@localhost:5433/crm_automotivo?schema=public";
 
 function run(command, args, options = {}) {
   const display = [command, ...args].join(" ");
@@ -29,6 +31,66 @@ function tryRun(command, args, options = {}) {
     }
     return false;
   }
+}
+
+function readEnvFile(path) {
+  if (!existsSync(path)) return {};
+
+  return Object.fromEntries(
+    readFileSync(path, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => {
+        const index = line.indexOf("=");
+        const key = line.slice(0, index).trim();
+        const value = line.slice(index + 1).trim().replace(/^["']|["']$/g, "");
+        return [key, value];
+      }),
+  );
+}
+
+function waitForTcp({ host, port, timeoutMs }) {
+  const startedAt = Date.now();
+
+  return new Promise((resolveWait, rejectWait) => {
+    let settled = false;
+    const attempt = () => {
+      const socket = net.createConnection({ host, port });
+      socket.setTimeout(1500);
+      socket.once("connect", () => {
+        settled = true;
+        socket.destroy();
+        resolveWait();
+      });
+      socket.once("timeout", () => {
+        socket.destroy();
+      });
+      socket.once("error", () => {
+        socket.destroy();
+      });
+      socket.once("close", () => {
+        if (settled) return;
+        if (Date.now() - startedAt >= timeoutMs) {
+          settled = true;
+          rejectWait(new Error(`Timeout aguardando ${host}:${port}.`));
+          return;
+        }
+        setTimeout(attempt, 1000);
+      });
+    };
+
+    attempt();
+  });
+}
+
+async function waitForDatabase(databaseUrl) {
+  const parsed = new URL(databaseUrl);
+  const host = parsed.hostname;
+  const port = Number(parsed.port || 5432);
+  console.log(`\nAguardando PostgreSQL em ${host}:${port}...`);
+  await waitForTcp({ host, port, timeoutMs: 60000 });
+  console.log("PostgreSQL aceitou conexao TCP.");
 }
 
 console.log("Setup do CRM Automotivo MVP");
@@ -56,9 +118,29 @@ if (skipDocker) {
   }
 }
 
-run("npm", ["run", "dev:check"]);
-run("npm", ["run", "db:generate"]);
-run("npm", ["run", "db:migrate"]);
+const env = { ...readEnvFile(envPath), ...process.env };
+await waitForDatabase(env.DATABASE_URL || defaultDatabaseUrl);
+
+const skipDevCheck = process.env.SETUP_SKIP_DEV_CHECK === "true";
+if (skipDevCheck) {
+  console.log("\nSETUP_SKIP_DEV_CHECK=true; pulando verificacao de portas Web/API.");
+} else {
+  run("npm", ["run", "dev:check"]);
+}
+
+const skipPrismaGenerate = process.env.SETUP_SKIP_PRISMA_GENERATE === "true";
+if (skipPrismaGenerate) {
+  console.log("\nSETUP_SKIP_PRISMA_GENERATE=true; pulando Prisma generate e usando migrate com --skip-generate.");
+} else {
+  run("npm", ["run", "db:generate"]);
+}
+
+if (skipPrismaGenerate) {
+  run("npx", ["prisma", "migrate", "dev", "--schema", "packages/db/prisma/schema.prisma", "--skip-generate"]);
+} else {
+  run("npm", ["run", "db:migrate"]);
+}
+
 run("npm", ["run", "db:seed"]);
 
 console.log("\nSetup concluido.");

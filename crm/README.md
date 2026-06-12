@@ -47,6 +47,7 @@ npm run setup
 ```
 
 O setup cria `.env` quando ainda nao existe, instala dependencias, sobe Docker Compose, gera Prisma, roda migrations e aplica o seed demo. Ele nao sobrescreve `.env` existente.
+Quando usa Docker, o setup aguarda o PostgreSQL aceitar conexao TCP antes de rodar migrations e seed.
 
 Se Docker/WSL estiver indisponivel, configure `.env` com PostgreSQL local ou Supabase Postgres de development e rode:
 
@@ -60,6 +61,22 @@ No PowerShell:
 $env:SETUP_SKIP_DOCKER="true"
 npm run setup
 Remove-Item Env:\SETUP_SKIP_DOCKER
+```
+
+Se API/Web ja estiverem rodando e voce precisar reexecutar apenas dependencias, banco e seed, use tambem:
+
+```powershell
+$env:SETUP_SKIP_DEV_CHECK="true"
+npm run setup
+Remove-Item Env:\SETUP_SKIP_DEV_CHECK
+```
+
+No Windows, se a API estiver rodando, o Prisma Client pode ficar bloqueado em `node_modules/.prisma`. Nesse caso, pare a API antes do setup ou, se o client ja foi gerado antes, use:
+
+```powershell
+$env:SETUP_SKIP_PRISMA_GENERATE="true"
+npm run setup
+Remove-Item Env:\SETUP_SKIP_PRISMA_GENERATE
 ```
 
 Depois do setup, suba API e Web em terminais separados:

@@ -335,3 +335,37 @@ Observacoes:
 - `qa:regression:local` exige API e Web ja rodando.
 - `qa:local` agora combina QA tecnico (`npm run qa`) e regressao operacional (`npm run qa:regression:local`).
 - Proxima etapa recomendada: revisar portabilidade Docker/setup e depois fechar a Sprint 11 tecnica.
+
+## 2026-06-12 - Portabilidade setup/Docker
+
+Contexto:
+
+- Etapa BMAP: validacao de setup e portabilidade local.
+- Foco: conferir Docker Compose, `.env.example`, setup idempotente e fallback sem Docker.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check bin/setup` | Passou |
+| `docker compose config` | Passou |
+| `docker compose up -d` | Falhou por erro 500 do Docker Desktop ao consultar/puxar imagem `axllent/mailpit:latest` |
+| `docker version` | Cliente respondeu, engine `desktop-linux` retornou erro 500 |
+| `SETUP_SKIP_DOCKER=true SETUP_SKIP_DEV_CHECK=true SETUP_SKIP_PRISMA_GENERATE=true node bin/setup` | Passou |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- `.env.example` usa porta Docker `5433`, alinhada com `docker-compose.yml`.
+- Setup agora aguarda PostgreSQL aceitar conexao TCP antes de migrations/seed.
+- Setup ganhou `SETUP_SKIP_DEV_CHECK=true` para reexecucao controlada quando API/Web ja estao rodando.
+- Setup ganhou `SETUP_SKIP_PRISMA_GENERATE=true` para reexecucao no Windows quando a API ativa bloqueia o arquivo do Prisma Client.
+- Fallback com PostgreSQL local `localhost:5432` validado com migrations em sync e seed demo aplicado.
+
+Observacoes:
+
+- A portabilidade Docker do arquivo Compose foi validada por `docker compose config`, mas a subida real depende de corrigir/reiniciar Docker Desktop no host.
+- Em uma maquina nova com Docker saudavel, o fluxo esperado continua sendo `npm run setup` sem flags.
+- Proxima etapa recomendada: corrigir Docker Desktop/WSL do host e repetir `docker compose up -d` seguido de `npm run setup` em `.env` Docker.
