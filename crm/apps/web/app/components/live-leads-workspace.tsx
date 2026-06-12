@@ -39,12 +39,27 @@ type LeadFormState = {
   nextActionAt: string;
 };
 
+type LeadOutcomeFormState = {
+  details: string;
+  reason: string;
+};
+
+type PendingLeadOutcome = {
+  lead: Lead;
+  toStage: LeadStatus;
+};
+
 const emptyLeadForm: LeadFormState = {
   interest: "",
   nextActionAt: "",
   source: "WhatsApp",
   temperature: "70",
   title: "",
+};
+
+const emptyLeadOutcomeForm: LeadOutcomeFormState = {
+  details: "",
+  reason: "Cliente comprou em outra loja",
 };
 
 const fallbackLeads: Lead[] = [
@@ -120,6 +135,15 @@ const filters: Array<{ label: string; status?: LeadStatus; source?: string }> = 
 
 const kanbanStatuses: LeadStatus[] = ["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "COLD", "LOST"];
 const terminalLeadStatuses = new Set<LeadStatus>(["WON", "LOST", "COLD"]);
+const leadOutcomeReasons: Record<LeadStatus, string[]> = {
+  COLD: ["Sem resposta apos tentativas", "Retorno futuro", "Interesse esfriou"],
+  CONTACTED: [],
+  LOST: ["Cliente comprou em outra loja", "Preco fora do esperado", "Veiculo indisponivel", "Credito nao aprovado"],
+  NEGOTIATION: [],
+  NEW: [],
+  SCHEDULED: [],
+  WON: ["Venda concluida", "Proposta aceita", "Cliente reservou veiculo"],
+};
 
 function humanizeSource(source: string | null) {
   return source?.trim() || "Sem origem";
@@ -179,6 +203,9 @@ export function LiveLeadsWorkspace() {
   const [form, setForm] = useState<LeadFormState>(emptyLeadForm);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
+  const [outcomeError, setOutcomeError] = useState<string | null>(null);
+  const [outcomeForm, setOutcomeForm] = useState<LeadOutcomeFormState>(emptyLeadOutcomeForm);
+  const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
@@ -259,44 +286,85 @@ export function LiveLeadsWorkspace() {
     }
   }
 
-  async function handleMoveLead(leadId: string, toStage: LeadStatus) {
+  async function moveLeadWithReason(lead: Lead, toStage: LeadStatus, reason: string) {
     if (!token || !canUpdateLeads || movingLeadId) {
-      return;
+      return false;
     }
 
+    if (lead.status === toStage) {
+      return false;
+    }
+
+    const currentLead = lead;
+    setMovingLeadId(lead.id);
+    setLeads((current) => current.map((item) => (item.id === lead.id ? { ...item, status: toStage, updatedAt: new Date().toISOString() } : item)));
+
+    try {
+      const response = await apiPost<{ data: Lead; unchanged: boolean }>(`/leads/${lead.id}/stage`, token, {
+        reason,
+        toStage,
+      });
+
+      setLeads((current) => current.map((item) => (item.id === lead.id ? response.data : item)));
+      setRefreshKey((current) => current + 1);
+      return true;
+    } catch {
+      setLeads((current) => current.map((item) => (item.id === lead.id ? currentLead : item)));
+      setStatus("error");
+      return false;
+    } finally {
+      setMovingLeadId(null);
+    }
+  }
+
+  async function handleMoveLead(leadId: string, toStage: LeadStatus) {
     const currentLead = leads.find((lead) => lead.id === leadId);
     if (!currentLead || currentLead.status === toStage) {
       return;
     }
 
-    setMovingLeadId(leadId);
-    setLeads((current) => current.map((lead) => (lead.id === leadId ? { ...lead, status: toStage, updatedAt: new Date().toISOString() } : lead)));
-    let reason = "Movido pelo kanban de leads";
-
     if (terminalLeadStatuses.has(toStage)) {
-      const providedReason = window.prompt("Informe o motivo desta conclusao do lead:");
-      if (!providedReason || providedReason.trim().length < 8) {
-        setLeads((current) => current.map((lead) => (lead.id === leadId ? currentLead : lead)));
-        setMovingLeadId(null);
-        return;
-      }
-      reason = providedReason.trim();
+      const defaultReason = leadOutcomeReasons[toStage][0] ?? "";
+      setOutcomeError(null);
+      setOutcomeForm({ details: "", reason: defaultReason });
+      setPendingOutcome({ lead: currentLead, toStage });
+      return;
     }
 
-    try {
-      const response = await apiPost<{ data: Lead; unchanged: boolean }>(`/leads/${leadId}/stage`, token, {
-        reason,
-        toStage,
-      });
+    await moveLeadWithReason(currentLead, toStage, "Movido pelo kanban de leads");
+  }
 
-      setLeads((current) => current.map((lead) => (lead.id === leadId ? response.data : lead)));
-      setRefreshKey((current) => current + 1);
-    } catch {
-      setLeads((current) => current.map((lead) => (lead.id === leadId ? currentLead : lead)));
-      setStatus("error");
-    } finally {
-      setMovingLeadId(null);
+  async function handleConfirmOutcome(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pendingOutcome || movingLeadId) {
+      return;
     }
+
+    const reasonParts = [outcomeForm.reason.trim(), outcomeForm.details.trim()].filter(Boolean);
+    const reason = reasonParts.join(" - ").slice(0, 300);
+
+    if (reason.length < 8) {
+      setOutcomeError("Informe um motivo com pelo menos 8 caracteres.");
+      return;
+    }
+
+    setOutcomeError(null);
+    const moved = await moveLeadWithReason(pendingOutcome.lead, pendingOutcome.toStage, reason);
+    if (moved) {
+      setPendingOutcome(null);
+      setOutcomeForm(emptyLeadOutcomeForm);
+    } else {
+      setOutcomeError("Nao foi possivel registrar o desfecho. Tente novamente.");
+    }
+  }
+
+  function closeOutcomeModal() {
+    if (movingLeadId) {
+      return;
+    }
+    setPendingOutcome(null);
+    setOutcomeError(null);
+    setOutcomeForm(emptyLeadOutcomeForm);
   }
 
   const view = useMemo(() => {
@@ -445,6 +513,66 @@ export function LiveLeadsWorkspace() {
                 </button>
                 <button className="primary-action" disabled={saving || form.title.trim().length < 2} type="submit">
                   {saving ? "Salvando..." : "Criar lead"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {pendingOutcome ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Desfecho do lead">
+          <section className="dre-modal lead-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Desfecho auditavel</p>
+                <h3>{statusLabels[pendingOutcome.toStage]}</h3>
+              </div>
+              <button aria-label="Fechar desfecho do lead" className="icon-button" onClick={closeOutcomeModal} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+
+            <form className="lead-modal-form" onSubmit={handleConfirmOutcome}>
+              <div className="lead-modal-wide lead-outcome-summary">
+                <strong>{pendingOutcome.lead.title}</strong>
+                <span>{pendingOutcome.lead.interest ?? "Interesse nao informado"} | {humanizeSource(pendingOutcome.lead.source)}</span>
+              </div>
+
+              <label className="lead-modal-wide">
+                Motivo padrao
+                <select
+                  autoFocus
+                  onChange={(event) => setOutcomeForm((current) => ({ ...current, reason: event.target.value }))}
+                  value={outcomeForm.reason}
+                >
+                  {leadOutcomeReasons[pendingOutcome.toStage].map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="lead-modal-wide">
+                Observacao complementar
+                <textarea
+                  maxLength={220}
+                  onChange={(event) => setOutcomeForm((current) => ({ ...current, details: event.target.value }))}
+                  placeholder="Ex.: cliente comprou um Corolla em outra loja, retomar em 90 dias."
+                  rows={4}
+                  value={outcomeForm.details}
+                />
+              </label>
+
+              {outcomeError ? <p className="lead-modal-error">{outcomeError}</p> : null}
+
+              <div className="lead-modal-actions">
+                <button className="text-button" disabled={Boolean(movingLeadId)} onClick={closeOutcomeModal} type="button">
+                  Cancelar
+                </button>
+                <button className="primary-action" disabled={Boolean(movingLeadId)} type="submit">
+                  {movingLeadId ? "Salvando..." : "Confirmar desfecho"}
                 </button>
               </div>
             </form>

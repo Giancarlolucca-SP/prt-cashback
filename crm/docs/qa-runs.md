@@ -400,3 +400,33 @@ Observacoes:
 
 - A regra evita funil com perdas/ganhos sem explicacao operacional.
 - Proxima melhoria recomendada: substituir o `prompt` simples da tela por modal proprio de desfecho com motivos padronizados e campo livre auditavel.
+
+## 2026-06-12 - UX Comercial: modal de desfecho de lead
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e funil comercial.
+- Foco: substituir confirmacao fragil por `prompt` do navegador por um modal proprio, auditavel e consistente com o design system.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Ao mover lead para `WON`, `LOST` ou `COLD`, a tela abre modal de desfecho.
+- O modal exibe o lead, etapa de destino, motivo padrao e observacao complementar.
+- Motivos padronizados cobrem ganho, perda e esfriamento.
+- Motivo final enviado ao backend combina motivo padrao e observacao livre, mantendo limite de 300 caracteres.
+- Em falha de API, o modal permanece aberto e mostra erro para nova tentativa.
+
+Observacoes:
+
+- A regra server-side de motivo obrigatorio continua sendo a garantia principal.
+- Proxima melhoria recomendada: persistir motivos padronizados em configuracao comercial para permitir personalizacao por loja.

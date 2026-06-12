@@ -3864,7 +3864,8 @@ input:focus-visible {
 }
 
 .lead-modal-form input,
-.lead-modal-form select {
+.lead-modal-form select,
+.lead-modal-form textarea {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -3876,9 +3877,15 @@ input:focus-visible {
 }
 
 .lead-modal-form input:focus,
-.lead-modal-form select:focus {
+.lead-modal-form select:focus,
+.lead-modal-form textarea:focus {
   border-color: var(--blue);
   outline: 3px solid rgba(124, 92, 255, 0.14);
+}
+
+.lead-modal-form textarea {
+  min-height: 104px;
+  resize: vertical;
 }
 
 .lead-modal-wide,
@@ -3892,6 +3899,25 @@ input:focus-visible {
   font-size: 13px;
   font-weight: 800;
   margin: 0;
+}
+
+.lead-outcome-summary {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.lead-outcome-summary strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.lead-outcome-summary span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .lead-modal-actions {
