@@ -134,7 +134,13 @@ Para validar layout desktop/mobile, erros de console acionaveis e capturar scree
 npm run qa:visual:local
 ```
 
-Atalho completo, incluindo QA tecnico e smoke local:
+Para rodar a regressao local operacional completa, com API e Web ja rodando:
+
+```bash
+npm run qa:regression:local
+```
+
+Atalho completo, incluindo QA tecnico e regressao local operacional:
 
 ```bash
 npm run qa:local

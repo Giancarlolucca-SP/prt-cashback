@@ -19,6 +19,12 @@ npm run qa:management:local
 npm run qa:visual:local
 ```
 
+Atalho equivalente para a regressao operacional completa:
+
+```powershell
+npm run qa:regression:local
+```
+
 URLs padrao:
 
 - Web: `http://localhost:3000`
@@ -135,6 +141,12 @@ npm test
 npm run typecheck
 npm run build:api
 npm run build:web
+```
+
+Ou, com API e Web ja rodando:
+
+```powershell
+npm run qa:local
 ```
 
 Registrar no artefato da sprint:

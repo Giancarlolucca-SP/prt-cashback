@@ -302,3 +302,36 @@ Observacoes:
 
 - O roteiro cria massa QA auditavel com prefixo `QA Gestao` e identificador unico por execucao.
 - Proxima etapa recomendada: rodar suite consolidada de regressao local e revisar portabilidade Docker antes de fechar a sprint tecnica.
+
+## 2026-06-12 - Regressao local consolidada
+
+Contexto:
+
+- Etapa BMAP: fechamento de regressao funcional local.
+- Foco: executar em um unico comando smoke, RBAC, fluxos operacionais por perfil e QA visual.
+- Escopo: apenas projeto novo `crm/`, com API e Web rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:regression:local` | Passou apos correcao de chave React duplicada |
+
+Resultado:
+
+- Smoke local aprovado, incluindo 26 rotas Web.
+- QA funcional/RBAC aprovado para Dono, Admin, Administrativo, Vendedor, SDR, Avaliador e Servicos.
+- Fluxos Comercial, Administrativo, Veiculos, Servicos/Pos-venda e Gestao/Dono aprovados.
+- QA visual desktop/mobile aprovado em 9 rotas.
+- Screenshots gerados em `.qa-screenshots/`.
+
+Correcao feita durante a rodada:
+
+- A fila de triagem administrativa usava `title + meta` como `key`; multiplas OS de QA com mesmo tipo e valor geravam aviso React de chave duplicada.
+- A chave passou a usar o tipo da entidade e o `id` real de origem (`sale`, `service-order`, `appointment`, `contract`).
+
+Observacoes:
+
+- `qa:regression:local` exige API e Web ja rodando.
+- `qa:local` agora combina QA tecnico (`npm run qa`) e regressao operacional (`npm run qa:regression:local`).
+- Proxima etapa recomendada: revisar portabilidade Docker/setup e depois fechar a Sprint 11 tecnica.

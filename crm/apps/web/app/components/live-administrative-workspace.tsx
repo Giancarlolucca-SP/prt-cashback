@@ -232,6 +232,7 @@ export function LiveAdministrativeWorkspace() {
       .filter((sale) => sale.status === "DOCUMENTATION" || !sale.sellerUserId || sale.type === "REPASSE")
       .slice(0, 4)
       .map((sale) => ({
+        key: `sale-${sale.id}`,
         meta: `${customersById[sale.customerId ?? ""]?.name ?? "Cliente nao vinculado"} | ${money(sale.salePrice)}`,
         status: sale.type === "REPASSE" ? "repasse" : sale.status.toLowerCase(),
         tags: [sale.type.toLowerCase(), sale.sellerUserId ? "responsavel ok" : "sem vendedor", "financeiro"],
@@ -243,6 +244,7 @@ export function LiveAdministrativeWorkspace() {
       .filter((order) => order.status === "WAITING_PROVIDER" || order.status === "WAITING_INVOICE" || !order.providerId)
       .slice(0, 3)
       .map((order) => ({
+        key: `service-order-${order.id}`,
         meta: `${order.type} | ${money(order.totalAmount)}`,
         status: order.status === "WAITING_INVOICE" ? "NF" : "validar",
         tags: ["servicos", order.providerId ? "prestador ok" : "sem prestador", "documentos"],
@@ -254,6 +256,7 @@ export function LiveAdministrativeWorkspace() {
       .filter((appointment) => appointment.status === "SCHEDULED" && !appointment.customerId)
       .slice(0, 2)
       .map((appointment) => ({
+        key: `appointment-${appointment.id}`,
         meta: `${appointment.title} | ${relativeDate(appointment.startsAt)}`,
         status: "corrigir",
         tags: ["agenda", "cliente", appointment.type],
@@ -265,6 +268,7 @@ export function LiveAdministrativeWorkspace() {
       .filter((contract) => !contract.signedAt)
       .slice(0, 2)
       .map((contract) => ({
+        key: `contract-${contract.id}`,
         meta: `Venda ${contract.saleId.slice(0, 8)} | ${relativeDate(contract.generatedAt)}`,
         status: contract.status.toLowerCase(),
         tags: ["documentos", "assinatura", "venda"],
@@ -430,7 +434,7 @@ export function LiveAdministrativeWorkspace() {
           <div className="section-heading"><div><p className="eyebrow">Triagem</p><h3>Itens administrativos para avaliar agora</h3></div><button className="text-button" onClick={() => void loadAdministrative()} type="button">Atualizar</button></div>
           <div className="blueprint-list">
             {queue.map((item) => (
-              <article className={`blueprint-row ${item.tone}`} key={`${item.title}-${item.meta}`}>
+              <article className={`blueprint-row ${item.tone}`} key={item.key}>
                 <div className="blueprint-main"><ClipboardCheck aria-hidden="true" /><div><strong>{item.title}</strong><span>{item.meta}</span></div></div>
                 <div className="blueprint-tags">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
                 <div className="blueprint-value"><strong>{item.status}</strong><span>revisar fluxo</span></div>
