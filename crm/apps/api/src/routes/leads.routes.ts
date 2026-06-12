@@ -7,6 +7,7 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 
 const leadStatusSchema = z.enum(["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "WON", "LOST", "COLD"]);
+const terminalLeadStatuses = new Set(["WON", "LOST", "COLD"]);
 
 const leadsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -39,11 +40,21 @@ const leadParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
-const moveLeadStageSchema = z.object({
-  toStage: leadStatusSchema,
-  reason: z.string().trim().max(300).optional(),
-  position: z.number().int().min(0).default(0),
-});
+const moveLeadStageSchema = z
+  .object({
+    toStage: leadStatusSchema,
+    reason: z.string().trim().max(300).optional(),
+    position: z.number().int().min(0).default(0),
+  })
+  .superRefine((input, context) => {
+    if (terminalLeadStatuses.has(input.toStage) && (!input.reason || input.reason.trim().length < 8)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe um motivo com pelo menos 8 caracteres para concluir, perder ou esfriar o lead.",
+        path: ["reason"],
+      });
+    }
+  });
 
 type LeadRecord = {
   id: string;

@@ -65,6 +65,7 @@ Endpoints principais:
 - `GET/POST /leads`
 - `GET/PATCH /leads/:id`
 - `POST /leads/:id/stage`
+  - Etapas conclusivas `WON`, `LOST` e `COLD` exigem `reason` com pelo menos 8 caracteres para preservar qualidade do funil e auditoria.
 - `GET/POST /appointments`
 - `GET/PATCH /appointments/:id`
 - `POST /appointments/:id/status`

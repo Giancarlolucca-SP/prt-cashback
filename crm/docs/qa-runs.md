@@ -369,3 +369,34 @@ Observacoes:
 - A portabilidade Docker do arquivo Compose foi validada por `docker compose config`, mas a subida real depende de corrigir/reiniciar Docker Desktop no host.
 - Em uma maquina nova com Docker saudavel, o fluxo esperado continua sendo `npm run setup` sem flags.
 - Proxima etapa recomendada: corrigir Docker Desktop/WSL do host e repetir `docker compose up -d` seguido de `npm run setup` em `.env` Docker.
+
+## 2026-06-12 - Endurecimento Comercial: desfecho de leads
+
+Contexto:
+
+- Etapa BMAP: inicio da proxima frente de dominio, focada em Clientes/Leads e funil comercial.
+- Foco: preservar qualidade do funil e trilha de auditoria quando um lead sai do fluxo ativo.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+
+Resultado:
+
+- `POST /leads/:id/stage` passa a exigir `reason` com pelo menos 8 caracteres para as etapas conclusivas `WON`, `LOST` e `COLD`.
+- Teste de contrato cobre tentativa de mover lead para `LOST` sem motivo e confirma erro `400`.
+- Teste de contrato confirma sucesso com motivo e persistencia em `LeadStageHistory`.
+- Tela de Leads pede motivo ao usuario quando a etapa escolhida e conclusiva.
+- `docs/api-map.md` e `docs/openapi-mvp.yaml` foram atualizados com a regra.
+
+Observacoes:
+
+- A regra evita funil com perdas/ganhos sem explicacao operacional.
+- Proxima melhoria recomendada: substituir o `prompt` simples da tela por modal proprio de desfecho com motivos padronizados e campo livre auditavel.

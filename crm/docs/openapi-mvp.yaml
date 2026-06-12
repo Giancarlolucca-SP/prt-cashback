@@ -107,7 +107,7 @@ paths:
     get: { tags: [Leads], summary: Detalha lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Leads], summary: Atualiza lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /leads/{id}/stage:
-    post: { tags: [Leads], summary: Move lead no funil., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+    post: { tags: [Leads], summary: Move lead no funil. Etapas WON, LOST e COLD exigem reason com pelo menos 8 caracteres., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
 
   /appointments:
     get: { tags: [Appointments], summary: Lista agendamentos., responses: { "200": { $ref: "#/components/responses/List" } } }

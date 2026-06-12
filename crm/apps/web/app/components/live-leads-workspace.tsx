@@ -119,6 +119,7 @@ const filters: Array<{ label: string; status?: LeadStatus; source?: string }> = 
 ];
 
 const kanbanStatuses: LeadStatus[] = ["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "COLD", "LOST"];
+const terminalLeadStatuses = new Set<LeadStatus>(["WON", "LOST", "COLD"]);
 
 function humanizeSource(source: string | null) {
   return source?.trim() || "Sem origem";
@@ -270,10 +271,21 @@ export function LiveLeadsWorkspace() {
 
     setMovingLeadId(leadId);
     setLeads((current) => current.map((lead) => (lead.id === leadId ? { ...lead, status: toStage, updatedAt: new Date().toISOString() } : lead)));
+    let reason = "Movido pelo kanban de leads";
+
+    if (terminalLeadStatuses.has(toStage)) {
+      const providedReason = window.prompt("Informe o motivo desta conclusao do lead:");
+      if (!providedReason || providedReason.trim().length < 8) {
+        setLeads((current) => current.map((lead) => (lead.id === leadId ? currentLead : lead)));
+        setMovingLeadId(null);
+        return;
+      }
+      reason = providedReason.trim();
+    }
 
     try {
       const response = await apiPost<{ data: Lead; unchanged: boolean }>(`/leads/${leadId}/stage`, token, {
-        reason: "Movido pelo kanban de leads",
+        reason,
         toStage,
       });
 

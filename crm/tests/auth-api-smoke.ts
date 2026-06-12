@@ -602,6 +602,32 @@ try {
   assert.equal(moveLeadStage.json().data.status, "CONTACTED");
   assert.equal(moveLeadStage.json().unchanged, false);
 
+  const moveLeadToLostWithoutReason = await app.inject({
+    method: "POST",
+    url: `/leads/${createdLeadId}/stage`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      toStage: "LOST",
+    },
+  });
+  assert.equal(moveLeadToLostWithoutReason.statusCode, 400);
+
+  const moveLeadToLostWithReason = await app.inject({
+    method: "POST",
+    url: `/leads/${createdLeadId}/stage`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      toStage: "LOST",
+      reason: "Cliente informou que comprou em outra loja",
+    },
+  });
+  assert.equal(moveLeadToLostWithReason.statusCode, 200);
+  assert.equal(moveLeadToLostWithReason.json().data.status, "LOST");
+
   const leadStageHistory = await prisma.leadStageHistory.findFirst({
     where: {
       leadId: createdLeadId,
@@ -610,6 +636,16 @@ try {
     },
   });
   assert.ok(leadStageHistory);
+
+  const lostLeadStageHistory = await prisma.leadStageHistory.findFirst({
+    where: {
+      leadId: createdLeadId,
+      fromStage: "CONTACTED",
+      toStage: "LOST",
+      reason: "Cliente informou que comprou em outra loja",
+    },
+  });
+  assert.ok(lostLeadStageHistory);
 
   const appraiserLogin = await app.inject({
     method: "POST",
