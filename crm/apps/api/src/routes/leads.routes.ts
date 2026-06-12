@@ -61,6 +61,12 @@ const moveLeadStageSchema = z
     }
   });
 
+const scheduleLeadFollowUpSchema = z.object({
+  dueAt: z.coerce.date(),
+  notes: z.string().trim().max(1000).optional(),
+  type: z.string().trim().min(2).max(80).default("Contato comercial"),
+});
+
 type LeadRecord = {
   id: string;
   customerId: string | null;
@@ -71,6 +77,19 @@ type LeadRecord = {
   interest: string | null;
   temperature: number | null;
   nextActionAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type FollowUpRecord = {
+  id: string;
+  leadId: string | null;
+  customerId: string | null;
+  assignedUserId: string | null;
+  type: string;
+  dueAt: Date;
+  completedAt: Date | null;
+  notes: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -88,6 +107,21 @@ function sanitizeLead(lead: LeadRecord) {
     nextActionAt: lead.nextActionAt?.toISOString() ?? null,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeFollowUp(followUp: FollowUpRecord) {
+  return {
+    id: followUp.id,
+    leadId: followUp.leadId,
+    customerId: followUp.customerId,
+    assignedUserId: followUp.assignedUserId,
+    type: followUp.type,
+    dueAt: followUp.dueAt.toISOString(),
+    completedAt: followUp.completedAt?.toISOString() ?? null,
+    notes: followUp.notes,
+    createdAt: followUp.createdAt.toISOString(),
+    updatedAt: followUp.updatedAt.toISOString(),
   };
 }
 
@@ -523,5 +557,91 @@ export async function registerLeadRoutes(app: FastifyInstance) {
     });
 
     return { data: sanitizeLead(lead), unchanged: false };
+  });
+
+  app.post("/:id/follow-ups", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = leadParamsSchema.parse(request.params);
+    const input = scheduleLeadFollowUpSchema.parse(request.body);
+
+    const current = await prisma.lead.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...leadScopeWhere(session.user),
+      },
+    });
+
+    if (!current) {
+      return denyOwnershipAccess({
+        action: "follow_up_scheduled",
+        entityId: params.id,
+        entityType: "lead",
+        message: "Lead nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const followUp = await tx.followUp.create({
+        data: {
+          storeId: session.user.storeId,
+          leadId: current.id,
+          customerId: current.customerId,
+          assignedUserId: current.assignedUserId ?? session.user.id,
+          type: input.type,
+          dueAt: input.dueAt,
+          notes: input.notes,
+        },
+      });
+
+      const lead = await tx.lead.update({
+        where: { id: current.id },
+        data: { nextActionAt: input.dueAt },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "follow_up_scheduled",
+          entityType: "lead",
+          entityId: lead.id,
+          result: "SUCCESS",
+          metadata: {
+            dueAt: input.dueAt.toISOString(),
+            followUpId: followUp.id,
+            type: input.type,
+          },
+        },
+      });
+
+      return { followUp, lead };
+    });
+
+    await emitInternalEvent({
+      name: "lead.follow_up_scheduled",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "lead",
+      entityId: result.lead.id,
+      payload: {
+        dueAt: result.followUp.dueAt.toISOString(),
+        followUpId: result.followUp.id,
+        type: result.followUp.type,
+      },
+    });
+
+    return reply.code(201).send({ data: sanitizeLead(result.lead), followUp: sanitizeFollowUp(result.followUp) });
   });
 }

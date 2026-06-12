@@ -67,6 +67,8 @@ Endpoints principais:
 - `GET/PATCH /leads/:id`
 - `POST /leads/:id/stage`
   - Etapas conclusivas `WON`, `LOST` e `COLD` exigem `reason` com pelo menos 8 caracteres para preservar qualidade do funil e auditoria.
+- `POST /leads/:id/follow-ups`
+  - Agenda proximo contato, cria `FollowUp`, atualiza `nextActionAt` do lead e gera auditoria.
 - `GET/POST /appointments`
 - `GET/PATCH /appointments/:id`
 - `POST /appointments/:id/status`

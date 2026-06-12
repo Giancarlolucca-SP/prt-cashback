@@ -52,6 +52,12 @@ type LeadOutcomeFormState = {
   reason: string;
 };
 
+type LeadFollowUpFormState = {
+  dueAt: string;
+  notes: string;
+  type: string;
+};
+
 type PendingLeadOutcome = {
   lead: Lead;
   toStage: LeadStatus;
@@ -68,6 +74,12 @@ const emptyLeadForm: LeadFormState = {
 const emptyLeadOutcomeForm: LeadOutcomeFormState = {
   details: "",
   reason: "Cliente comprou em outra loja",
+};
+
+const emptyLeadFollowUpForm: LeadFollowUpFormState = {
+  dueAt: "",
+  notes: "",
+  type: "Contato comercial",
 };
 
 const fallbackLeads: Lead[] = [
@@ -214,6 +226,9 @@ export function LiveLeadsWorkspace() {
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
   const [outcomeForm, setOutcomeForm] = useState<LeadOutcomeFormState>(emptyLeadOutcomeForm);
   const [outcomeReasons, setOutcomeReasons] = useState(defaultLeadOutcomeReasons);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
+  const [followUpForm, setFollowUpForm] = useState<LeadFollowUpFormState>(emptyLeadFollowUpForm);
+  const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -379,6 +394,58 @@ export function LiveLeadsWorkspace() {
     setPendingOutcome(null);
     setOutcomeError(null);
     setOutcomeForm(emptyLeadOutcomeForm);
+  }
+
+  function openFollowUpModal(lead: Lead) {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    tomorrow.setMinutes(0, 0, 0);
+    setFollowUpError(null);
+    setFollowUpForm({
+      dueAt: lead.nextActionAt ? lead.nextActionAt.slice(0, 16) : tomorrow.toISOString().slice(0, 16),
+      notes: "",
+      type: "Contato comercial",
+    });
+    setFollowUpLead(lead);
+  }
+
+  function closeFollowUpModal() {
+    if (saving) {
+      return;
+    }
+    setFollowUpError(null);
+    setFollowUpForm(emptyLeadFollowUpForm);
+    setFollowUpLead(null);
+  }
+
+  async function handleScheduleFollowUp(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !canUpdateLeads || !followUpLead || saving) {
+      return;
+    }
+
+    if (!followUpForm.dueAt) {
+      setFollowUpError("Informe a data do proximo contato.");
+      return;
+    }
+
+    setSaving(true);
+    setFollowUpError(null);
+    try {
+      const response = await apiPost<{ data: Lead }>(`/leads/${followUpLead.id}/follow-ups`, token, {
+        dueAt: new Date(followUpForm.dueAt).toISOString(),
+        notes: followUpForm.notes.trim() || undefined,
+        type: followUpForm.type.trim() || "Contato comercial",
+      });
+      setLeads((current) => current.map((lead) => (lead.id === followUpLead.id ? response.data : lead)));
+      setRefreshKey((current) => current + 1);
+      setFollowUpError(null);
+      setFollowUpForm(emptyLeadFollowUpForm);
+      setFollowUpLead(null);
+    } catch {
+      setFollowUpError("Nao foi possivel agendar o follow-up. Confira os campos e tente novamente.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const view = useMemo(() => {
@@ -594,6 +661,52 @@ export function LiveLeadsWorkspace() {
         </div>
       ) : null}
 
+      {followUpLead ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Agendar follow-up do lead">
+          <section className="dre-modal lead-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Proxima acao</p>
+                <h3>Agendar follow-up</h3>
+              </div>
+              <button aria-label="Fechar follow-up" className="icon-button" onClick={closeFollowUpModal} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+
+            <form className="lead-modal-form" onSubmit={handleScheduleFollowUp}>
+              <div className="lead-modal-wide lead-outcome-summary">
+                <strong>{followUpLead.title}</strong>
+                <span>{followUpLead.interest ?? "Interesse nao informado"} | {humanizeSource(followUpLead.source)}</span>
+              </div>
+              <label>
+                Tipo
+                <select onChange={(event) => setFollowUpForm((current) => ({ ...current, type: event.target.value }))} value={followUpForm.type}>
+                  <option>Contato comercial</option>
+                  <option>Retorno WhatsApp</option>
+                  <option>Ligacao</option>
+                  <option>Confirmar visita</option>
+                  <option>Enviar proposta</option>
+                </select>
+              </label>
+              <label>
+                Data e hora
+                <input required type="datetime-local" value={followUpForm.dueAt} onChange={(event) => setFollowUpForm((current) => ({ ...current, dueAt: event.target.value }))} />
+              </label>
+              <label className="lead-modal-wide">
+                Observacao
+                <textarea maxLength={1000} onChange={(event) => setFollowUpForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Ex.: confirmar se avaliou proposta e oferecer test drive." value={followUpForm.notes} />
+              </label>
+              {followUpError ? <p className="lead-modal-error">{followUpError}</p> : null}
+              <div className="lead-modal-actions">
+                <button className="text-button" disabled={saving} onClick={closeFollowUpModal} type="button">Cancelar</button>
+                <button className="primary-action" disabled={saving} type="submit">{saving ? "Salvando..." : "Agendar"}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
       <section className="panel module-kanban-panel" aria-label="Kanban individual de leads">
         <div className="section-heading">
           <div>
@@ -675,6 +788,7 @@ export function LiveLeadsWorkspace() {
                 <div className="lead-score">
                   <span>{relativeTime(lead.createdAt)}</span>
                   <strong>{lead.temperature ?? "--"}</strong>
+                  <button className="text-button" disabled={!canUpdateLeads} onClick={() => openFollowUpModal(lead)} type="button">Follow-up</button>
                 </div>
               </article>
             ))}

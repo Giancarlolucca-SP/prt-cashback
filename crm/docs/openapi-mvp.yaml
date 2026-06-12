@@ -110,6 +110,8 @@ paths:
     patch: { tags: [Leads], summary: Atualiza lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /leads/{id}/stage:
     post: { tags: [Leads], summary: Move lead no funil. Etapas WON, LOST e COLD exigem reason com pelo menos 8 caracteres., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /leads/{id}/follow-ups:
+    post: { tags: [Leads], summary: Agenda proximo follow-up do lead e atualiza nextActionAt., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "201": { $ref: "#/components/responses/Created" } } }
 
   /appointments:
     get: { tags: [Appointments], summary: Lista agendamentos., responses: { "200": { $ref: "#/components/responses/List" } } }

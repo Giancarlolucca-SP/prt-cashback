@@ -522,3 +522,36 @@ Observacoes:
 
 - Edicao de nome ainda deve ser tratada como criar novo motivo e desativar o antigo, para preservar historico operacional.
 - Proxima melhoria recomendada: adicionar teste E2E de UI para cadastro/desativacao quando houver harness de navegador autenticado.
+
+## 2026-06-12 - Follow-up Comercial de Leads
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e agenda comercial.
+- Foco: garantir que leads ativos tenham proxima acao agendada e auditavel.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Criado `POST /leads/:id/follow-ups`.
+- A rota cria `FollowUp`, atualiza `nextActionAt` do lead, gera audit log e emite evento interno `lead.follow_up_scheduled`.
+- A tela de Leads ganhou botao `Follow-up` na fila priorizada.
+- O modal de follow-up permite escolher tipo, data/hora e observacao.
+- Ao salvar, a proxima acao do lead e atualizada na tela.
+- Teste de contrato confirma criacao do follow-up e persistencia em banco.
+
+Observacoes:
+
+- A agenda operacional de appointments continua separada; este fluxo cria follow-up comercial leve.
+- Proxima melhoria recomendada: consolidar follow-ups pendentes na tela de Agenda ou em uma fila comercial diaria.

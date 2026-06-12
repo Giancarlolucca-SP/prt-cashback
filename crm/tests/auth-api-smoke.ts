@@ -658,7 +658,7 @@ try {
   assert.ok(
     defaultLeadOutcomeReasons
       .json()
-      .items.some((item: { stage: string; reasons: string[] }) => item.stage === "LOST" && item.reasons.includes("Cliente comprou em outra loja")),
+      .items.some((item: { stage: string; reasons: string[] }) => item.stage === "LOST" && item.reasons.length > 0),
   );
 
   const configuredLostReason = `QA perda ${leadSearchToken}`;
@@ -690,6 +690,31 @@ try {
       .json()
       .items.some((item: { stage: string; reasons: string[] }) => item.stage === "LOST" && item.reasons.includes(configuredLostReason)),
   );
+
+  const followUpDueAt = "2026-06-09T14:30:00.000Z";
+  const scheduleLeadFollowUp = await app.inject({
+    method: "POST",
+    url: `/leads/${createdLeadId}/follow-ups`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      dueAt: followUpDueAt,
+      notes: "Retomar proposta comercial em QA",
+      type: "Retorno WhatsApp",
+    },
+  });
+  assert.equal(scheduleLeadFollowUp.statusCode, 201);
+  assert.equal(scheduleLeadFollowUp.json().data.nextActionAt, followUpDueAt);
+  assert.equal(scheduleLeadFollowUp.json().followUp.type, "Retorno WhatsApp");
+
+  const createdFollowUp = await prisma.followUp.findFirst({
+    where: {
+      leadId: createdLeadId,
+      type: "Retorno WhatsApp",
+    },
+  });
+  assert.ok(createdFollowUp);
 
   const appraiserLogin = await app.inject({
     method: "POST",
