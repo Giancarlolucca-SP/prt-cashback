@@ -158,6 +158,12 @@ function isBirthdayNotificationValue(value: unknown): value is BirthdayNotificat
   return Boolean(value && typeof value === "object" && "daysBefore" in value && "enabled" in value);
 }
 
+function leadOutcomeStageFromMetadata(metadata: unknown): LeadOutcomeStage | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const stage = (metadata as { stage?: unknown }).stage;
+  return stage === "WON" || stage === "LOST" || stage === "COLD" ? stage : null;
+}
+
 function relativeDate(dateIso: string | null) {
   if (!dateIso) return "nunca";
   const days = Math.max(0, Math.round((Date.now() - new Date(dateIso).getTime()) / 86400000));
@@ -326,6 +332,32 @@ export function LiveSettingsWorkspace() {
     }
   }
 
+  async function deactivateLeadOutcomeReason(category: SettingSummary["categories"][number]) {
+    if (!token || !canManageSettings || saving) return;
+
+    const stage = leadOutcomeStageFromMetadata(category.metadata);
+    if (!stage) {
+      setSaveError("Motivo de lead sem etapa valida.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await apiPost<{ data: { id: string } }>("/settings/categories", token, {
+        domain: "lead_outcome_reason",
+        metadata: { stage },
+        name: category.name,
+        status: "INACTIVE",
+      });
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setSaveError("Nao foi possivel desativar o motivo de lead.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const view = useMemo(() => {
     const templates = summary.documentTemplates.length + summary.messageTemplates.length;
     const critical = summary.operationalParameters.length + summary.deadlines.length + summary.taxSettings.length;
@@ -349,7 +381,13 @@ export function LiveSettingsWorkspace() {
   const birthdayParameter = summary.operationalParameters.find((parameter) => parameter.key === "customer_birthday_notifications");
   const birthdayValue = isBirthdayNotificationValue(birthdayParameter?.value) ? birthdayParameter.value : null;
   const birthdayResponsible = users.find((user) => user.id === birthdayValue?.responsibleUserId);
-  const leadOutcomeReasons = summary.categories.filter((category) => category.domain === "lead_outcome_reason");
+  const leadOutcomeReasons = summary.categories
+    .filter((category) => category.domain === "lead_outcome_reason")
+    .sort((a, b) => {
+      const firstStage = leadOutcomeStageFromMetadata(a.metadata) ?? "";
+      const secondStage = leadOutcomeStageFromMetadata(b.metadata) ?? "";
+      return firstStage.localeCompare(secondStage) || a.name.localeCompare(b.name);
+    });
 
   return (
     <>
@@ -500,6 +538,29 @@ export function LiveSettingsWorkspace() {
                 <div className="blueprint-value"><strong>{relativeDate(user.lastLoginAt)}</strong><span>ultimo login</span></div>
               </article>
             ))}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="section-heading">
+            <div><p className="eyebrow">Comercial</p><h3>Motivos de desfecho de lead</h3></div>
+            <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("leadOutcome")} type="button">Adicionar</button>
+          </div>
+          <div className="blueprint-list">
+            {leadOutcomeReasons.map((reason) => {
+              const stage = leadOutcomeStageFromMetadata(reason.metadata);
+              return (
+                <article className={`blueprint-row ${reason.status === "ACTIVE" ? "blue" : "rose"}`} key={reason.id}>
+                  <div className="blueprint-main"><SlidersHorizontal aria-hidden="true" /><div><strong>{reason.name}</strong><span>{stage ? leadOutcomeStageLabels[stage] : "etapa nao definida"}</span></div></div>
+                  <div className="blueprint-tags"><span>{reason.status === "ACTIVE" ? "ativo" : "inativo"}</span><span>lead_outcome_reason</span></div>
+                  <div className="blueprint-value">
+                    {reason.status === "ACTIVE" ? <button className="text-button" disabled={saving} onClick={() => void deactivateLeadOutcomeReason(reason)} type="button">Desativar</button> : <strong>inativo</strong>}
+                    <span>configuracao auditavel</span>
+                  </div>
+                </article>
+              );
+            })}
+            {leadOutcomeReasons.length === 0 ? <article className="blueprint-row"><div className="blueprint-main"><SlidersHorizontal aria-hidden="true" /><div><strong>Usando motivos padrao</strong><span>Nenhum motivo personalizado cadastrado.</span></div></div></article> : null}
           </div>
         </article>
 

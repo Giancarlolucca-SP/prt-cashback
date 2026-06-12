@@ -492,3 +492,33 @@ Observacoes:
 
 - A UI evita que o gestor precise conhecer dominio tecnico ou metadata JSON.
 - Proxima melhoria recomendada: listar/editar/desativar motivos existentes diretamente na tela, mantendo auditoria.
+
+## 2026-06-12 - UI Configuracoes: listagem e desativacao de motivos de lead
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e Configuracoes.
+- Foco: permitir ao gestor visualizar motivos cadastrados e desativar motivos ativos sem payload tecnico.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:management:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Configuracoes ganhou painel `Motivos de desfecho de lead`.
+- O painel lista motivo, etapa (`WON`, `LOST`, `COLD` humanizados), status e dominio tecnico.
+- Motivos ativos podem ser desativados pela propria UI.
+- A desativacao usa o endpoint de categorias com `status: INACTIVE`, preservando registro auditavel e evitando exclusao destrutiva.
+- Quando nao ha motivo personalizado, a tela informa que os defaults do sistema estao em uso.
+
+Observacoes:
+
+- Edicao de nome ainda deve ser tratada como criar novo motivo e desativar o antigo, para preservar historico operacional.
+- Proxima melhoria recomendada: adicionar teste E2E de UI para cadastro/desativacao quando houver harness de navegador autenticado.
