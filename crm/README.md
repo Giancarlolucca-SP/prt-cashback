@@ -104,6 +104,12 @@ Para validar o fluxo Comercial com perfil Vendedor:
 npm run qa:commercial:local
 ```
 
+Para validar o fluxo Administrativo com triagem, repasse, documentos e prestadores:
+
+```bash
+npm run qa:administrative:local
+```
+
 Para validar layout desktop/mobile, erros de console acionaveis e capturar screenshots locais:
 
 ```bash

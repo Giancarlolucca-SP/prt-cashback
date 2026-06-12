@@ -172,3 +172,36 @@ Observacoes:
 
 - O roteiro cria massa QA auditavel com prefixo `QA Comercial` e identificador unico por execucao.
 - Proxima etapa recomendada: QA operacional Administrativo, validando atalhos, triagem, prestador/fornecedor e venda de repasse.
+
+## 2026-06-11 - QA Administrativo automatizado
+
+Contexto:
+
+- Etapa BMAP: QA operacional do fluxo administrativo.
+- Foco: validar criacao rapida administrativa, triagem, venda de repasse, contrato pendente, prestador/fornecedor, OS e bloqueios sensiveis.
+- Escopo: apenas projeto novo `crm/`, com API e Web ja rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:administrative:local` | Passou |
+
+Resultado:
+
+- Readiness da API: ok.
+- Perfil usado: `administrativo@gt3.local`.
+- Cliente criado.
+- Agendamento criado.
+- Venda de repasse criada em `DRAFT` e movida para `DOCUMENTATION`.
+- Contrato gerado em `GENERATED` e listado como nao assinado.
+- Prestador/fornecedor criado com referencia de segredo mascarada.
+- Cliente de pos-venda criado.
+- OS criada, com item, custo, nota e status `WAITING_INVOICE`.
+- Bloqueios sensiveis confirmados: `/audit/logs` e `/users`.
+- Rotas Web administrativas verificadas: `/administrativo`, `/fornecedores`, `/servicos`, `/vendas`, `/documentos`.
+
+Observacoes:
+
+- O roteiro cria massa QA auditavel com prefixo `QA Administrativo` e identificador unico por execucao.
+- Proxima etapa recomendada: QA operacional Veiculos/Avaliador, validando compras, avaliacoes e estoque sem financeiro global.
