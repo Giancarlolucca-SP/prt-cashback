@@ -430,3 +430,36 @@ Observacoes:
 
 - A regra server-side de motivo obrigatorio continua sendo a garantia principal.
 - Proxima melhoria recomendada: persistir motivos padronizados em configuracao comercial para permitir personalizacao por loja.
+
+## 2026-06-12 - Configuracao Comercial: motivos de desfecho de lead
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e funil comercial.
+- Foco: permitir que motivos de ganho, perda e esfriamento venham de configuracao por loja, mantendo fallback padrao.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Criado `GET /leads/outcome-reasons`.
+- A rota exige permissao de leitura de leads e retorna motivos configurados no dominio `lead_outcome_reason`.
+- Categorias configuraveis usam `metadata.stage` com `WON`, `LOST` ou `COLD`.
+- Quando nao ha configuracao, a API retorna motivos padrao por etapa.
+- A tela de Leads carrega os motivos pela API e usa fallback local se necessario.
+- Teste de contrato cobre retorno default e retorno configurado via `/settings/categories`.
+
+Observacoes:
+
+- Vendedor/SDR podem consumir os motivos sem acesso direto ao modulo de Configuracoes.
+- Proxima melhoria recomendada: criar UI em Configuracoes para gerenciar esses motivos sem depender de payload tecnico.

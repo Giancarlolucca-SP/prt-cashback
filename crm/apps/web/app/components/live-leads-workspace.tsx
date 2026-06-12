@@ -31,6 +31,14 @@ type SalesFunnel = {
   leadsByStatus: Record<string, number>;
 };
 
+type LeadOutcomeReasonsResponse = {
+  items: Array<{
+    reasons: string[];
+    stage: LeadStatus;
+  }>;
+  source: "configuration" | "default";
+};
+
 type LeadFormState = {
   title: string;
   source: string;
@@ -135,7 +143,7 @@ const filters: Array<{ label: string; status?: LeadStatus; source?: string }> = 
 
 const kanbanStatuses: LeadStatus[] = ["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "COLD", "LOST"];
 const terminalLeadStatuses = new Set<LeadStatus>(["WON", "LOST", "COLD"]);
-const leadOutcomeReasons: Record<LeadStatus, string[]> = {
+const defaultLeadOutcomeReasons: Record<LeadStatus, string[]> = {
   COLD: ["Sem resposta apos tentativas", "Retorno futuro", "Interesse esfriou"],
   CONTACTED: [],
   LOST: ["Cliente comprou em outra loja", "Preco fora do esperado", "Veiculo indisponivel", "Credito nao aprovado"],
@@ -205,6 +213,7 @@ export function LiveLeadsWorkspace() {
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
   const [outcomeForm, setOutcomeForm] = useState<LeadOutcomeFormState>(emptyLeadOutcomeForm);
+  const [outcomeReasons, setOutcomeReasons] = useState(defaultLeadOutcomeReasons);
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -234,14 +243,19 @@ export function LiveLeadsWorkspace() {
     Promise.all([
       apiGet<ListResponse<Lead>>(`/leads?${query.toString()}`, token),
       canReadDashboard ? apiGet<SalesFunnel>("/analytics/sales-funnel", token) : Promise.resolve(fallbackFunnel),
+      apiGet<LeadOutcomeReasonsResponse>("/leads/outcome-reasons", token),
     ])
-      .then(([list, nextFunnel]) => {
+      .then(([list, nextFunnel, nextOutcomeReasons]) => {
         if (!isCurrent) {
           return;
         }
 
         setLeads(list.items.length > 0 ? list.items : []);
         setFunnel(nextFunnel);
+        setOutcomeReasons((current) => ({
+          ...current,
+          ...Object.fromEntries(nextOutcomeReasons.items.map((item) => [item.stage, item.reasons.length > 0 ? item.reasons : current[item.stage]])),
+        }));
         setStatus("live");
       })
       .catch(() => {
@@ -324,7 +338,7 @@ export function LiveLeadsWorkspace() {
     }
 
     if (terminalLeadStatuses.has(toStage)) {
-      const defaultReason = leadOutcomeReasons[toStage][0] ?? "";
+      const defaultReason = outcomeReasons[toStage][0] ?? "";
       setOutcomeError(null);
       setOutcomeForm({ details: "", reason: defaultReason });
       setPendingOutcome({ lead: currentLead, toStage });
@@ -546,7 +560,7 @@ export function LiveLeadsWorkspace() {
                   onChange={(event) => setOutcomeForm((current) => ({ ...current, reason: event.target.value }))}
                   value={outcomeForm.reason}
                 >
-                  {leadOutcomeReasons[pendingOutcome.toStage].map((reason) => (
+                  {outcomeReasons[pendingOutcome.toStage].map((reason) => (
                     <option key={reason} value={reason}>
                       {reason}
                     </option>

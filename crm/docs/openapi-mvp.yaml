@@ -103,6 +103,8 @@ paths:
   /leads:
     get: { tags: [Leads], summary: Lista leads., responses: { "200": { $ref: "#/components/responses/List" } } }
     post: { tags: [Leads], summary: Cria lead., responses: { "201": { $ref: "#/components/responses/Created" } } }
+  /leads/outcome-reasons:
+    get: { tags: [Leads], summary: Lista motivos configurados ou padrao para desfecho de leads., responses: { "200": { $ref: "#/components/responses/List" } } }
   /leads/{id}:
     get: { tags: [Leads], summary: Detalha lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Leads], summary: Atualiza lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }

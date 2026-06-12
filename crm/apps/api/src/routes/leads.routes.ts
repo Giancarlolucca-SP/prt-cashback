@@ -8,6 +8,11 @@ import { prisma } from "../lib/db.js";
 
 const leadStatusSchema = z.enum(["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "WON", "LOST", "COLD"]);
 const terminalLeadStatuses = new Set(["WON", "LOST", "COLD"]);
+const defaultLeadOutcomeReasons: Record<"WON" | "LOST" | "COLD", string[]> = {
+  COLD: ["Sem resposta apos tentativas", "Retorno futuro", "Interesse esfriou"],
+  LOST: ["Cliente comprou em outra loja", "Preco fora do esperado", "Veiculo indisponivel", "Credito nao aprovado"],
+  WON: ["Venda concluida", "Proposta aceita", "Cliente reservou veiculo"],
+};
 
 const leadsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -84,6 +89,22 @@ function sanitizeLead(lead: LeadRecord) {
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
   };
+}
+
+function metadataStage(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const stage = (metadata as { stage?: unknown }).stage;
+  return typeof stage === "string" && terminalLeadStatuses.has(stage) ? (stage as "WON" | "LOST" | "COLD") : null;
+}
+
+function defaultOutcomeReasonItems() {
+  return Object.entries(defaultLeadOutcomeReasons).map(([stage, reasons]) => ({
+    reasons,
+    stage,
+  }));
 }
 
 function leadScopeWhere(user: { id: string; role: string }) {
@@ -173,6 +194,46 @@ export async function registerLeadRoutes(app: FastifyInstance) {
     ]);
 
     return listResponse(items.map(sanitizeLead), query, total);
+  });
+
+  app.get("/outcome-reasons", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+
+    const categories = await prisma.configurableCategory.findMany({
+      where: {
+        storeId: session.user.storeId,
+        deletedAt: null,
+        domain: "lead_outcome_reason",
+        status: "ACTIVE",
+      },
+      orderBy: [{ name: "asc" }],
+    });
+
+    if (categories.length === 0) {
+      return { items: defaultOutcomeReasonItems(), source: "default" };
+    }
+
+    const byStage = new Map<"WON" | "LOST" | "COLD", string[]>();
+    for (const category of categories) {
+      const stage = metadataStage(category.metadata);
+      if (!stage) {
+        continue;
+      }
+      byStage.set(stage, [...(byStage.get(stage) ?? []), category.name]);
+    }
+
+    return {
+      items: Object.entries(defaultLeadOutcomeReasons).map(([stage, reasons]) => ({
+        reasons: byStage.get(stage as "WON" | "LOST" | "COLD") ?? reasons,
+        stage,
+      })),
+      source: "configuration",
+    };
   });
 
   app.get("/:id", async (request) => {

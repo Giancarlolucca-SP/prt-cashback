@@ -647,6 +647,50 @@ try {
   });
   assert.ok(lostLeadStageHistory);
 
+  const defaultLeadOutcomeReasons = await app.inject({
+    method: "GET",
+    url: "/leads/outcome-reasons",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(defaultLeadOutcomeReasons.statusCode, 200);
+  assert.ok(
+    defaultLeadOutcomeReasons
+      .json()
+      .items.some((item: { stage: string; reasons: string[] }) => item.stage === "LOST" && item.reasons.includes("Cliente comprou em outra loja")),
+  );
+
+  const configuredLostReason = `QA perda ${leadSearchToken}`;
+  const createLeadOutcomeReason = await app.inject({
+    method: "POST",
+    url: "/settings/categories",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      domain: "lead_outcome_reason",
+      metadata: { stage: "LOST" },
+      name: configuredLostReason,
+      status: "ACTIVE",
+    },
+  });
+  assert.equal(createLeadOutcomeReason.statusCode, 201);
+
+  const configuredLeadOutcomeReasons = await app.inject({
+    method: "GET",
+    url: "/leads/outcome-reasons",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(configuredLeadOutcomeReasons.statusCode, 200);
+  assert.ok(
+    configuredLeadOutcomeReasons
+      .json()
+      .items.some((item: { stage: string; reasons: string[] }) => item.stage === "LOST" && item.reasons.includes(configuredLostReason)),
+  );
+
   const appraiserLogin = await app.inject({
     method: "POST",
     url: "/auth/login",
