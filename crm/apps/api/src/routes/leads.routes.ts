@@ -54,6 +54,10 @@ const leadParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const followUpParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
 const moveLeadStageSchema = z
   .object({
     toStage: leadStatusSchema,
@@ -74,6 +78,10 @@ const scheduleLeadFollowUpSchema = z.object({
   dueAt: z.coerce.date(),
   notes: z.string().trim().max(1000).optional(),
   type: z.string().trim().min(2).max(80).default("Contato comercial"),
+});
+
+const completeLeadFollowUpSchema = z.object({
+  notes: z.string().trim().max(1000).optional(),
 });
 
 type LeadRecord = {
@@ -352,6 +360,88 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       query,
       total,
     );
+  });
+
+  app.post("/follow-ups/:id/complete", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = followUpParamsSchema.parse(request.params);
+    const input = completeLeadFollowUpSchema.parse(request.body ?? {});
+
+    const current = await prisma.followUp.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        ...followUpScopeWhere(session.user),
+      },
+    });
+
+    if (!current) {
+      return denyOwnershipAccess({
+        action: "follow_up_completed",
+        entityId: params.id,
+        entityType: "follow_up",
+        message: "Follow-up nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
+    }
+
+    if (current.completedAt) {
+      return { data: sanitizeFollowUp(current), unchanged: true };
+    }
+
+    const completedAt = new Date();
+    const followUp = await prisma.$transaction(async (tx) => {
+      const updated = await tx.followUp.update({
+        where: { id: current.id },
+        data: {
+          completedAt,
+          notes: input.notes ?? current.notes,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "follow_up_completed",
+          entityType: "follow_up",
+          entityId: updated.id,
+          result: "SUCCESS",
+          metadata: {
+            completedAt: completedAt.toISOString(),
+            dueAt: current.dueAt.toISOString(),
+            leadId: current.leadId,
+            type: current.type,
+          },
+        },
+      });
+
+      return updated;
+    });
+
+    await emitInternalEvent({
+      name: "lead.follow_up_completed",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "follow_up",
+      entityId: followUp.id,
+      payload: {
+        completedAt: followUp.completedAt?.toISOString() ?? completedAt.toISOString(),
+        dueAt: followUp.dueAt.toISOString(),
+        leadId: followUp.leadId,
+      },
+    });
+
+    return { data: sanitizeFollowUp(followUp), unchanged: false };
   });
 
   app.get("/:id", async (request) => {

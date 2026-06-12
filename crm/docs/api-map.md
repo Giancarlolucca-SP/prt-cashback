@@ -65,6 +65,8 @@ Endpoints principais:
 - `GET/POST /leads`
 - `GET /leads/outcome-reasons`
 - `GET /leads/follow-ups`
+- `POST /leads/follow-ups/:id/complete`
+  - Conclui follow-up pendente, grava `completedAt`, gera auditoria e remove da fila padrao de pendencias.
 - `GET/PATCH /leads/:id`
 - `POST /leads/:id/stage`
   - Etapas conclusivas `WON`, `LOST` e `COLD` exigem `reason` com pelo menos 8 caracteres para preservar qualidade do funil e auditoria.

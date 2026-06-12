@@ -44,6 +44,7 @@ type LeadFollowUp = {
   leadId: string | null;
   type: string;
   dueAt: string;
+  completedAt: string | null;
   notes: string | null;
   lead: {
     id: string;
@@ -248,6 +249,7 @@ export function LiveLeadsWorkspace() {
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
   const [followUps, setFollowUps] = useState(fallbackFollowUps);
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
+  const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
@@ -465,6 +467,23 @@ export function LiveLeadsWorkspace() {
       setFollowUpError("Nao foi possivel agendar o follow-up. Confira os campos e tente novamente.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function completeFollowUp(followUp: LeadFollowUp) {
+    if (!token || !canUpdateLeads || completingFollowUpId) {
+      return;
+    }
+
+    setCompletingFollowUpId(followUp.id);
+    try {
+      const response = await apiPost<{ data: LeadFollowUp; unchanged: boolean }>(`/leads/follow-ups/${followUp.id}/complete`, token, {});
+      setFollowUps((current) => current.filter((item) => item.id !== response.data.id));
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setStatus("error");
+    } finally {
+      setCompletingFollowUpId(null);
     }
   }
 
@@ -806,6 +825,14 @@ export function LiveLeadsWorkspace() {
                 <div className="lead-score">
                   <span>pendente</span>
                   <strong>{relativeTime(followUp.dueAt)}</strong>
+                  <button
+                    className="text-button lead-score-action"
+                    disabled={!canUpdateLeads || completingFollowUpId === followUp.id}
+                    onClick={() => void completeFollowUp(followUp)}
+                    type="button"
+                  >
+                    {completingFollowUpId === followUp.id ? "Salvando..." : "Concluir"}
+                  </button>
                 </div>
               </article>
             ))}

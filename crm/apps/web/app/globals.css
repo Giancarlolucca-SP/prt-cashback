@@ -1187,6 +1187,11 @@ input:focus-visible {
   text-align: right;
 }
 
+.lead-score-action {
+  margin-top: 8px;
+  width: 100%;
+}
+
 .lead-score strong {
   color: var(--teal);
   font-size: 24px;

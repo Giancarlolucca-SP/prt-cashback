@@ -589,3 +589,36 @@ Observacoes:
 
 - Follow-up segue separado de appointment; appointment continua sendo agenda operacional formal.
 - Proxima melhoria recomendada: permitir concluir follow-up pendente, gravando `completedAt` e audit log.
+
+## 2026-06-12 - Conclusao de follow-ups comerciais
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rotina diaria do vendedor.
+- Foco: permitir que a fila diaria tenha fechamento operacional auditavel.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Criado `POST /leads/follow-ups/:id/complete`.
+- A rota grava `completedAt`, atualiza observacao opcional, gera audit log e emite evento interno `lead.follow_up_completed`.
+- Ownership segue protegido por escopo de loja e responsavel; acesso indevido retorna 404 operacional via guard padrao.
+- A fila `GET /leads/follow-ups` continua omitindo concluidos por default e permite auditoria via `include_completed=true`.
+- A tela de Leads ganhou acao `Concluir` em cada follow-up pendente.
+- Teste de contrato confirma conclusao, retirada da fila pendente e retorno quando `include_completed=true`.
+
+Observacoes:
+
+- O fechamento do follow-up nao altera automaticamente a etapa do lead; mudanca de funil segue no fluxo auditavel de stage.
+- Proxima melhoria recomendada: adicionar filtro de periodo na UI para revisar follow-ups vencidos e futuros.

@@ -107,6 +107,8 @@ paths:
     get: { tags: [Leads], summary: Lista motivos configurados ou padrao para desfecho de leads., responses: { "200": { $ref: "#/components/responses/List" } } }
   /leads/follow-ups:
     get: { tags: [Leads], summary: Lista follow-ups comerciais pendentes por periodo., responses: { "200": { $ref: "#/components/responses/List" } } }
+  /leads/follow-ups/{id}/complete:
+    post: { tags: [Leads], summary: Conclui follow-up comercial, grava completedAt e auditoria., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /leads/{id}:
     get: { tags: [Leads], summary: Detalha lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Leads], summary: Atualiza lead., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }

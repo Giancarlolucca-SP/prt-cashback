@@ -730,6 +730,45 @@ try {
       .items.some((followUp: { id: string; lead: { id: string } | null }) => followUp.id === createdFollowUp.id && followUp.lead?.id === createdLeadId),
   );
 
+  const completeLeadFollowUp = await app.inject({
+    method: "POST",
+    url: `/leads/follow-ups/${createdFollowUp.id}/complete`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      notes: "Follow-up concluido em QA",
+    },
+  });
+  assert.equal(completeLeadFollowUp.statusCode, 200);
+  assert.ok(completeLeadFollowUp.json().data.completedAt);
+  assert.equal(completeLeadFollowUp.json().data.notes, "Follow-up concluido em QA");
+  assert.equal(completeLeadFollowUp.json().unchanged, false);
+
+  const listPendingFollowUpsAfterComplete = await app.inject({
+    method: "GET",
+    url: "/leads/follow-ups?from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listPendingFollowUpsAfterComplete.statusCode, 200);
+  assert.ok(!listPendingFollowUpsAfterComplete.json().items.some((followUp: { id: string }) => followUp.id === createdFollowUp.id));
+
+  const listCompletedLeadFollowUps = await app.inject({
+    method: "GET",
+    url: "/leads/follow-ups?include_completed=true&from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCompletedLeadFollowUps.statusCode, 200);
+  assert.ok(
+    listCompletedLeadFollowUps
+      .json()
+      .items.some((followUp: { id: string; completedAt: string | null }) => followUp.id === createdFollowUp.id && followUp.completedAt),
+  );
+
   const appraiserLogin = await app.inject({
     method: "POST",
     url: "/auth/login",
