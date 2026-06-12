@@ -39,6 +39,21 @@ type LeadOutcomeReasonsResponse = {
   source: "configuration" | "default";
 };
 
+type LeadFollowUp = {
+  id: string;
+  leadId: string | null;
+  type: string;
+  dueAt: string;
+  notes: string | null;
+  lead: {
+    id: string;
+    interest: string | null;
+    source: string | null;
+    status: LeadStatus;
+    title: string;
+  } | null;
+};
+
 type LeadFormState = {
   title: string;
   source: string;
@@ -133,6 +148,8 @@ const fallbackFunnel: SalesFunnel = {
   leadsBySource: { WhatsApp: 34, Site: 21, Marketplace: 31, Loja: 14 },
   leadsByStatus: { NEW: 18, CONTACTED: 14, SCHEDULED: 8, NEGOTIATION: 9, WON: 7, LOST: 3, COLD: 5 },
 };
+
+const fallbackFollowUps: LeadFollowUp[] = [];
 
 const statusLabels: Record<LeadStatus, string> = {
   COLD: "Esfriando",
@@ -229,6 +246,7 @@ export function LiveLeadsWorkspace() {
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [followUpForm, setFollowUpForm] = useState<LeadFollowUpFormState>(emptyLeadFollowUpForm);
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
+  const [followUps, setFollowUps] = useState(fallbackFollowUps);
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -259,14 +277,16 @@ export function LiveLeadsWorkspace() {
       apiGet<ListResponse<Lead>>(`/leads?${query.toString()}`, token),
       canReadDashboard ? apiGet<SalesFunnel>("/analytics/sales-funnel", token) : Promise.resolve(fallbackFunnel),
       apiGet<LeadOutcomeReasonsResponse>("/leads/outcome-reasons", token),
+      apiGet<ListResponse<LeadFollowUp>>("/leads/follow-ups?page=1&page_size=20", token),
     ])
-      .then(([list, nextFunnel, nextOutcomeReasons]) => {
+      .then(([list, nextFunnel, nextOutcomeReasons, nextFollowUps]) => {
         if (!isCurrent) {
           return;
         }
 
         setLeads(list.items.length > 0 ? list.items : []);
         setFunnel(nextFunnel);
+        setFollowUps(nextFollowUps.items);
         setOutcomeReasons((current) => ({
           ...current,
           ...Object.fromEntries(nextOutcomeReasons.items.map((item) => [item.stage, item.reasons.length > 0 ? item.reasons : current[item.stage]])),
@@ -460,6 +480,7 @@ export function LiveLeadsWorkspace() {
       metrics: [
         { label: "Novos hoje", value: String(newToday), detail: topSource ? `${topSource[1]} vieram de ${topSource[0]}` : "origem em apuracao", tone: "teal" },
         { label: "Sem resposta", value: String(withoutResponse), detail: "novo contato ou retorno pendente", tone: "amber" },
+        { label: "Follow-ups hoje", value: String(followUps.length), detail: "fila comercial do dia", tone: "teal" },
         { label: "Origem principal", value: topSource?.[0] ?? "--", detail: topSource ? `${topSource[1]} leads no periodo` : "sem dados suficientes", tone: "blue" },
         { label: "Risco de esfriar", value: String(cold), detail: "acionar follow-up", tone: "rose" },
       ],
@@ -479,7 +500,7 @@ export function LiveLeadsWorkspace() {
       }),
       prioritized: [...leads].sort((a, b) => (b.temperature ?? 0) - (a.temperature ?? 0)).slice(0, 8),
     };
-  }, [funnel, leads]);
+  }, [followUps.length, funnel, leads]);
 
   const statusLabel = {
     error: "Usando fallback",
@@ -757,6 +778,46 @@ export function LiveLeadsWorkspace() {
       </section>
 
       <section className="leads-page-grid">
+        <section className="panel leads-board" aria-label="Lista priorizada de leads">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Fila do dia</p>
+              <h3>Follow-ups comerciais pendentes</h3>
+            </div>
+            <span className="live-pill">{followUps.length}</span>
+          </div>
+
+          <div className="lead-list">
+            {followUps.slice(0, 6).map((followUp) => (
+              <article className="lead-row" key={followUp.id}>
+                <div className="lead-identity">
+                  <strong>{followUp.lead?.title ?? "Lead sem titulo"}</strong>
+                  <span>{followUp.lead?.interest ?? followUp.notes ?? "Sem observacao"}</span>
+                </div>
+                <div className="lead-meta">
+                  <span>{followUp.type}</span>
+                  <span>{followUp.lead ? statusLabels[followUp.lead.status] : "sem lead"}</span>
+                  <span>{humanizeSource(followUp.lead?.source ?? null)}</span>
+                </div>
+                <div className="lead-next">
+                  <CalendarClock aria-hidden="true" size={16} />
+                  <span>{new Date(followUp.dueAt).toLocaleString("pt-BR", { day: "2-digit", hour: "2-digit", minute: "2-digit", month: "2-digit" })}</span>
+                </div>
+                <div className="lead-score">
+                  <span>pendente</span>
+                  <strong>{relativeTime(followUp.dueAt)}</strong>
+                </div>
+              </article>
+            ))}
+            {followUps.length === 0 ? (
+              <article className="lead-row">
+                <div className="lead-identity"><strong>Sem follow-ups hoje</strong><span>A fila comercial do dia esta limpa.</span></div>
+                <div className="lead-meta"><span>ok</span><span>agenda</span><span>0</span></div>
+              </article>
+            ) : null}
+          </div>
+        </section>
+
         <section className="panel leads-board" aria-label="Lista priorizada de leads">
           <div className="section-heading">
             <div>

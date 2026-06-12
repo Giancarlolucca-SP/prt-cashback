@@ -23,6 +23,15 @@ const leadsQuerySchema = z.object({
   assigned_user_id: z.string().uuid().optional(),
 });
 
+const followUpsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  assigned_user_id: z.string().uuid().optional(),
+  from: z.coerce.date().optional(),
+  include_completed: z.coerce.boolean().default(false),
+  to: z.coerce.date().optional(),
+});
+
 const createLeadSchema = z.object({
   customerId: z.string().uuid().optional(),
   assignedUserId: z.string().uuid().optional(),
@@ -149,6 +158,22 @@ function leadScopeWhere(user: { id: string; role: string }) {
   return {};
 }
 
+function followUpScopeWhere(user: { id: string; role: string }) {
+  if (user.role === "SELLER" || user.role === "SDR") {
+    return { assignedUserId: user.id };
+  }
+
+  return {};
+}
+
+function todayRange() {
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from);
+  to.setDate(to.getDate() + 1);
+  return { from, to };
+}
+
 async function ensureCustomerInStore(storeId: string, customerId?: string) {
   if (!customerId) {
     return;
@@ -268,6 +293,65 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       })),
       source: "configuration",
     };
+  });
+
+  app.get("/follow-ups", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const query = followUpsQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const defaultRange = todayRange();
+    const from = query.from ?? defaultRange.from;
+    const to = query.to ?? defaultRange.to;
+
+    const where = {
+      storeId: session.user.storeId,
+      ...followUpScopeWhere(session.user),
+      ...(query.assigned_user_id ? { assignedUserId: query.assigned_user_id } : {}),
+      ...(query.include_completed ? {} : { completedAt: null }),
+      dueAt: {
+        gte: from,
+        lt: to,
+      },
+    };
+
+    const [items, total] = await Promise.all([
+      prisma.followUp.findMany({
+        where,
+        orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+        skip,
+        take,
+      }),
+      prisma.followUp.count({ where }),
+    ]);
+    const leads = await prisma.lead.findMany({
+      where: {
+        id: { in: items.map((followUp) => followUp.leadId).filter((id): id is string => Boolean(id)) },
+        storeId: session.user.storeId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        interest: true,
+        source: true,
+        status: true,
+        title: true,
+      },
+    });
+    const leadById = new Map(leads.map((lead) => [lead.id, lead]));
+
+    return listResponse(
+      items.map((followUp) => ({
+        ...sanitizeFollowUp(followUp),
+        lead: followUp.leadId ? leadById.get(followUp.leadId) ?? null : null,
+      })),
+      query,
+      total,
+    );
   });
 
   app.get("/:id", async (request) => {

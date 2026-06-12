@@ -716,6 +716,20 @@ try {
   });
   assert.ok(createdFollowUp);
 
+  const listLeadFollowUps = await app.inject({
+    method: "GET",
+    url: "/leads/follow-ups?from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listLeadFollowUps.statusCode, 200);
+  assert.ok(
+    listLeadFollowUps
+      .json()
+      .items.some((followUp: { id: string; lead: { id: string } | null }) => followUp.id === createdFollowUp.id && followUp.lead?.id === createdLeadId),
+  );
+
   const appraiserLogin = await app.inject({
     method: "POST",
     url: "/auth/login",

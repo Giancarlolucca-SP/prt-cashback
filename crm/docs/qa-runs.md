@@ -555,3 +555,37 @@ Observacoes:
 
 - A agenda operacional de appointments continua separada; este fluxo cria follow-up comercial leve.
 - Proxima melhoria recomendada: consolidar follow-ups pendentes na tela de Agenda ou em uma fila comercial diaria.
+
+## 2026-06-12 - Fila diaria comercial de follow-ups
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rotina diaria do vendedor.
+- Foco: listar follow-ups pendentes do periodo para evitar leads parados no funil.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Criado `GET /leads/follow-ups`.
+- A rota lista follow-ups pendentes por periodo, com default para o dia atual.
+- A listagem respeita escopo de vendedor/SDR por `assignedUserId`.
+- Como `FollowUp` nao possui relacao Prisma declarada com `Lead`, a API busca os leads vinculados separadamente e monta a resposta.
+- A tela de Leads ganhou painel `Follow-ups comerciais pendentes`.
+- O indicador `Follow-ups hoje` foi adicionado aos cards do topo.
+- Teste de contrato confirma listagem por periodo e lead vinculado.
+
+Observacoes:
+
+- Follow-up segue separado de appointment; appointment continua sendo agenda operacional formal.
+- Proxima melhoria recomendada: permitir concluir follow-up pendente, gravando `completedAt` e audit log.

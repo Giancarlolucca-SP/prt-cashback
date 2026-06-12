@@ -64,6 +64,7 @@ Endpoints principais:
 - `POST /customers/:id/kanban-status`
 - `GET/POST /leads`
 - `GET /leads/outcome-reasons`
+- `GET /leads/follow-ups`
 - `GET/PATCH /leads/:id`
 - `POST /leads/:id/stage`
   - Etapas conclusivas `WON`, `LOST` e `COLD` exigem `reason` com pelo menos 8 caracteres para preservar qualidade do funil e auditoria.
