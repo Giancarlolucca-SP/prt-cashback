@@ -15,6 +15,7 @@ npm run qa:commercial:local
 npm run qa:administrative:local
 npm run qa:vehicles:local
 npm run qa:services:local
+npm run qa:management:local
 npm run qa:visual:local
 ```
 
@@ -93,6 +94,7 @@ Com `dono@gt3.local`:
 - Abrir `/financeiro`, criar lancamento e conferir impacto em resumo.
 - Abrir `/auditoria`, confirmar logs recentes.
 - Abrir `/configuracoes`, confirmar usuarios, regras e parametros.
+- Executar `npm run qa:management:local` para validar resultados, financeiro, auditoria, configuracoes, usuarios e revogacao de sessao por alteracao sensivel.
 
 ## RBAC e Dados Sensiveis
 
@@ -127,6 +129,7 @@ npm run qa:commercial:local
 npm run qa:administrative:local
 npm run qa:vehicles:local
 npm run qa:services:local
+npm run qa:management:local
 npm run qa:visual:local
 npm test
 npm run typecheck

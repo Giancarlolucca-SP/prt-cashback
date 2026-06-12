@@ -122,6 +122,12 @@ Para validar o fluxo Servicos/Pos-venda com OS, prestadores e notas:
 npm run qa:services:local
 ```
 
+Para validar o fluxo Gestao/Dono com resultados, financeiro, auditoria, configuracoes, usuarios e revogacao de sessao:
+
+```bash
+npm run qa:management:local
+```
+
 Para validar layout desktop/mobile, erros de console acionaveis e capturar screenshots locais:
 
 ```bash

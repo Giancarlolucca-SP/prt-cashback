@@ -270,3 +270,35 @@ Observacoes:
 
 - O roteiro cria massa QA auditavel com prefixo `QA Pos-venda` e identificador unico por execucao.
 - Proxima etapa recomendada: QA Gestao/Dono, validando resultados, financeiro, auditoria, configuracoes e operacoes sensiveis.
+
+## 2026-06-12 - QA Gestao/Dono automatizado
+
+Contexto:
+
+- Etapa BMAP: QA operacional do fluxo de gestao.
+- Foco: validar visao executiva, financeiro, auditoria, configuracoes, usuarios, permissoes explicitas e revogacao de sessao apos alteracao sensivel.
+- Escopo: apenas projeto novo `crm/`, com API e Web rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:management:local` | Passou |
+
+Resultado:
+
+- Readiness da API: ok.
+- Perfil usado: `dono@gt3.local`.
+- Resultados executivos, funil de vendas e performance de estoque consultados.
+- Resumo financeiro consultado.
+- Lancamento financeiro criado, baixado como `PAID` e reconsultado.
+- Configuracoes atualizadas: store setting, aniversarios, categoria, template de documento, template de mensagem e parametro operacional.
+- Usuario QA criado, permissao explicita adicionada, escopo operacional adicionado e alteracao sensivel aplicada.
+- Sessao do usuario QA revogada apos desativacao/forca de troca de senha.
+- Auditoria e lista de usuarios consultadas apos operacoes sensiveis.
+- Rotas Web de gestao verificadas: `/resultados`, `/financeiro`, `/auditoria`, `/configuracoes`.
+
+Observacoes:
+
+- O roteiro cria massa QA auditavel com prefixo `QA Gestao` e identificador unico por execucao.
+- Proxima etapa recomendada: rodar suite consolidada de regressao local e revisar portabilidade Docker antes de fechar a sprint tecnica.
