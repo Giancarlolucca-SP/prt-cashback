@@ -74,6 +74,8 @@ type LeadFollowUpFormState = {
   type: string;
 };
 
+type FollowUpPeriod = "today" | "overdue" | "next7";
+
 type PendingLeadOutcome = {
   lead: Lead;
   toStage: LeadStatus;
@@ -171,6 +173,12 @@ const filters: Array<{ label: string; status?: LeadStatus; source?: string }> = 
   { label: "Risco", status: "COLD" },
 ];
 
+const followUpPeriodFilters: Array<{ key: FollowUpPeriod; label: string }> = [
+  { key: "today", label: "Hoje" },
+  { key: "overdue", label: "Vencidos" },
+  { key: "next7", label: "Proximos 7 dias" },
+];
+
 const kanbanStatuses: LeadStatus[] = ["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "COLD", "LOST"];
 const terminalLeadStatuses = new Set<LeadStatus>(["WON", "LOST", "COLD"]);
 const defaultLeadOutcomeReasons: Record<LeadStatus, string[]> = {
@@ -228,6 +236,40 @@ function nextAction(lead: Lead) {
   return "Atualizar proximo passo";
 }
 
+function dateRangeForFollowUpPeriod(period: FollowUpPeriod) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (period === "overdue") {
+    return {
+      emptyMessage: "Nenhum follow-up vencido.",
+      from: new Date("2020-01-01T00:00:00.000Z"),
+      heading: "Follow-ups comerciais vencidos",
+      to: today,
+    };
+  }
+
+  if (period === "next7") {
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return {
+      emptyMessage: "Nenhum follow-up nos proximos 7 dias.",
+      from: today,
+      heading: "Follow-ups dos proximos 7 dias",
+      to: nextWeek,
+    };
+  }
+
+  return {
+    emptyMessage: "A fila comercial do dia esta limpa.",
+    from: today,
+    heading: "Follow-ups comerciais pendentes",
+    to: tomorrow,
+  };
+}
+
 export function LiveLeadsWorkspace() {
   const { hasPermission, token } = useAuth();
   const canReadLeads = hasPermission({ module: "leads", action: "read" });
@@ -247,6 +289,7 @@ export function LiveLeadsWorkspace() {
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [followUpForm, setFollowUpForm] = useState<LeadFollowUpFormState>(emptyLeadFollowUpForm);
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
+  const [followUpPeriod, setFollowUpPeriod] = useState<FollowUpPeriod>("today");
   const [followUps, setFollowUps] = useState(fallbackFollowUps);
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
   const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
@@ -272,6 +315,13 @@ export function LiveLeadsWorkspace() {
     if (activeFilter.source) {
       query.set("search", activeFilter.source);
     }
+    const followUpRange = dateRangeForFollowUpPeriod(followUpPeriod);
+    const followUpQuery = new URLSearchParams({
+      from: followUpRange.from.toISOString(),
+      page: "1",
+      page_size: "20",
+      to: followUpRange.to.toISOString(),
+    });
 
     setStatus("loading");
 
@@ -279,7 +329,7 @@ export function LiveLeadsWorkspace() {
       apiGet<ListResponse<Lead>>(`/leads?${query.toString()}`, token),
       canReadDashboard ? apiGet<SalesFunnel>("/analytics/sales-funnel", token) : Promise.resolve(fallbackFunnel),
       apiGet<LeadOutcomeReasonsResponse>("/leads/outcome-reasons", token),
-      apiGet<ListResponse<LeadFollowUp>>("/leads/follow-ups?page=1&page_size=20", token),
+      apiGet<ListResponse<LeadFollowUp>>(`/leads/follow-ups?${followUpQuery.toString()}`, token),
     ])
       .then(([list, nextFunnel, nextOutcomeReasons, nextFollowUps]) => {
         if (!isCurrent) {
@@ -304,7 +354,7 @@ export function LiveLeadsWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canReadDashboard, canReadLeads, refreshKey, token]);
+  }, [activeFilter, canReadDashboard, canReadLeads, followUpPeriod, refreshKey, token]);
 
   async function handleCreateLead(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -528,6 +578,7 @@ export function LiveLeadsWorkspace() {
     loading: "Sincronizando",
     locked: "Sem permissao",
   }[status];
+  const followUpPeriodDetails = dateRangeForFollowUpPeriod(followUpPeriod);
 
   return (
     <>
@@ -801,9 +852,21 @@ export function LiveLeadsWorkspace() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Fila do dia</p>
-              <h3>Follow-ups comerciais pendentes</h3>
+              <h3>{followUpPeriodDetails.heading}</h3>
             </div>
             <span className="live-pill">{followUps.length}</span>
+          </div>
+          <div className="follow-up-filter" aria-label="Periodo dos follow-ups">
+            {followUpPeriodFilters.map((filter) => (
+              <button
+                className={filter.key === followUpPeriod ? "active" : ""}
+                key={filter.key}
+                onClick={() => setFollowUpPeriod(filter.key)}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
           </div>
 
           <div className="lead-list">
@@ -838,7 +901,7 @@ export function LiveLeadsWorkspace() {
             ))}
             {followUps.length === 0 ? (
               <article className="lead-row">
-                <div className="lead-identity"><strong>Sem follow-ups hoje</strong><span>A fila comercial do dia esta limpa.</span></div>
+                <div className="lead-identity"><strong>Sem follow-ups</strong><span>{followUpPeriodDetails.emptyMessage}</span></div>
                 <div className="lead-meta"><span>ok</span><span>agenda</span><span>0</span></div>
               </article>
             ) : null}

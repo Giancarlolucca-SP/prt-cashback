@@ -622,3 +622,34 @@ Observacoes:
 
 - O fechamento do follow-up nao altera automaticamente a etapa do lead; mudanca de funil segue no fluxo auditavel de stage.
 - Proxima melhoria recomendada: adicionar filtro de periodo na UI para revisar follow-ups vencidos e futuros.
+
+## 2026-06-12 - Filtros de periodo em follow-ups comerciais
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rotina diaria do vendedor.
+- Foco: permitir revisao operacional de follow-ups de hoje, vencidos e proximos 7 dias.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- A fila `Follow-ups comerciais pendentes` ganhou filtros `Hoje`, `Vencidos` e `Proximos 7 dias`.
+- A UI usa os parametros existentes de `GET /leads/follow-ups` (`from` e `to`) sem criar novo contrato backend.
+- O titulo e o estado vazio mudam conforme o periodo selecionado.
+- O indicador do painel passa a refletir a fila filtrada.
+
+Observacoes:
+
+- Follow-ups concluidos seguem fora da fila padrao; auditoria de concluidos permanece disponivel via API com `include_completed=true`.
+- Proxima melhoria recomendada: criar uma visao dedicada de agenda comercial unindo appointments e follow-ups.

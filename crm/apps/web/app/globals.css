@@ -1122,6 +1122,31 @@ input:focus-visible {
   gap: 10px;
 }
 
+.follow-up-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.follow-up-filter button {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.follow-up-filter button.active,
+.follow-up-filter button:hover {
+  background: rgba(20, 184, 166, 0.1);
+  border-color: rgba(20, 184, 166, 0.42);
+  color: var(--teal);
+}
+
 .lead-row {
   align-items: center;
   background: #f8fafc;
