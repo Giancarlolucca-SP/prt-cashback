@@ -463,3 +463,32 @@ Observacoes:
 
 - Vendedor/SDR podem consumir os motivos sem acesso direto ao modulo de Configuracoes.
 - Proxima melhoria recomendada: criar UI em Configuracoes para gerenciar esses motivos sem depender de payload tecnico.
+
+## 2026-06-12 - UI Configuracoes: motivos de desfecho de lead
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e Configuracoes.
+- Foco: permitir cadastro de motivos de desfecho de lead por gestor, sem JSON tecnico.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:management:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Tela de Configuracoes ganhou acao `Motivo lead`.
+- O modal dedicado permite escolher etapa `WON`, `LOST` ou `COLD` e informar o motivo.
+- O cadastro grava categoria no dominio `lead_outcome_reason` com `metadata.stage`, consumida por `/leads/outcome-reasons`.
+- A lateral administrativa mostra quantos motivos de lead estao configurados ou se o sistema esta usando defaults.
+
+Observacoes:
+
+- A UI evita que o gestor precise conhecer dominio tecnico ou metadata JSON.
+- Proxima melhoria recomendada: listar/editar/desativar motivos existentes diretamente na tela, mantendo auditoria.

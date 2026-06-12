@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-provider";
 
 type RecordStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 type UserRole = "OWNER_MANAGER" | "ADMIN" | "ADMINISTRATIVE" | "SELLER" | "SDR" | "APPRAISER" | "SERVICE_MANAGER";
+type LeadOutcomeStage = "WON" | "LOST" | "COLD";
 
 type SettingSummary = {
   storeSettings: Array<{ id: string; key: string; value: unknown }>;
@@ -15,7 +16,7 @@ type SettingSummary = {
   businessHours: Array<{ id: string; weekday: number; opensAt: string | null; closesAt: string | null; isClosed: boolean }>;
   holidays: Array<{ id: string; name: string; date: string; isRecurring: boolean }>;
   deadlines: Array<{ id: string; module: string; action: string; hours: number }>;
-  categories: Array<{ id: string; domain: string; name: string; status: RecordStatus }>;
+  categories: Array<{ id: string; domain: string; metadata?: unknown; name: string; status: RecordStatus }>;
   documentTemplates: Array<{ id: string; name: string; module: string; version: number; status: RecordStatus }>;
   messageTemplates: Array<{ id: string; name: string; channel: string; version: number; status: RecordStatus }>;
   operationalParameters: Array<{ id: string; key: string; value: unknown }>;
@@ -47,7 +48,7 @@ type ListResponse<T> = {
   total?: number;
 };
 
-type ModalKind = "user" | "message" | "document" | "category" | "deadline" | "parameter" | "birthday" | "accountant" | "tax";
+type ModalKind = "user" | "message" | "document" | "category" | "leadOutcome" | "deadline" | "parameter" | "birthday" | "accountant" | "tax";
 
 type FormState = {
   action: string;
@@ -57,6 +58,7 @@ type FormState = {
   email: string;
   hours: string;
   key: string;
+  leadOutcomeStage: LeadOutcomeStage;
   module: string;
   name: string;
   password: string;
@@ -76,6 +78,7 @@ const emptyForm: FormState = {
   email: "",
   hours: "24",
   key: "ai.guardrails",
+  leadOutcomeStage: "LOST",
   module: "leads",
   name: "",
   password: "Temp12345",
@@ -120,10 +123,17 @@ const modalLabels: Record<ModalKind, string> = {
   category: "Categoria",
   deadline: "Prazo",
   document: "Template documento",
+  leadOutcome: "Motivo de lead",
   message: "Template mensagem",
   parameter: "Parametro",
   tax: "Fiscal",
   user: "Usuario",
+};
+
+const leadOutcomeStageLabels: Record<LeadOutcomeStage, string> = {
+  COLD: "Esfriou",
+  LOST: "Perdido",
+  WON: "Ganho",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -262,6 +272,14 @@ export function LiveSettingsWorkspace() {
           status: "ACTIVE",
         });
       }
+      if (modalKind === "leadOutcome") {
+        await apiPost<{ data: { id: string } }>("/settings/categories", token, {
+          domain: "lead_outcome_reason",
+          metadata: { stage: form.leadOutcomeStage },
+          name: form.name.trim(),
+          status: "ACTIVE",
+        });
+      }
       if (modalKind === "deadline") {
         await apiPost<{ data: { id: string } }>("/settings/deadlines", token, {
           action: form.action.trim(),
@@ -331,6 +349,7 @@ export function LiveSettingsWorkspace() {
   const birthdayParameter = summary.operationalParameters.find((parameter) => parameter.key === "customer_birthday_notifications");
   const birthdayValue = isBirthdayNotificationValue(birthdayParameter?.value) ? birthdayParameter.value : null;
   const birthdayResponsible = users.find((user) => user.id === birthdayValue?.responsibleUserId);
+  const leadOutcomeReasons = summary.categories.filter((category) => category.domain === "lead_outcome_reason");
 
   return (
     <>
@@ -352,6 +371,7 @@ export function LiveSettingsWorkspace() {
         </div>
         <button className="primary-action" disabled={!canManageUsers} onClick={() => openModal("user")} type="button"><Plus aria-hidden="true" size={17} />Usuario</button>
         <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("message")} type="button">Template msg</button>
+        <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("leadOutcome")} type="button">Motivo lead</button>
         <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("birthday")} type="button">Aniversarios</button>
         <button className="text-button" disabled={!canManageSettings} onClick={() => openModal("parameter")} type="button">Parametro</button>
       </section>
@@ -392,6 +412,16 @@ export function LiveSettingsWorkspace() {
                   <label>Dominio<input autoFocus required value={form.domain} onChange={(event) => setForm((current) => ({ ...current, domain: event.target.value }))} /></label>
                   <label>Nome<input required minLength={2} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
                   <label className="lead-modal-wide">Metadata JSON<textarea value={form.value} onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))} /></label>
+                </>
+              ) : null}
+              {modalKind === "leadOutcome" ? (
+                <>
+                  <label>Etapa<select autoFocus value={form.leadOutcomeStage} onChange={(event) => setForm((current) => ({ ...current, leadOutcomeStage: event.target.value as LeadOutcomeStage }))}>{(Object.keys(leadOutcomeStageLabels) as LeadOutcomeStage[]).map((stage) => <option key={stage} value={stage}>{leadOutcomeStageLabels[stage]}</option>)}</select></label>
+                  <label>Motivo<input required minLength={2} maxLength={120} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ex.: Cliente comprou em outra loja" /></label>
+                  <div className="lead-modal-wide lead-outcome-summary">
+                    <strong>Configuracao comercial</strong>
+                    <span>O motivo sera usado no modal de desfecho do funil e gravado em auditoria quando selecionado.</span>
+                  </div>
                 </>
               ) : null}
               {modalKind === "deadline" ? (
@@ -478,6 +508,7 @@ export function LiveSettingsWorkspace() {
           <div className="stock-actions">
             <button disabled={!canManageSettings} onClick={() => openModal("document")} type="button"><FileText aria-hidden="true" size={17} />Template doc</button>
             <button disabled={!canManageSettings} onClick={() => openModal("birthday")} type="button"><UsersRound aria-hidden="true" size={17} />Aniversarios</button>
+            <button disabled={!canManageSettings} onClick={() => openModal("leadOutcome")} type="button"><SlidersHorizontal aria-hidden="true" size={17} />Motivo lead</button>
             <button disabled={!canManageSettings} onClick={() => openModal("category")} type="button"><SlidersHorizontal aria-hidden="true" size={17} />Categoria</button>
             <button disabled={!canManageSettings} onClick={() => openModal("deadline")} type="button"><KeyRound aria-hidden="true" size={17} />Prazo</button>
             <button disabled={!canManageSettings} onClick={() => openModal("accountant")} type="button"><Database aria-hidden="true" size={17} />Contador</button>
@@ -485,6 +516,7 @@ export function LiveSettingsWorkspace() {
           </div>
           <ul className="blueprint-side-list">
             <li><UsersRound aria-hidden="true" size={18} /><div><strong>Aniversarios</strong><span>{birthdayValue?.enabled === false ? "Notificacoes pausadas" : `Responsavel: ${birthdayResponsible?.name ?? "nao definido"} | ${birthdayValue?.daysBefore ?? 7} dia(s) antes`}</span></div></li>
+            <li><SlidersHorizontal aria-hidden="true" size={18} /><div><strong>Motivos de lead</strong><span>{leadOutcomeReasons.length > 0 ? `${leadOutcomeReasons.length} motivo(s) configurado(s)` : "usando motivos padrao do sistema"}</span></div></li>
             <li><ShieldCheck aria-hidden="true" size={18} /><div><strong>RBAC real</strong><span>Usuarios e ajustes tecnicos exigem permissao sensivel.</span></div></li>
             <li><SlidersHorizontal aria-hidden="true" size={18} /><div><strong>Configuravel</strong><span>Templates, prazos e categorias saem do hardcode.</span></div></li>
             <li><Bot aria-hidden="true" size={18} /><div><strong>Integracoes</strong><span>Parametros operacionais guardam toggles e guardrails.</span></div></li>
