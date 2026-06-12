@@ -26,6 +26,7 @@
     "qa:local": "npm run qa && npm run smoke:local",
     "qa:commercial:local": "node scripts/qa-commercial-local.mjs",
     "qa:functional:local": "node scripts/qa-functional-local.mjs",
+    "qa:vehicles:local": "node scripts/qa-vehicles-local.mjs",
     "qa:visual:local": "node scripts/qa-visual-local.mjs",
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "smoke:local": "node scripts/smoke-local.mjs",

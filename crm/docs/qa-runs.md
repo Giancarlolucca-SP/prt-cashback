@@ -205,3 +205,35 @@ Observacoes:
 
 - O roteiro cria massa QA auditavel com prefixo `QA Administrativo` e identificador unico por execucao.
 - Proxima etapa recomendada: QA operacional Veiculos/Avaliador, validando compras, avaliacoes e estoque sem financeiro global.
+
+## 2026-06-11 - QA Veiculos/Avaliador automatizado
+
+Contexto:
+
+- Etapa BMAP: QA operacional do fluxo de veiculos e avaliacao.
+- Foco: validar compras, avaliacoes, checklist de avaliacao, leitura de estoque e bloqueios sensiveis do perfil Avaliador.
+- Escopo: apenas projeto novo `crm/`, com API e Web ja rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:vehicles:local` | Passou |
+
+Resultado:
+
+- Readiness da API: ok.
+- Perfil usado: `avaliador@gt3.local`.
+- Estoque listado.
+- Oportunidade de compra criada em `OPEN`.
+- Oportunidade movida para `EVALUATING`.
+- Avaliacao criada com decisao `NEGOTIATING`.
+- Checklist de avaliacao criado e recuperado nos detalhes.
+- Aprovacao sensivel da avaliacao bloqueada para Avaliador.
+- Bloqueios sensiveis confirmados: `/finance/summary`, `/audit/logs`, `/users` e `/sales`.
+- Rotas Web de veiculos verificadas: `/compras`, `/avaliacoes`, `/estoque`.
+
+Observacoes:
+
+- O roteiro cria massa QA auditavel com origem `QA Veiculos` e identificador unico por execucao.
+- Proxima etapa recomendada: QA operacional Servicos/Pos-venda, validando OS, prestadores, pos-venda e bloqueio de resultado financeiro global.

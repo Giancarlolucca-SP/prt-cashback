@@ -13,6 +13,7 @@ npm run smoke:local
 npm run qa:functional:local
 npm run qa:commercial:local
 npm run qa:administrative:local
+npm run qa:vehicles:local
 npm run qa:visual:local
 ```
 
@@ -123,6 +124,7 @@ npm run smoke:local
 npm run qa:functional:local
 npm run qa:commercial:local
 npm run qa:administrative:local
+npm run qa:vehicles:local
 npm run qa:visual:local
 npm test
 npm run typecheck

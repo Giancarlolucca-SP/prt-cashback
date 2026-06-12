@@ -110,6 +110,12 @@ Para validar o fluxo Administrativo com triagem, repasse, documentos e prestador
 npm run qa:administrative:local
 ```
 
+Para validar o fluxo Veiculos/Avaliador com compras, avaliacoes e estoque:
+
+```bash
+npm run qa:vehicles:local
+```
+
 Para validar layout desktop/mobile, erros de console acionaveis e capturar screenshots locais:
 
 ```bash
