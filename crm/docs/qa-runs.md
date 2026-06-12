@@ -237,3 +237,36 @@ Observacoes:
 
 - O roteiro cria massa QA auditavel com origem `QA Veiculos` e identificador unico por execucao.
 - Proxima etapa recomendada: QA operacional Servicos/Pos-venda, validando OS, prestadores, pos-venda e bloqueio de resultado financeiro global.
+
+## 2026-06-11 - QA Servicos/Pos-venda automatizado
+
+Contexto:
+
+- Etapa BMAP: QA operacional do fluxo de servicos e pos-venda.
+- Foco: validar cliente de pos-venda, prestador, catalogo, OS, itens, custos, notas, conclusao da OS e bloqueios sensiveis.
+- Escopo: apenas projeto novo `crm/`, com API e Web ja rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:services:local` | Passou |
+
+Resultado:
+
+- Readiness da API: ok.
+- Perfil usado: `servicos@gt3.local`.
+- Cliente de pos-venda criado.
+- Prestador criado.
+- Item de catalogo criado.
+- OS criada em `OPEN`, movida para `SCHEDULED` e depois `DONE`.
+- Item, custo e nota vinculados a OS.
+- Detalhes da OS retornaram item/custo/nota.
+- Lista de pos-venda retornou o cliente criado.
+- Bloqueios sensiveis confirmados: `/finance/summary`, `/audit/logs` e `/users`.
+- Rotas Web de servicos verificadas: `/servicos`, `/fornecedores`, `/pos-venda`, `/agendamentos`.
+
+Observacoes:
+
+- O roteiro cria massa QA auditavel com prefixo `QA Pos-venda` e identificador unico por execucao.
+- Proxima etapa recomendada: QA Gestao/Dono, validando resultados, financeiro, auditoria, configuracoes e operacoes sensiveis.

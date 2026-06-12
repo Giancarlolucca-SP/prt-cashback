@@ -116,6 +116,12 @@ Para validar o fluxo Veiculos/Avaliador com compras, avaliacoes e estoque:
 npm run qa:vehicles:local
 ```
 
+Para validar o fluxo Servicos/Pos-venda com OS, prestadores e notas:
+
+```bash
+npm run qa:services:local
+```
+
 Para validar layout desktop/mobile, erros de console acionaveis e capturar screenshots locais:
 
 ```bash
