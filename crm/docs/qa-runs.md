@@ -653,3 +653,35 @@ Observacoes:
 
 - Follow-ups concluidos seguem fora da fila padrao; auditoria de concluidos permanece disponivel via API com `include_completed=true`.
 - Proxima melhoria recomendada: criar uma visao dedicada de agenda comercial unindo appointments e follow-ups.
+
+## 2026-06-12 - Agenda comercial unificada
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rotina diaria da equipe comercial.
+- Foco: aproximar agenda formal (`appointments`) e follow-ups leves de leads sem misturar responsabilidades de banco.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- A tela `/agendamentos` passou a buscar `GET /appointments` e `GET /leads/follow-ups` para o mesmo periodo do dia.
+- Foi adicionado o card de metrica `Follow-ups` na agenda.
+- A tela ganhou a secao `Agenda comercial`, listando follow-ups de leads do dia ao lado da agenda operacional.
+- Follow-ups podem ser concluidos tambem pela tela de Agendamentos, usando o endpoint auditavel existente.
+- Quando nao ha appointments ou follow-ups, a tela mostra estados vazios explicitos.
+
+Observacoes:
+
+- `Appointment` continua sendo agenda operacional formal; `FollowUp` continua sendo contato comercial leve.
+- Proxima melhoria recomendada: permitir converter follow-up em appointment quando o contato virar visita, avaliacao ou entrega.

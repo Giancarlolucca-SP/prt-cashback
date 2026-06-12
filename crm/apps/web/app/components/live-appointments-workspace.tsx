@@ -42,6 +42,22 @@ type ListResponse<T> = {
   total?: number;
 };
 
+type LeadFollowUp = {
+  id: string;
+  leadId: string | null;
+  type: string;
+  dueAt: string;
+  completedAt: string | null;
+  notes: string | null;
+  lead: {
+    id: string;
+    interest: string | null;
+    source: string | null;
+    status: string;
+    title: string;
+  } | null;
+};
+
 type AppointmentFormState = {
   endsAt: string;
   notes: string;
@@ -91,6 +107,8 @@ const fallbackAppointments: Appointment[] = [
   },
 ];
 
+const fallbackFollowUps: LeadFollowUp[] = [];
+
 const filters: Array<{ label: string; status?: AppointmentStatus }> = [
   { label: "Todos" },
   { label: "Agendados", status: "SCHEDULED" },
@@ -134,8 +152,11 @@ function toneForStatus(status: AppointmentStatus) {
 export function LiveAppointmentsWorkspace() {
   const { hasPermission, token } = useAuth();
   const canManageAppointments = hasPermission({ module: "appointments", action: "manage" });
+  const canReadLeads = hasPermission({ module: "leads", action: "read" });
+  const canUpdateLeads = hasPermission({ module: "leads", action: "update" });
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [appointments, setAppointments] = useState(fallbackAppointments);
+  const [followUps, setFollowUps] = useState(fallbackFollowUps);
   const [form, setForm] = useState<AppointmentFormState>(emptyForm);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -162,10 +183,14 @@ export function LiveAppointmentsWorkspace() {
     if (activeFilter.status) query.set("status", activeFilter.status);
 
     setStatus("loading");
-    apiGet<ListResponse<Appointment>>(`/appointments?${query.toString()}`, token)
-      .then((list) => {
+    Promise.all([
+      apiGet<ListResponse<Appointment>>(`/appointments?${query.toString()}`, token),
+      canReadLeads ? apiGet<ListResponse<LeadFollowUp>>(`/leads/follow-ups?${query.toString()}`, token) : Promise.resolve({ items: fallbackFollowUps, page: 1, pageSize: 50 }),
+    ])
+      .then(([list, followUpList]) => {
         if (!isCurrent) return;
         setAppointments(list.items);
+        setFollowUps(followUpList.items);
         setStatus("live");
       })
       .catch(() => {
@@ -175,7 +200,7 @@ export function LiveAppointmentsWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canManageAppointments, refreshKey, token]);
+  }, [activeFilter, canManageAppointments, canReadLeads, refreshKey, token]);
 
   function openCreateModal() {
     const start = new Date(Date.now() + 60 * 60000);
@@ -254,6 +279,21 @@ export function LiveAppointmentsWorkspace() {
     }
   }
 
+  async function completeFollowUp(followUp: LeadFollowUp) {
+    if (!token || !canUpdateLeads || movingId) return;
+
+    setMovingId(followUp.id);
+    try {
+      const response = await apiPost<{ data: LeadFollowUp }>(`/leads/follow-ups/${followUp.id}/complete`, token, {});
+      setFollowUps((current) => current.filter((item) => item.id !== response.data.id));
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setStatus("error");
+    } finally {
+      setMovingId(null);
+    }
+  }
+
   const view = useMemo(() => {
     const confirmed = appointments.filter((item) => item.status === "CONFIRMED").length;
     const scheduled = appointments.filter((item) => item.status === "SCHEDULED").length;
@@ -262,6 +302,7 @@ export function LiveAppointmentsWorkspace() {
     return {
       metrics: [
         { label: "Hoje", value: String(appointments.length), detail: "visitas, avaliacoes e entregas", tone: "teal" },
+        { label: "Follow-ups", value: String(followUps.length), detail: "contatos comerciais do dia", tone: "teal" },
         { label: "Confirmados", value: String(confirmed), detail: "com status confirmado", tone: "blue" },
         { label: "Reagendar", value: String(scheduled), detail: "aguardam confirmacao", tone: "amber" },
         { label: "Conflitos", value: String(conflicts), detail: "mesmo horario ou responsavel", tone: "rose" },
@@ -272,7 +313,7 @@ export function LiveAppointmentsWorkspace() {
         target: `${item.title} | ${timeLabel(item.startsAt)}`,
       })),
     };
-  }, [appointments]);
+  }, [appointments, followUps.length]);
 
   const statusLabel = {
     error: "Usando fallback",
@@ -409,6 +450,19 @@ export function LiveAppointmentsWorkspace() {
                 </div>
               </article>
             ))}
+            {appointments.length === 0 ? (
+              <article className="appointment-card">
+                <div className="appointment-time">
+                  <Clock3 aria-hidden="true" size={18} />
+                  <strong>--:--</strong>
+                </div>
+                <div className="appointment-main">
+                  <span>Agenda</span>
+                  <strong>Nenhum agendamento formal hoje</strong>
+                  <em>Use o botao Novo agendamento para criar visita, avaliacao ou entrega.</em>
+                </div>
+              </article>
+            ) : null}
           </div>
         </section>
 
@@ -456,6 +510,51 @@ export function LiveAppointmentsWorkspace() {
             <span>Agendamentos devem sempre vincular lead, veiculo, venda ou OS quando existir origem.</span>
           </div>
         </aside>
+
+        <section className="panel schedule-board commercial-agenda" aria-label="Agenda comercial de follow-ups">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Agenda comercial</p>
+              <h3>Follow-ups de leads hoje</h3>
+            </div>
+            <span className="live-pill">{followUps.length}</span>
+          </div>
+
+          <div className="appointment-list">
+            {followUps.map((followUp) => (
+              <article className="appointment-card warning" key={followUp.id}>
+                <div className="appointment-time">
+                  <MessageCircle aria-hidden="true" size={18} />
+                  <strong>{timeLabel(followUp.dueAt)}</strong>
+                </div>
+                <div className="appointment-main">
+                  <span>{followUp.type}</span>
+                  <strong>{followUp.lead?.title ?? "Lead sem titulo"}</strong>
+                  <em>{followUp.lead?.interest ?? followUp.notes ?? "Sem observacoes"}</em>
+                </div>
+                <div className="appointment-tags">
+                  <span>{followUp.lead?.source ?? "Origem nao informada"}</span>
+                  <button disabled={!canUpdateLeads || movingId === followUp.id} onClick={() => void completeFollowUp(followUp)} type="button">
+                    {movingId === followUp.id ? "Salvando..." : "Concluir"}
+                  </button>
+                </div>
+              </article>
+            ))}
+            {followUps.length === 0 ? (
+              <article className="appointment-card confirmed">
+                <div className="appointment-time">
+                  <CheckCircle2 aria-hidden="true" size={18} />
+                  <strong>ok</strong>
+                </div>
+                <div className="appointment-main">
+                  <span>Follow-ups</span>
+                  <strong>Sem contatos pendentes hoje</strong>
+                  <em>A fila comercial leve esta limpa para o periodo.</em>
+                </div>
+              </article>
+            ) : null}
+          </div>
+        </section>
       </section>
     </>
   );

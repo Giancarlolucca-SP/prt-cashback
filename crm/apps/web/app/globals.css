@@ -2123,6 +2123,10 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.8fr);
 }
 
+.commercial-agenda {
+  grid-column: 1 / -1;
+}
+
 .appointment-list,
 .schedule-task-list {
   display: grid;
