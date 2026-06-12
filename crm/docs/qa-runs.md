@@ -140,3 +140,35 @@ Observacoes:
 
 - O script ignora ruidos conhecidos do Next/React em modo development, como avisos de `unsafe-eval`.
 - A inspecao humana ainda deve revisar detalhes finos de usabilidade, texto e fluxo de modais.
+
+## 2026-06-11 - QA Comercial automatizado
+
+Contexto:
+
+- Etapa BMAP: QA operacional do primeiro fluxo de negocio.
+- Foco: validar fluxo Comercial com perfil Vendedor, cobrindo lead, cliente, agenda, venda em rascunho e bloqueio de areas sensiveis.
+- Escopo: apenas projeto novo `crm/`, com API e Web ja rodando localmente.
+
+Comando executado:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:commercial:local` | Passou |
+
+Resultado:
+
+- Readiness da API: ok.
+- Perfil usado: `vendedor@gt3.local`.
+- Criado cliente + lead minimo com origem `QA Comercial`.
+- Lead movido de `NEW` para `CONTACTED`.
+- Cliente movido para status operacional `SCHEDULED`.
+- Agendamento criado e confirmado.
+- Venda criada em `DRAFT` e movida para `PROPOSAL`.
+- Historico do cliente retornou eventos e venda vinculada.
+- Bloqueios sensiveis confirmados: `/finance/summary` e `/audit/logs`.
+- Rotas Web comerciais verificadas: `/leads`, `/clientes`, `/agendamentos`, `/vendas`.
+
+Observacoes:
+
+- O roteiro cria massa QA auditavel com prefixo `QA Comercial` e identificador unico por execucao.
+- Proxima etapa recomendada: QA operacional Administrativo, validando atalhos, triagem, prestador/fornecedor e venda de repasse.
