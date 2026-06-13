@@ -820,6 +820,94 @@ input:focus-visible {
   margin: 0;
 }
 
+.profile-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.profile-card {
+  min-height: 260px;
+}
+
+.profile-detail-list,
+.profile-check-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-detail-list li,
+.profile-check-list li {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.profile-detail-list strong {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.profile-detail-list span,
+.profile-check-list span {
+  color: var(--ink);
+  font-size: 14px;
+  text-align: right;
+}
+
+.profile-check-list li {
+  justify-content: flex-start;
+}
+
+.profile-check-list svg {
+  color: var(--teal);
+  flex: 0 0 auto;
+}
+
+.profile-preference-list {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-preference-row {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 14px;
+}
+
+.profile-preference-row strong,
+.profile-preference-row span,
+.profile-preference-row small {
+  display: block;
+}
+
+.profile-preference-row span,
+.profile-preference-row small,
+.profile-preference-row time {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.profile-preference-row small {
+  margin-top: 6px;
+  word-break: break-word;
+}
+
 .chart-zone {
   display: grid;
   gap: 16px;
@@ -5367,6 +5455,7 @@ html[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
 
 @media (max-width: 1220px) {
   .metric-grid,
+  .profile-grid,
   .chart-zone,
   .decision-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5446,6 +5535,7 @@ html[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
   }
 
   .lead-row,
+  .profile-preference-row,
   .deal-card,
   .service-card,
   .audit-card,

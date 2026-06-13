@@ -69,6 +69,13 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Ok" }
         "403": { $ref: "#/components/responses/Error" }
+  /auth/preferences:
+    get:
+      tags: [Auth]
+      summary: Lista preferencias persistidas do usuario autenticado.
+      responses:
+        "200": { $ref: "#/components/responses/List" }
+        "401": { $ref: "#/components/responses/Error" }
   /auth/preferences/{key}:
     get:
       tags: [Auth]
@@ -80,6 +87,13 @@ paths:
     put:
       tags: [Auth]
       summary: Cria ou atualiza preferencia persistida do usuario autenticado.
+      parameters: [ { $ref: "#/components/parameters/Key" } ]
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [Auth]
+      summary: Remove preferencia persistida do usuario autenticado.
       parameters: [ { $ref: "#/components/parameters/Key" } ]
       responses:
         "200": { $ref: "#/components/responses/Ok" }

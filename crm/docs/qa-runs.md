@@ -1000,3 +1000,35 @@ Observacoes:
 
 - O QA visual detectou e validou a correcao do preflight para `PUT`.
 - Proxima melhoria recomendada: criar tela simples de perfil/preferencias para expor e limpar preferencias do usuario.
+
+## 2026-06-13 - Tela de perfil e limpeza de preferencias
+
+Contexto:
+
+- Etapa BMAP: governanca de usabilidade e controle pelo usuario.
+- Foco: permitir que o usuario veja e limpe preferencias pessoais salvas no backend.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou com `/perfil` incluido na regressao visual |
+
+Resultado:
+
+- Criada pagina `/perfil`, acessivel a qualquer usuario autenticado no menu Sistema.
+- A tela mostra dados da conta, controles de seguranca e preferencias pessoais salvas.
+- Adicionados endpoints `GET /auth/preferences` e `DELETE /auth/preferences/:key`.
+- A limpeza de preferencia e idempotente e auditada como `preference_deleted`.
+- Smoke test cobre listagem, exclusao e confirmacao de isolamento por usuario.
+
+Observacoes:
+
+- O contrato OpenAPI e o mapa da API foram atualizados.
+- Proxima melhoria recomendada: permitir reset seletivo de preferencias direto dos modais onde elas sao usadas.

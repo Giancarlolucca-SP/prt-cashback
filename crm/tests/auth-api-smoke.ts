@@ -175,6 +175,20 @@ try {
     search: "retorno",
   });
 
+  const listOwnerPreferences = await app.inject({
+    method: "GET",
+    url: "/auth/preferences",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listOwnerPreferences.statusCode, 200);
+  assert.ok(
+    (listOwnerPreferences.json().items as Array<{ key: string }>).some(
+      (preference) => preference.key === "customer_history_timeline",
+    ),
+  );
+
   const sellerPreferenceIsolation = await app.inject({
     method: "GET",
     url: "/auth/preferences/customer_history_timeline",
@@ -184,6 +198,26 @@ try {
   });
   assert.equal(sellerPreferenceIsolation.statusCode, 200);
   assert.equal(sellerPreferenceIsolation.json().data.value, null);
+
+  const deleteOwnerPreference = await app.inject({
+    method: "DELETE",
+    url: "/auth/preferences/customer_history_timeline",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(deleteOwnerPreference.statusCode, 200);
+  assert.equal(deleteOwnerPreference.json().ok, true);
+
+  const deletedOwnerPreference = await app.inject({
+    method: "GET",
+    url: "/auth/preferences/customer_history_timeline",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(deletedOwnerPreference.statusCode, 200);
+  assert.equal(deletedOwnerPreference.json().data.value, null);
 
   const healthReady = await app.inject({
     method: "GET",

@@ -19,6 +19,7 @@ const routes = [
   "/clientes",
   "/estoque",
   "/administrativo",
+  "/perfil",
   "/configuracoes",
   "/auditoria",
 ];

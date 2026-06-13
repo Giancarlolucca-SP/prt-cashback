@@ -222,6 +222,29 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     return { allowed: true };
   });
 
+  app.get("/preferences", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+
+    const preferences = await prisma.userPreference.findMany({
+      where: { userId: session.user.id },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return {
+      items: preferences.map((preference) => ({
+        key: preference.key,
+        value: preference.value,
+        updatedAt: preference.updatedAt,
+      })),
+      page: 1,
+      pageSize: preferences.length,
+      total: preferences.length,
+    };
+  });
+
   app.get("/preferences/:key", async (request, reply) => {
     const session = await getSessionUser(request);
     if (!session) {
@@ -302,5 +325,43 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         updatedAt: preference.updatedAt,
       },
     };
+  });
+
+  app.delete("/preferences/:key", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+
+    const parsedParams = preferenceKeySchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "invalid_payload" });
+    }
+
+    const preference = await prisma.userPreference.findUnique({
+      where: {
+        userId_key: {
+          userId: session.user.id,
+          key: parsedParams.data.key,
+        },
+      },
+    });
+
+    if (!preference) {
+      return { ok: true };
+    }
+
+    await prisma.userPreference.delete({ where: { id: preference.id } });
+    await auditAuthEvent({
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      actorRole: session.user.role,
+      action: "preference_deleted",
+      entityType: "user_preference",
+      entityId: preference.id,
+      metadata: { key: preference.key },
+    });
+
+    return { ok: true };
   });
 }

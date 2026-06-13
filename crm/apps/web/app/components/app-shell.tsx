@@ -19,6 +19,7 @@ import {
   Search,
   SearchCheck,
   Settings,
+  Settings2,
   ShieldCheck,
   Sparkles,
   Store,
@@ -79,6 +80,7 @@ const navGroups = [
   {
     label: "Sistema",
     items: [
+      { label: "Perfil", href: "/perfil", icon: Settings2 },
       { label: "Automacoes", href: "/automacoes", icon: Bot, permission: { module: "automation", action: "manage", scope: "ALL", sensitiveArea: "technical" } },
       { label: "Configuracoes", href: "/configuracoes", icon: Settings, permission: { module: "settings", action: "manage", scope: "ALL", sensitiveArea: "technical" } },
       { label: "Site Loja", href: "/site-loja", icon: Store, permission: { module: "ads", action: "manage" } },
