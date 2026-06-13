@@ -66,6 +66,8 @@ type AppointmentFormState = {
   type: string;
 };
 
+type FollowUpConversionFormState = AppointmentFormState;
+
 const emptyForm: AppointmentFormState = {
   endsAt: "",
   notes: "",
@@ -73,6 +75,8 @@ const emptyForm: AppointmentFormState = {
   title: "",
   type: "Visita loja",
 };
+
+const emptyConversionForm: FollowUpConversionFormState = emptyForm;
 
 const fallbackAppointments: Appointment[] = [
   {
@@ -157,6 +161,8 @@ export function LiveAppointmentsWorkspace() {
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [appointments, setAppointments] = useState(fallbackAppointments);
   const [followUps, setFollowUps] = useState(fallbackFollowUps);
+  const [conversionFollowUp, setConversionFollowUp] = useState<LeadFollowUp | null>(null);
+  const [conversionForm, setConversionForm] = useState<FollowUpConversionFormState>(emptyConversionForm);
   const [form, setForm] = useState<AppointmentFormState>(emptyForm);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -208,6 +214,27 @@ export function LiveAppointmentsWorkspace() {
     setForm({ ...emptyForm, endsAt: toDateTimeLocal(end), startsAt: toDateTimeLocal(start) });
     setSaveError(null);
     setModalOpen(true);
+  }
+
+  function openConversionModal(followUp: LeadFollowUp) {
+    const start = new Date(followUp.dueAt);
+    const end = new Date(start.getTime() + 60 * 60000);
+    setConversionForm({
+      endsAt: toDateTimeLocal(end),
+      notes: followUp.notes ?? followUp.lead?.interest ?? "",
+      startsAt: toDateTimeLocal(start),
+      title: followUp.lead?.title ?? "Visita de lead",
+      type: "Visita loja",
+    });
+    setConversionFollowUp(followUp);
+    setSaveError(null);
+  }
+
+  function closeConversionModal() {
+    if (saving || movingId) return;
+    setConversionFollowUp(null);
+    setConversionForm(emptyConversionForm);
+    setSaveError(null);
   }
 
   async function handleCreateAppointment(event: React.FormEvent<HTMLFormElement>) {
@@ -294,28 +321,34 @@ export function LiveAppointmentsWorkspace() {
     }
   }
 
-  async function convertFollowUpToAppointment(followUp: LeadFollowUp) {
-    if (!token || !canManageAppointments || !canUpdateLeads || movingId) return;
+  async function handleConvertFollowUp(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !canManageAppointments || !canUpdateLeads || !conversionFollowUp || saving) return;
 
-    const startsAt = new Date(followUp.dueAt);
-    const endsAt = new Date(startsAt.getTime() + 60 * 60000);
+    if (!conversionForm.startsAt) {
+      setSaveError("Informe o horario de inicio do agendamento.");
+      return;
+    }
 
-    setMovingId(followUp.id);
+    setSaving(true);
+    setSaveError(null);
     try {
-      const response = await apiPost<{ appointment: Appointment; followUp: LeadFollowUp }>(`/leads/follow-ups/${followUp.id}/appointment`, token, {
-        endsAt: endsAt.toISOString(),
-        notes: followUp.notes ?? followUp.lead?.interest ?? undefined,
-        startsAt: startsAt.toISOString(),
-        title: followUp.lead?.title ?? "Visita de lead",
-        type: "Visita loja",
+      const response = await apiPost<{ appointment: Appointment; followUp: LeadFollowUp }>(`/leads/follow-ups/${conversionFollowUp.id}/appointment`, token, {
+        endsAt: conversionForm.endsAt ? new Date(conversionForm.endsAt).toISOString() : undefined,
+        notes: conversionForm.notes.trim() || undefined,
+        startsAt: new Date(conversionForm.startsAt).toISOString(),
+        title: conversionForm.title.trim() || conversionFollowUp.lead?.title || "Visita de lead",
+        type: conversionForm.type.trim() || "Visita loja",
       });
       setAppointments((current) => [response.appointment, ...current.filter((item) => item.id !== response.appointment.id)].sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
       setFollowUps((current) => current.filter((item) => item.id !== response.followUp.id));
+      setConversionFollowUp(null);
+      setConversionForm(emptyConversionForm);
       setRefreshKey((current) => current + 1);
     } catch {
-      setStatus("error");
+      setSaveError("Nao foi possivel converter o follow-up. Confira tipo e horarios.");
     } finally {
-      setMovingId(null);
+      setSaving(false);
     }
   }
 
@@ -422,6 +455,63 @@ export function LiveAppointmentsWorkspace() {
                 </button>
                 <button className="primary-action" disabled={saving || form.title.trim().length < 2 || !form.startsAt} type="submit">
                   {saving ? "Salvando..." : "Criar agendamento"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {conversionFollowUp ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Converter follow-up em agendamento">
+          <section className="dre-modal lead-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Agenda comercial</p>
+                <h3>Converter follow-up</h3>
+              </div>
+              <button aria-label="Fechar conversao de follow-up" className="icon-button" onClick={closeConversionModal} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <form className="lead-modal-form" onSubmit={handleConvertFollowUp}>
+              <div className="lead-modal-wide lead-outcome-summary">
+                <strong>{conversionFollowUp.lead?.title ?? "Lead sem titulo"}</strong>
+                <span>{conversionFollowUp.lead?.interest ?? conversionFollowUp.notes ?? "Sem observacoes"}</span>
+              </div>
+              <label>
+                Tipo
+                <select onChange={(event) => setConversionForm((current) => ({ ...current, type: event.target.value }))} value={conversionForm.type}>
+                  <option>Visita loja</option>
+                  <option>Avaliacao</option>
+                  <option>Vistoria</option>
+                  <option>Entrega tecnica</option>
+                  <option>Retorno comercial</option>
+                </select>
+              </label>
+              <label>
+                Titulo
+                <input maxLength={180} minLength={2} onChange={(event) => setConversionForm((current) => ({ ...current, title: event.target.value }))} required value={conversionForm.title} />
+              </label>
+              <label>
+                Inicio
+                <input onChange={(event) => setConversionForm((current) => ({ ...current, startsAt: event.target.value }))} required type="datetime-local" value={conversionForm.startsAt} />
+              </label>
+              <label>
+                Fim
+                <input onChange={(event) => setConversionForm((current) => ({ ...current, endsAt: event.target.value }))} type="datetime-local" value={conversionForm.endsAt} />
+              </label>
+              <label className="lead-modal-wide">
+                Observacoes
+                <textarea maxLength={1000} onChange={(event) => setConversionForm((current) => ({ ...current, notes: event.target.value }))} value={conversionForm.notes} />
+              </label>
+              {saveError ? <p className="lead-modal-error">{saveError}</p> : null}
+              <div className="lead-modal-actions">
+                <button className="text-button" disabled={saving} onClick={closeConversionModal} type="button">
+                  Cancelar
+                </button>
+                <button className="primary-action" disabled={saving || conversionForm.title.trim().length < 2 || !conversionForm.startsAt} type="submit">
+                  {saving ? "Convertendo..." : "Criar agendamento"}
                 </button>
               </div>
             </form>
@@ -559,8 +649,8 @@ export function LiveAppointmentsWorkspace() {
                 </div>
                 <div className="appointment-tags">
                   <span>{followUp.lead?.source ?? "Origem nao informada"}</span>
-                  <button disabled={!canManageAppointments || !canUpdateLeads || movingId === followUp.id} onClick={() => void convertFollowUpToAppointment(followUp)} type="button">
-                    {movingId === followUp.id ? "Salvando..." : "Virou visita"}
+                  <button disabled={!canManageAppointments || !canUpdateLeads || movingId === followUp.id} onClick={() => openConversionModal(followUp)} type="button">
+                    Virou visita
                   </button>
                   <button disabled={!canUpdateLeads || movingId === followUp.id} onClick={() => void completeFollowUp(followUp)} type="button">
                     {movingId === followUp.id ? "Salvando..." : "Concluir"}

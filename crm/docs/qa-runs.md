@@ -717,3 +717,34 @@ Observacoes:
 
 - A conversao usa o horario do follow-up como inicio e a UI cria uma visita de 1 hora por default.
 - Proxima melhoria recomendada: abrir modal de conversao para escolher tipo (`Visita`, `Avaliacao`, `Entrega`) e horario antes de criar o appointment.
+
+## 2026-06-13 - Modal de conversao de follow-up
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e agenda comercial.
+- Foco: dar controle ao vendedor antes de transformar follow-up em appointment formal.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- A acao `Virou visita` agora abre modal antes de converter o follow-up.
+- O modal permite escolher tipo, titulo, inicio, fim e observacoes do appointment.
+- Os campos sao pre-preenchidos com horario e contexto do follow-up.
+- A conversao continua usando o endpoint auditavel `POST /leads/follow-ups/:id/appointment`.
+
+Observacoes:
+
+- A UI ainda sugere `Visita loja` por default, mas permite alterar para avaliacao, vistoria, entrega tecnica ou retorno comercial.
+- Proxima melhoria recomendada: listar appointments vinculados no historico do lead/cliente com origem `follow_up`.
