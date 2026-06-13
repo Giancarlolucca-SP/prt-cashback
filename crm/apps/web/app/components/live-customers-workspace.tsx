@@ -89,6 +89,15 @@ type CustomerHistoryEvent = {
   occurredAt: string;
 };
 
+type CustomerHistoryTimelineItem = {
+  id: string;
+  entityId: string;
+  kind: "sale" | "purchase_lead" | "evaluation" | "appointment" | "event";
+  title: string;
+  description: string | null;
+  occurredAt: string;
+};
+
 type CustomerHistoryResponse = {
   customer: Customer;
   sales: CustomerHistorySale[];
@@ -96,6 +105,7 @@ type CustomerHistoryResponse = {
   evaluations: CustomerHistoryEvaluation[];
   appointments: CustomerHistoryAppointment[];
   events: CustomerHistoryEvent[];
+  timeline: CustomerHistoryTimelineItem[];
 };
 
 type ListResponse<T> = {
@@ -568,7 +578,7 @@ export function LiveCustomersWorkspace() {
     }
 
     setSelectedHistoryStatus("loading");
-    setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [] });
+    setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
     try {
       const response = await apiGet<CustomerHistoryResponse>(`/customers/${customer.id}/history`, token);
@@ -994,36 +1004,10 @@ export function LiveCustomersWorkspace() {
                     <span>Avaliacoes<strong>{selectedHistory.evaluations.length}</strong></span>
                     <span>Agenda<strong>{selectedHistory.appointments.length}</strong></span>
                   </div>
-                  {selectedHistory.sales.slice(0, 4).map((sale) => (
-                    <article className="customer-history-entry" key={sale.id}>
-                      <strong>Venda {sale.status}</strong>
-                      <span>{sale.type} | {money(sale.salePrice)} | {sale.closedAt ? "fechada" : "em andamento"}</span>
-                    </article>
-                  ))}
-                  {selectedHistory.purchaseLeads.slice(0, 3).map((lead) => (
-                    <article className="customer-history-entry" key={lead.id}>
-                      <strong>Compra {lead.status}</strong>
-                      <span>{lead.source ?? "Origem nao informada"} | {money(lead.askingPrice)}</span>
-                    </article>
-                  ))}
-                  {selectedHistory.evaluations.slice(0, 3).map((evaluation) => (
-                    <article className="customer-history-entry" key={evaluation.id}>
-                      <strong>Avaliacao {evaluation.decision}</strong>
-                      <span>Pedido {money(evaluation.requestedPrice)} | sugerido {money(evaluation.suggestedPrice)}</span>
-                    </article>
-                  ))}
-                  {selectedHistory.appointments.slice(0, 3).map((appointment) => (
-                    <article className="customer-history-entry" key={appointment.id}>
-                      <strong>{appointment.type} {appointment.status}</strong>
-                      <span>
-                        {relativeDate(appointment.startsAt)} | {appointment.origin === "follow_up" ? "origem follow-up" : "agenda manual"} | {appointment.title}
-                      </span>
-                    </article>
-                  ))}
-                  {selectedHistory.events.slice(0, 3).map((event) => (
-                    <article className="customer-history-entry" key={event.id}>
-                      <strong>{event.title}</strong>
-                      <span>{relativeDate(event.occurredAt)} | {event.description ?? event.type}</span>
+                  {selectedHistory.timeline.slice(0, 8).map((item) => (
+                    <article className="customer-history-entry" key={item.id}>
+                      <strong>{item.title}</strong>
+                      <span>{relativeDate(item.occurredAt)} | {item.description ?? item.kind}</span>
                     </article>
                   ))}
                 </div>

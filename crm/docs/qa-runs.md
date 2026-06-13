@@ -779,3 +779,34 @@ Observacoes:
 
 - O historico permanece centrado no cliente; historico especifico do lead ainda pode virar uma rota dedicada depois.
 - Proxima melhoria recomendada: criar timeline unica ordenada por data combinando vendas, agenda, compras, avaliacoes e eventos.
+
+## 2026-06-13 - Timeline unica do historico do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rastreabilidade comercial.
+- Foco: reduzir leitura fragmentada do historico do cliente em uma sequencia temporal unica.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- `GET /customers/:id/history` passou a retornar `timeline` com vendas, compras, avaliacoes, appointments e eventos.
+- A timeline e ordenada por data decrescente e limitada aos 20 itens mais recentes.
+- A tela de Clientes passou a renderizar os itens recentes da timeline no card de historico.
+- O smoke test valida appointments comuns e appointments originados de follow-up dentro da timeline.
+
+Observacoes:
+
+- Os arrays separados continuam no contrato para contadores e usos especificos.
+- Proxima melhoria recomendada: adicionar filtros de timeline por tipo de evento no painel de historico do cliente.

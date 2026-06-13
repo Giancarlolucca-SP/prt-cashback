@@ -728,14 +728,62 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
     });
     const followUpAppointmentIds = new Set(followUpAppointmentLogs.map((log) => log.entityId).filter((id): id is string => Boolean(id)));
     const interests = await primaryInterestsByCustomer(session.user.storeId, [customer.id]);
+    const sanitizedSales = sales.map(sanitizeCustomerSale);
+    const sanitizedPurchaseLeads = purchaseLeads.map(sanitizeCustomerPurchaseLead);
+    const sanitizedEvaluations = evaluations.map(sanitizeCustomerEvaluation);
+    const sanitizedAppointments = appointments.map((appointment) => sanitizeCustomerAppointment(appointment, followUpAppointmentIds.has(appointment.id) ? "follow_up" : "manual"));
+    const sanitizedEvents = events.map(sanitizeCustomerHistoryEvent);
+    const timeline = [
+      ...sanitizedSales.map((sale) => ({
+        id: `sale-${sale.id}`,
+        entityId: sale.id,
+        kind: "sale",
+        title: `Venda ${sale.status}`,
+        description: `${sale.type} | ${sale.salePrice ?? "sem valor"}`,
+        occurredAt: sale.closedAt ?? sale.createdAt,
+      })),
+      ...sanitizedPurchaseLeads.map((lead) => ({
+        id: `purchase-${lead.id}`,
+        entityId: lead.id,
+        kind: "purchase_lead",
+        title: `Compra ${lead.status}`,
+        description: `${lead.source ?? "Origem nao informada"} | ${lead.askingPrice ?? "sem valor"}`,
+        occurredAt: lead.createdAt,
+      })),
+      ...sanitizedEvaluations.map((evaluation) => ({
+        id: `evaluation-${evaluation.id}`,
+        entityId: evaluation.id,
+        kind: "evaluation",
+        title: `Avaliacao ${evaluation.decision}`,
+        description: `Pedido ${evaluation.requestedPrice ?? "sem valor"} | sugerido ${evaluation.suggestedPrice ?? "sem valor"}`,
+        occurredAt: evaluation.evaluatedAt,
+      })),
+      ...sanitizedAppointments.map((appointment) => ({
+        id: `appointment-${appointment.id}`,
+        entityId: appointment.id,
+        kind: "appointment",
+        title: `${appointment.type} ${appointment.status}`,
+        description: `${appointment.origin === "follow_up" ? "Origem follow-up" : "Agenda manual"} | ${appointment.title}`,
+        occurredAt: appointment.startsAt,
+      })),
+      ...sanitizedEvents.map((event) => ({
+        id: `event-${event.id}`,
+        entityId: event.id,
+        kind: "event",
+        title: event.title,
+        description: event.description ?? event.type,
+        occurredAt: event.occurredAt,
+      })),
+    ].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).slice(0, 20);
 
     return {
       customer: sanitizeCustomer(withPrimaryInterest(customer, interests)),
-      sales: sales.map(sanitizeCustomerSale),
-      purchaseLeads: purchaseLeads.map(sanitizeCustomerPurchaseLead),
-      evaluations: evaluations.map(sanitizeCustomerEvaluation),
-      appointments: appointments.map((appointment) => sanitizeCustomerAppointment(appointment, followUpAppointmentIds.has(appointment.id) ? "follow_up" : "manual")),
-      events: events.map(sanitizeCustomerHistoryEvent),
+      sales: sanitizedSales,
+      purchaseLeads: sanitizedPurchaseLeads,
+      evaluations: sanitizedEvaluations,
+      appointments: sanitizedAppointments,
+      events: sanitizedEvents,
+      timeline,
     };
   });
 

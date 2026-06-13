@@ -833,6 +833,14 @@ try {
           appointment.id === convertedAppointment.id && appointment.leadId === createdLeadId && appointment.origin === "follow_up",
       ),
   );
+  assert.ok(
+    customerHistoryAfterFollowUpAppointment
+      .json()
+      .timeline.some(
+        (item: { entityId: string; kind: string; description: string }) =>
+          item.entityId === convertedAppointment.id && item.kind === "appointment" && item.description.includes("Origem follow-up"),
+      ),
+  );
 
   const appraiserLogin = await app.inject({
     method: "POST",
@@ -2137,6 +2145,7 @@ try {
   assert.ok(customerHistory.json().purchaseLeads.some((lead: { id: string }) => lead.id === purchaseLeadId));
   assert.ok(customerHistory.json().evaluations.some((evaluation: { id: string }) => evaluation.id === evaluationId));
   assert.ok(customerHistory.json().appointments.some((appointment: { id: string }) => appointment.id === createdAppointmentId));
+  assert.ok(customerHistory.json().timeline.some((item: { kind: string; entityId: string }) => item.kind === "appointment" && item.entityId === createdAppointmentId));
   assert.ok(customerHistory.json().events.length >= 1);
 
   const soldInventory = await app.inject({
