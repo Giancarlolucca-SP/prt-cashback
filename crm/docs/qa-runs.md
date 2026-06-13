@@ -748,3 +748,34 @@ Observacoes:
 
 - A UI ainda sugere `Visita loja` por default, mas permite alterar para avaliacao, vistoria, entrega tecnica ou retorno comercial.
 - Proxima melhoria recomendada: listar appointments vinculados no historico do lead/cliente com origem `follow_up`.
+
+## 2026-06-13 - Appointments no historico do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rastreabilidade comercial.
+- Foco: mostrar compromissos formais no historico do cliente e destacar origem em follow-up quando aplicavel.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- `GET /customers/:id/history` passou a retornar `appointments`.
+- Appointments criados via conversao de follow-up retornam `origin: "follow_up"` com base no audit log `create_from_follow_up`.
+- A tela de Clientes passou a exibir contagem e entradas recentes de agenda no card de historico.
+- O smoke test valida appointment comum no historico e appointment convertido com origem `follow_up`.
+
+Observacoes:
+
+- O historico permanece centrado no cliente; historico especifico do lead ainda pode virar uma rota dedicada depois.
+- Proxima melhoria recomendada: criar timeline unica ordenada por data combinando vendas, agenda, compras, avaliacoes e eventos.

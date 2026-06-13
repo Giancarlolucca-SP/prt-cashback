@@ -190,6 +190,38 @@ function sanitizeCustomerEvaluation(evaluation: {
   };
 }
 
+function sanitizeCustomerAppointment(
+  appointment: {
+    id: string;
+    customerId: string | null;
+    leadId: string | null;
+    assignedUserId: string | null;
+    type: string;
+    title: string;
+    startsAt: Date;
+    endsAt: Date | null;
+    status: string;
+    notes: string | null;
+    createdAt: Date;
+  },
+  origin: "follow_up" | "manual",
+) {
+  return {
+    id: appointment.id,
+    customerId: appointment.customerId,
+    leadId: appointment.leadId,
+    assignedUserId: appointment.assignedUserId,
+    type: appointment.type,
+    title: appointment.title,
+    startsAt: appointment.startsAt.toISOString(),
+    endsAt: appointment.endsAt?.toISOString() ?? null,
+    status: appointment.status,
+    notes: appointment.notes,
+    origin,
+    createdAt: appointment.createdAt.toISOString(),
+  };
+}
+
 function sanitizeCustomerHistoryEvent(event: {
   id: string;
   type: string;
@@ -657,7 +689,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Cliente nao encontrado.");
     }
 
-    const [sales, purchaseLeads, evaluations, events] = await Promise.all([
+    const [sales, purchaseLeads, evaluations, appointments, events] = await Promise.all([
       prisma.sale.findMany({
         where: { storeId: session.user.storeId, customerId: customer.id, deletedAt: null },
         orderBy: { createdAt: "desc" },
@@ -673,12 +705,28 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         orderBy: { evaluatedAt: "desc" },
         take: 10,
       }),
+      prisma.appointment.findMany({
+        where: { storeId: session.user.storeId, customerId: customer.id, deletedAt: null },
+        orderBy: { startsAt: "desc" },
+        take: 10,
+      }),
       prisma.customerHistoryEvent.findMany({
         where: { storeId: session.user.storeId, customerId: customer.id },
         orderBy: { occurredAt: "desc" },
         take: 20,
       }),
     ]);
+    const followUpAppointmentLogs = await prisma.auditLog.findMany({
+      where: {
+        storeId: session.user.storeId,
+        module: "appointments",
+        action: "create_from_follow_up",
+        entityType: "appointment",
+        entityId: { in: appointments.map((appointment) => appointment.id) },
+      },
+      select: { entityId: true },
+    });
+    const followUpAppointmentIds = new Set(followUpAppointmentLogs.map((log) => log.entityId).filter((id): id is string => Boolean(id)));
     const interests = await primaryInterestsByCustomer(session.user.storeId, [customer.id]);
 
     return {
@@ -686,6 +734,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       sales: sales.map(sanitizeCustomerSale),
       purchaseLeads: purchaseLeads.map(sanitizeCustomerPurchaseLead),
       evaluations: evaluations.map(sanitizeCustomerEvaluation),
+      appointments: appointments.map((appointment) => sanitizeCustomerAppointment(appointment, followUpAppointmentIds.has(appointment.id) ? "follow_up" : "manual")),
       events: events.map(sanitizeCustomerHistoryEvent),
     };
   });

@@ -817,6 +817,23 @@ try {
   });
   assert.ok(convertedAppointment);
 
+  const customerHistoryAfterFollowUpAppointment = await app.inject({
+    method: "GET",
+    url: `/customers/${createdCustomerId}/history`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(customerHistoryAfterFollowUpAppointment.statusCode, 200);
+  assert.ok(
+    customerHistoryAfterFollowUpAppointment
+      .json()
+      .appointments.some(
+        (appointment: { id: string; leadId: string | null; origin: string }) =>
+          appointment.id === convertedAppointment.id && appointment.leadId === createdLeadId && appointment.origin === "follow_up",
+      ),
+  );
+
   const appraiserLogin = await app.inject({
     method: "POST",
     url: "/auth/login",
@@ -2119,6 +2136,7 @@ try {
   assert.ok(customerHistory.json().sales.some((sale: { id: string }) => sale.id === saleId));
   assert.ok(customerHistory.json().purchaseLeads.some((lead: { id: string }) => lead.id === purchaseLeadId));
   assert.ok(customerHistory.json().evaluations.some((evaluation: { id: string }) => evaluation.id === evaluationId));
+  assert.ok(customerHistory.json().appointments.some((appointment: { id: string }) => appointment.id === createdAppointmentId));
   assert.ok(customerHistory.json().events.length >= 1);
 
   const soldInventory = await app.inject({

@@ -69,6 +69,18 @@ type CustomerHistoryEvaluation = {
   evaluatedAt: string;
 };
 
+type CustomerHistoryAppointment = {
+  id: string;
+  leadId: string | null;
+  type: string;
+  title: string;
+  startsAt: string;
+  endsAt: string | null;
+  status: string;
+  notes: string | null;
+  origin: "follow_up" | "manual";
+};
+
 type CustomerHistoryEvent = {
   id: string;
   type: string;
@@ -82,6 +94,7 @@ type CustomerHistoryResponse = {
   sales: CustomerHistorySale[];
   purchaseLeads: CustomerHistoryPurchaseLead[];
   evaluations: CustomerHistoryEvaluation[];
+  appointments: CustomerHistoryAppointment[];
   events: CustomerHistoryEvent[];
 };
 
@@ -555,7 +568,7 @@ export function LiveCustomersWorkspace() {
     }
 
     setSelectedHistoryStatus("loading");
-    setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], events: [] });
+    setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [] });
 
     try {
       const response = await apiGet<CustomerHistoryResponse>(`/customers/${customer.id}/history`, token);
@@ -979,6 +992,7 @@ export function LiveCustomersWorkspace() {
                     <span>Vendas<strong>{selectedHistory.sales.length}</strong></span>
                     <span>Compras<strong>{selectedHistory.purchaseLeads.length}</strong></span>
                     <span>Avaliacoes<strong>{selectedHistory.evaluations.length}</strong></span>
+                    <span>Agenda<strong>{selectedHistory.appointments.length}</strong></span>
                   </div>
                   {selectedHistory.sales.slice(0, 4).map((sale) => (
                     <article className="customer-history-entry" key={sale.id}>
@@ -996,6 +1010,14 @@ export function LiveCustomersWorkspace() {
                     <article className="customer-history-entry" key={evaluation.id}>
                       <strong>Avaliacao {evaluation.decision}</strong>
                       <span>Pedido {money(evaluation.requestedPrice)} | sugerido {money(evaluation.suggestedPrice)}</span>
+                    </article>
+                  ))}
+                  {selectedHistory.appointments.slice(0, 3).map((appointment) => (
+                    <article className="customer-history-entry" key={appointment.id}>
+                      <strong>{appointment.type} {appointment.status}</strong>
+                      <span>
+                        {relativeDate(appointment.startsAt)} | {appointment.origin === "follow_up" ? "origem follow-up" : "agenda manual"} | {appointment.title}
+                      </span>
                     </article>
                   ))}
                   {selectedHistory.events.slice(0, 3).map((event) => (
