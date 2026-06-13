@@ -341,7 +341,7 @@ function customerToForm(customer: Customer): CustomerFormState {
 }
 
 export function LiveCustomersWorkspace() {
-  const { hasPermission, token } = useAuth();
+  const { hasPermission, token, user } = useAuth();
   const canReadCustomers = hasPermission({ module: "customers", action: "read" });
   const canCreateCustomers = hasPermission({ module: "customers", action: "create" });
   const canCreateLeads = hasPermission({ module: "leads", action: "create" });
@@ -380,6 +380,7 @@ export function LiveCustomersWorkspace() {
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [total, setTotal] = useState(fallbackCustomers.length);
   const [visitFilter, setVisitFilter] = useState("");
+  const historyPreferenceKey = user?.id ? `gt3-crm-customer-history:${user.id}` : null;
 
   useEffect(() => {
     if (!token) {
@@ -423,6 +424,43 @@ export function LiveCustomersWorkspace() {
       isCurrent = false;
     };
   }, [activeFilter, birthMonthFilter, canReadCustomers, purchaseFilter, refreshKey, search, token, visitFilter]);
+
+  useEffect(() => {
+    if (!historyPreferenceKey) {
+      return;
+    }
+
+    try {
+      const rawPreference = window.localStorage.getItem(historyPreferenceKey);
+      if (!rawPreference) {
+        return;
+      }
+
+      const preference = JSON.parse(rawPreference) as { filter?: CustomerHistoryTimelineFilter; search?: string };
+      if (preference.filter && customerHistoryTimelineFilters.some((filter) => filter.key === preference.filter)) {
+        setSelectedHistoryTimelineFilter(preference.filter);
+      }
+      if (typeof preference.search === "string") {
+        setSelectedHistoryTimelineSearch(preference.search.slice(0, 80));
+      }
+    } catch {
+      window.localStorage.removeItem(historyPreferenceKey);
+    }
+  }, [historyPreferenceKey]);
+
+  useEffect(() => {
+    if (!historyPreferenceKey) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      historyPreferenceKey,
+      JSON.stringify({
+        filter: selectedHistoryTimelineFilter,
+        search: selectedHistoryTimelineSearch.slice(0, 80),
+      }),
+    );
+  }, [historyPreferenceKey, selectedHistoryTimelineFilter, selectedHistoryTimelineSearch]);
 
   useEffect(() => {
     if (!token) {
@@ -595,8 +633,6 @@ export function LiveCustomersWorkspace() {
     setSelectedHistoryStatus("loading");
     setExpandedTimelineItemId(null);
     setHistoryModalOpen(false);
-    setSelectedHistoryTimelineSearch("");
-    setSelectedHistoryTimelineFilter("all");
     setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
     try {

@@ -935,3 +935,34 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: persistir preferencia de filtro/busca por usuario quando houver perfil de uso.
+
+## 2026-06-13 - Preferencias locais da timeline do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e usabilidade da rastreabilidade.
+- Foco: preservar o modo de leitura preferido do usuario na timeline do cliente.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Filtro e busca da timeline do cliente passaram a ser persistidos em `localStorage`.
+- A chave de preferencia usa o `user.id` autenticado para evitar misturar usuarios no mesmo navegador.
+- Preferencias invalidas ou corrompidas sao descartadas automaticamente.
+- Ao abrir outro cliente, o item expandido fecha, mas filtro e busca preferidos sao preservados.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: mover essas preferencias para backend quando houver tela formal de perfil/preferencias.
