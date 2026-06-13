@@ -3030,7 +3030,7 @@ input:focus-visible {
 .customer-history-summary {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
 }
 
@@ -3047,6 +3047,31 @@ input:focus-visible {
 .customer-history-summary strong {
   color: var(--ink);
   font-size: 16px;
+}
+
+.customer-history-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.customer-history-filter button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.customer-history-filter button.active,
+.customer-history-filter button:hover {
+  background: rgba(20, 184, 166, 0.1);
+  border-color: rgba(20, 184, 166, 0.42);
+  color: var(--teal);
 }
 
 .customer-history-entry {

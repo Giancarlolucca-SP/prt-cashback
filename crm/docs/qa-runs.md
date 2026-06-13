@@ -810,3 +810,34 @@ Observacoes:
 
 - Os arrays separados continuam no contrato para contadores e usos especificos.
 - Proxima melhoria recomendada: adicionar filtros de timeline por tipo de evento no painel de historico do cliente.
+
+## 2026-06-13 - Filtros da timeline do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rastreabilidade comercial.
+- Foco: permitir que o usuario leia a timeline por tipo sem perder a visao consolidada.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- O painel de historico do cliente ganhou filtros `Todos`, `Vendas`, `Agenda`, `Compras`, `Avaliacoes` e `Eventos`.
+- A filtragem acontece localmente usando a `timeline` ja retornada por `GET /customers/:id/history`.
+- O painel exibe estado vazio quando nao ha itens para o filtro selecionado.
+- O grid de contadores foi ajustado para incluir `Agenda`.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: adicionar detalhes expansíveis por item da timeline.

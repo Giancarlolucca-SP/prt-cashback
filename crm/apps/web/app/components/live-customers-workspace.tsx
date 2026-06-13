@@ -98,6 +98,8 @@ type CustomerHistoryTimelineItem = {
   occurredAt: string;
 };
 
+type CustomerHistoryTimelineFilter = CustomerHistoryTimelineItem["kind"] | "all";
+
 type CustomerHistoryResponse = {
   customer: Customer;
   sales: CustomerHistorySale[];
@@ -154,6 +156,15 @@ const emptyMinimalLeadForm: MinimalLeadFormState = {
   origin: "WhatsApp",
   phone: "",
 };
+
+const customerHistoryTimelineFilters: Array<{ key: CustomerHistoryTimelineFilter; label: string }> = [
+  { key: "all", label: "Todos" },
+  { key: "sale", label: "Vendas" },
+  { key: "appointment", label: "Agenda" },
+  { key: "purchase_lead", label: "Compras" },
+  { key: "evaluation", label: "Avaliacoes" },
+  { key: "event", label: "Eventos" },
+];
 
 const fallbackCustomers: Customer[] = [
   {
@@ -361,6 +372,7 @@ export function LiveCustomersWorkspace() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedHistory, setSelectedHistory] = useState<CustomerHistoryResponse | null>(null);
+  const [selectedHistoryTimelineFilter, setSelectedHistoryTimelineFilter] = useState<CustomerHistoryTimelineFilter>("all");
   const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<"idle" | "loading" | "loaded" | "error" | "locked">("idle");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [total, setTotal] = useState(fallbackCustomers.length);
@@ -578,6 +590,7 @@ export function LiveCustomersWorkspace() {
     }
 
     setSelectedHistoryStatus("loading");
+    setSelectedHistoryTimelineFilter("all");
     setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
     try {
@@ -625,6 +638,18 @@ export function LiveCustomersWorkspace() {
       rows: customers.slice(0, 10),
     };
   }, [customers, total]);
+
+  const selectedHistoryTimeline = useMemo(() => {
+    if (!selectedHistory) {
+      return [];
+    }
+
+    if (selectedHistoryTimelineFilter === "all") {
+      return selectedHistory.timeline;
+    }
+
+    return selectedHistory.timeline.filter((item) => item.kind === selectedHistoryTimelineFilter);
+  }, [selectedHistory, selectedHistoryTimelineFilter]);
 
   const statusLabel = {
     error: "Usando fallback",
@@ -1004,12 +1029,30 @@ export function LiveCustomersWorkspace() {
                     <span>Avaliacoes<strong>{selectedHistory.evaluations.length}</strong></span>
                     <span>Agenda<strong>{selectedHistory.appointments.length}</strong></span>
                   </div>
-                  {selectedHistory.timeline.slice(0, 8).map((item) => (
+                  <div className="customer-history-filter" aria-label="Filtro do historico do cliente">
+                    {customerHistoryTimelineFilters.map((filter) => (
+                      <button
+                        className={selectedHistoryTimelineFilter === filter.key ? "active" : ""}
+                        key={filter.key}
+                        onClick={() => setSelectedHistoryTimelineFilter(filter.key)}
+                        type="button"
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedHistoryTimeline.slice(0, 8).map((item) => (
                     <article className="customer-history-entry" key={item.id}>
                       <strong>{item.title}</strong>
                       <span>{relativeDate(item.occurredAt)} | {item.description ?? item.kind}</span>
                     </article>
                   ))}
+                  {selectedHistoryTimeline.length === 0 ? (
+                    <article className="customer-history-entry">
+                      <strong>Sem eventos neste filtro</strong>
+                      <span>Escolha outro tipo de historico para revisar este cliente.</span>
+                    </article>
+                  ) : null}
                 </div>
               </li>
             ) : null}
