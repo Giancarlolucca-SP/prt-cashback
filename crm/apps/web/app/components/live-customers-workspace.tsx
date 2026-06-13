@@ -1179,6 +1179,7 @@ export function LiveCustomersWorkspace() {
                 />
               </label>
               <div className="customer-history-actions">
+                {hasCustomHistoryPreference ? <span>Preferencia salva</span> : null}
                 <button disabled={!hasCustomHistoryPreference || clearingHistoryPreference} onClick={() => void clearCustomerHistoryPreference()} type="button">
                   {clearingHistoryPreference ? "Limpando preferencia..." : "Limpar preferencia"}
                 </button>
@@ -1342,6 +1343,7 @@ export function LiveCustomersWorkspace() {
                     />
                   </label>
                   <div className="customer-history-actions">
+                    {hasCustomHistoryPreference ? <span>Preferencia salva</span> : null}
                     <button disabled={!hasCustomHistoryPreference || clearingHistoryPreference} onClick={() => void clearCustomerHistoryPreference()} type="button">
                       {clearingHistoryPreference ? "Limpando..." : "Limpar preferencia"}
                     </button>

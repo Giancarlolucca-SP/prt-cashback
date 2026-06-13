@@ -1061,3 +1061,31 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: adicionar indicador visual discreto quando a timeline estiver usando preferencia salva.
+
+## 2026-06-13 - Indicador de preferencia salva na timeline
+
+Contexto:
+
+- Etapa BMAP: clareza de estado e usabilidade no fluxo de clientes.
+- Foco: deixar explicito quando filtro/busca da timeline estao personalizados.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Card lateral e modal completo do historico exibem chip `Preferencia salva` quando filtro ou busca saem do padrao.
+- O indicador fica junto da acao `Limpar preferencia`, deixando claro por que a timeline esta filtrada.
+- O estado padrao segue sem ruido visual.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: adicionar um teste visual/funcional especifico que interaja com filtro, indicador e limpeza da preferencia.
