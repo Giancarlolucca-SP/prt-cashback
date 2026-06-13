@@ -371,6 +371,7 @@ export function LiveCustomersWorkspace() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [expandedTimelineItemId, setExpandedTimelineItemId] = useState<string | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<CustomerHistoryResponse | null>(null);
   const [selectedHistoryTimelineFilter, setSelectedHistoryTimelineFilter] = useState<CustomerHistoryTimelineFilter>("all");
   const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<"idle" | "loading" | "loaded" | "error" | "locked">("idle");
@@ -590,6 +591,7 @@ export function LiveCustomersWorkspace() {
     }
 
     setSelectedHistoryStatus("loading");
+    setExpandedTimelineItemId(null);
     setSelectedHistoryTimelineFilter("all");
     setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
@@ -650,6 +652,42 @@ export function LiveCustomersWorkspace() {
 
     return selectedHistory.timeline.filter((item) => item.kind === selectedHistoryTimelineFilter);
   }, [selectedHistory, selectedHistoryTimelineFilter]);
+
+  function timelineItemDetails(item: CustomerHistoryTimelineItem) {
+    if (!selectedHistory) {
+      return [];
+    }
+
+    if (item.kind === "sale") {
+      const sale = selectedHistory.sales.find((historyItem) => historyItem.id === item.entityId);
+      return sale ? [`Valor: ${money(sale.salePrice)}`, `Margem: ${money(sale.grossMargin)}`, sale.closedAt ? `Fechada em ${relativeDate(sale.closedAt)}` : "Venda em andamento"] : [];
+    }
+
+    if (item.kind === "appointment") {
+      const appointment = selectedHistory.appointments.find((historyItem) => historyItem.id === item.entityId);
+      return appointment
+        ? [
+            `Status: ${appointment.status}`,
+            `Origem: ${appointment.origin === "follow_up" ? "follow-up" : "agenda manual"}`,
+            appointment.endsAt ? `Fim: ${relativeDate(appointment.endsAt)}` : "Sem horario final",
+            appointment.notes ? `Obs.: ${appointment.notes}` : "Sem observacoes",
+          ]
+        : [];
+    }
+
+    if (item.kind === "purchase_lead") {
+      const lead = selectedHistory.purchaseLeads.find((historyItem) => historyItem.id === item.entityId);
+      return lead ? [`Origem: ${lead.source ?? "nao informada"}`, `Valor pedido: ${money(lead.askingPrice)}`, `Status: ${lead.status}`] : [];
+    }
+
+    if (item.kind === "evaluation") {
+      const evaluation = selectedHistory.evaluations.find((historyItem) => historyItem.id === item.entityId);
+      return evaluation ? [`Pedido: ${money(evaluation.requestedPrice)}`, `Sugerido: ${money(evaluation.suggestedPrice)}`, `Decisao: ${evaluation.decision}`] : [];
+    }
+
+    const event = selectedHistory.events.find((historyItem) => historyItem.id === item.entityId);
+    return event ? [`Tipo: ${event.type}`, event.description ?? "Sem descricao complementar"] : [];
+  }
 
   const statusLabel = {
     error: "Usando fallback",
@@ -1034,7 +1072,10 @@ export function LiveCustomersWorkspace() {
                       <button
                         className={selectedHistoryTimelineFilter === filter.key ? "active" : ""}
                         key={filter.key}
-                        onClick={() => setSelectedHistoryTimelineFilter(filter.key)}
+                        onClick={() => {
+                          setExpandedTimelineItemId(null);
+                          setSelectedHistoryTimelineFilter(filter.key);
+                        }}
                         type="button"
                       >
                         {filter.label}
@@ -1043,8 +1084,20 @@ export function LiveCustomersWorkspace() {
                   </div>
                   {selectedHistoryTimeline.slice(0, 8).map((item) => (
                     <article className="customer-history-entry" key={item.id}>
-                      <strong>{item.title}</strong>
+                      <div className="customer-history-entry-heading">
+                        <strong>{item.title}</strong>
+                        <button onClick={() => setExpandedTimelineItemId((current) => (current === item.id ? null : item.id))} type="button">
+                          {expandedTimelineItemId === item.id ? "Ocultar" : "Detalhes"}
+                        </button>
+                      </div>
                       <span>{relativeDate(item.occurredAt)} | {item.description ?? item.kind}</span>
+                      {expandedTimelineItemId === item.id ? (
+                        <div className="customer-history-entry-details">
+                          {timelineItemDetails(item).map((detail) => (
+                            <span key={detail}>{detail}</span>
+                          ))}
+                        </div>
+                      ) : null}
                     </article>
                   ))}
                   {selectedHistoryTimeline.length === 0 ? (

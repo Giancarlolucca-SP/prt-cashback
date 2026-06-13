@@ -841,3 +841,35 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: adicionar detalhes expansíveis por item da timeline.
+
+## 2026-06-13 - Detalhes expansíveis na timeline do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rastreabilidade comercial.
+- Foco: permitir leitura rapida da timeline com aprofundamento pontual por item.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Cada item da timeline ganhou acao `Detalhes`/`Ocultar`.
+- Vendas exibem valor, margem e fechamento.
+- Agenda exibe status, origem, fim e observacoes.
+- Compras, avaliacoes e eventos exibem dados complementares do proprio historico.
+- Ao trocar o filtro da timeline, o detalhe aberto e fechado para evitar leitura fora de contexto.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: mover o historico do cliente para um painel/modal maior quando a densidade da timeline crescer.

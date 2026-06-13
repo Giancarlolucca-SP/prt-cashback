@@ -3092,6 +3092,31 @@ input:focus-visible {
   color: var(--muted);
 }
 
+.customer-history-entry-heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.customer-history-entry-heading button {
+  background: transparent;
+  border: 0;
+  color: var(--teal);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0;
+}
+
+.customer-history-entry-details {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 3px;
+  margin-top: 3px;
+  padding-top: 7px;
+}
+
 .customer-archive-reason {
   background: var(--surface);
   border: 1px solid var(--border);
