@@ -1089,3 +1089,31 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: adicionar um teste visual/funcional especifico que interaja com filtro, indicador e limpeza da preferencia.
+
+## 2026-06-13 - QA funcional da preferencia da timeline
+
+Contexto:
+
+- Etapa BMAP: reforco de regressao automatizada para estado persistido.
+- Foco: validar ponta a ponta filtro, indicador e limpeza da preferencia da timeline.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:customer-history-preferences:local` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- Criado script `scripts/qa-customer-history-preferences-local.mjs`.
+- O QA cria cliente e agendamento via API, abre `/clientes` no navegador, aplica filtro `Agenda`, verifica o chip `Preferencia salva`, confirma persistencia no backend e limpa a preferencia.
+- O novo comando `qa:customer-history-preferences:local` entrou na regressao local.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: ampliar esse padrao para outras preferencias quando novas telas persistirem estado do usuario.
