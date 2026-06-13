@@ -51,7 +51,8 @@ export function buildApp() {
   app.register(helmet);
   app.register(cors, {
     origin: true,
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
   });
   app.setErrorHandler(apiErrorHandler);
   registerRateLimit(app);

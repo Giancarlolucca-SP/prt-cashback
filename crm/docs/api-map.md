@@ -31,6 +31,8 @@ Endpoints principais:
 - `POST /auth/logout`
 - `GET /auth/me`
 - `POST /auth/permissions/check`
+- `GET /auth/preferences/:key`
+- `PUT /auth/preferences/:key`
 - `GET /health`
 - `GET /health/ready`
 - `GET /ops/summary`

@@ -40,12 +40,28 @@ model User {
   updatedAt          DateTime  @updatedAt @map("updated_at")
   deletedAt          DateTime? @map("deleted_at")
 
-  store Store @relation(fields: [storeId], references: [id])
+  preferences UserPreference[]
+  store       Store            @relation(fields: [storeId], references: [id])
 
   @@index([storeId])
   @@index([role])
   @@index([isActive])
   @@map("users")
+}
+
+model UserPreference {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  key       String
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_preferences")
 }
 
 model Role {

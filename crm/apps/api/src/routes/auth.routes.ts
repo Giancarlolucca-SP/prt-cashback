@@ -23,6 +23,14 @@ const permissionCheckSchema = z.object({
   sensitiveArea: z.string().min(1).max(80).nullable().optional(),
 });
 
+const preferenceKeySchema = z.object({
+  key: z.string().trim().min(2).max(120).regex(/^[a-z0-9._:-]+$/i),
+});
+
+const userPreferenceSchema = z.object({
+  value: z.record(z.unknown()),
+});
+
 function publicUser(user: User & { store: Store }) {
   return {
     id: user.id,
@@ -212,5 +220,87 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     }
 
     return { allowed: true };
+  });
+
+  app.get("/preferences/:key", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+
+    const parsedParams = preferenceKeySchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "invalid_payload" });
+    }
+
+    const preference = await prisma.userPreference.findUnique({
+      where: {
+        userId_key: {
+          userId: session.user.id,
+          key: parsedParams.data.key,
+        },
+      },
+    });
+
+    return {
+      data: {
+        key: parsedParams.data.key,
+        value: preference?.value ?? null,
+        updatedAt: preference?.updatedAt ?? null,
+      },
+    };
+  });
+
+  app.put("/preferences/:key", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+
+    const parsedParams = preferenceKeySchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "invalid_payload" });
+    }
+
+    const parsedBody = userPreferenceSchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: "invalid_payload" });
+    }
+
+    const preferenceValue = parsedBody.data.value as Prisma.InputJsonObject;
+    const preference = await prisma.userPreference.upsert({
+      where: {
+        userId_key: {
+          userId: session.user.id,
+          key: parsedParams.data.key,
+        },
+      },
+      create: {
+        userId: session.user.id,
+        key: parsedParams.data.key,
+        value: preferenceValue,
+      },
+      update: {
+        value: preferenceValue,
+      },
+    });
+
+    await auditAuthEvent({
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      actorRole: session.user.role,
+      action: "preference_updated",
+      entityType: "user_preference",
+      entityId: preference.id,
+      metadata: { key: preference.key },
+    });
+
+    return {
+      data: {
+        key: preference.key,
+        value: preference.value,
+        updatedAt: preference.updatedAt,
+      },
+    };
   });
 }

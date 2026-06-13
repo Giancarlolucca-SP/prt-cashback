@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, CarFront, FileText, History, Phone, Plus, Search, UserRoundCheck, X } from "lucide-react";
-import { apiDelete, apiGet, apiPatch, apiPost } from "../auth/auth-client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../auth/auth-client";
 import { useAuth } from "../auth/auth-provider";
 
 type CustomerStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
@@ -100,6 +100,19 @@ type CustomerHistoryTimelineItem = {
 
 type CustomerHistoryTimelineFilter = CustomerHistoryTimelineItem["kind"] | "all";
 
+type CustomerHistoryPreference = {
+  filter?: CustomerHistoryTimelineFilter;
+  search?: string;
+};
+
+type UserPreferenceResponse = {
+  data: {
+    key: string;
+    value: unknown | null;
+    updatedAt: string | null;
+  };
+};
+
 type CustomerHistoryResponse = {
   customer: Customer;
   sales: CustomerHistorySale[];
@@ -165,6 +178,8 @@ const customerHistoryTimelineFilters: Array<{ key: CustomerHistoryTimelineFilter
   { key: "evaluation", label: "Avaliacoes" },
   { key: "event", label: "Eventos" },
 ];
+
+const customerHistoryPreferenceApiKey = "customer_history_timeline";
 
 const fallbackCustomers: Customer[] = [
   {
@@ -327,6 +342,22 @@ function applyCustomerFilters(
   }
 }
 
+function isCustomerHistoryTimelineFilter(value: unknown): value is CustomerHistoryTimelineFilter {
+  return customerHistoryTimelineFilters.some((filter) => filter.key === value);
+}
+
+function normalizeCustomerHistoryPreference(value: unknown): CustomerHistoryPreference | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const preference = value as { filter?: unknown; search?: unknown };
+  return {
+    ...(isCustomerHistoryTimelineFilter(preference.filter) ? { filter: preference.filter } : {}),
+    ...(typeof preference.search === "string" ? { search: preference.search.slice(0, 80) } : {}),
+  };
+}
+
 function customerToForm(customer: Customer): CustomerFormState {
   return {
     birthDate: dateInputValue(customer.birthDate),
@@ -376,6 +407,7 @@ export function LiveCustomersWorkspace() {
   const [selectedHistory, setSelectedHistory] = useState<CustomerHistoryResponse | null>(null);
   const [selectedHistoryTimelineSearch, setSelectedHistoryTimelineSearch] = useState("");
   const [selectedHistoryTimelineFilter, setSelectedHistoryTimelineFilter] = useState<CustomerHistoryTimelineFilter>("all");
+  const [historyPreferenceLoaded, setHistoryPreferenceLoaded] = useState(false);
   const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<"idle" | "loading" | "loaded" | "error" | "locked">("idle");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [total, setTotal] = useState(fallbackCustomers.length);
@@ -427,40 +459,91 @@ export function LiveCustomersWorkspace() {
 
   useEffect(() => {
     if (!historyPreferenceKey) {
+      setHistoryPreferenceLoaded(true);
       return;
     }
 
-    try {
-      const rawPreference = window.localStorage.getItem(historyPreferenceKey);
-      if (!rawPreference) {
+    let isCurrent = true;
+    const localPreferenceKey = historyPreferenceKey;
+    setHistoryPreferenceLoaded(false);
+
+    function applyPreference(preference: CustomerHistoryPreference | null) {
+      if (!preference) {
         return;
       }
 
-      const preference = JSON.parse(rawPreference) as { filter?: CustomerHistoryTimelineFilter; search?: string };
-      if (preference.filter && customerHistoryTimelineFilters.some((filter) => filter.key === preference.filter)) {
+      if (preference.filter) {
         setSelectedHistoryTimelineFilter(preference.filter);
       }
       if (typeof preference.search === "string") {
-        setSelectedHistoryTimelineSearch(preference.search.slice(0, 80));
+        setSelectedHistoryTimelineSearch(preference.search);
       }
-    } catch {
-      window.localStorage.removeItem(historyPreferenceKey);
     }
-  }, [historyPreferenceKey]);
 
-  useEffect(() => {
-    if (!historyPreferenceKey) {
+    function readLocalPreference() {
+      try {
+        const rawPreference = window.localStorage.getItem(localPreferenceKey);
+        return rawPreference ? normalizeCustomerHistoryPreference(JSON.parse(rawPreference)) : null;
+      } catch {
+        window.localStorage.removeItem(localPreferenceKey);
+        return null;
+      }
+    }
+
+    const localPreference = readLocalPreference();
+    applyPreference(localPreference);
+
+    if (!token) {
+      setHistoryPreferenceLoaded(true);
       return;
     }
 
-    window.localStorage.setItem(
-      historyPreferenceKey,
-      JSON.stringify({
-        filter: selectedHistoryTimelineFilter,
-        search: selectedHistoryTimelineSearch.slice(0, 80),
-      }),
-    );
-  }, [historyPreferenceKey, selectedHistoryTimelineFilter, selectedHistoryTimelineSearch]);
+    apiGet<UserPreferenceResponse>(`/auth/preferences/${customerHistoryPreferenceApiKey}`, token)
+      .then((response) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        applyPreference(normalizeCustomerHistoryPreference(response.data.value) ?? localPreference);
+      })
+      .catch(() => {
+        if (isCurrent) {
+          applyPreference(localPreference);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setHistoryPreferenceLoaded(true);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [historyPreferenceKey, token]);
+
+  useEffect(() => {
+    if (!historyPreferenceKey || !historyPreferenceLoaded) {
+      return;
+    }
+
+    const preference = {
+      filter: selectedHistoryTimelineFilter,
+      search: selectedHistoryTimelineSearch.slice(0, 80),
+    };
+
+    try {
+      window.localStorage.setItem(historyPreferenceKey, JSON.stringify(preference));
+    } catch {
+      window.localStorage.removeItem(historyPreferenceKey);
+    }
+
+    if (!token) {
+      return;
+    }
+
+    apiPut(`/auth/preferences/${customerHistoryPreferenceApiKey}`, token, { value: preference }).catch(() => undefined);
+  }, [historyPreferenceKey, historyPreferenceLoaded, selectedHistoryTimelineFilter, selectedHistoryTimelineSearch, token]);
 
   useEffect(() => {
     if (!token) {

@@ -966,3 +966,37 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: mover essas preferencias para backend quando houver tela formal de perfil/preferencias.
+
+## 2026-06-13 - Preferencias de usuario no backend
+
+Contexto:
+
+- Etapa BMAP: consolidacao de usabilidade com persistencia autenticada.
+- Foco: mover preferencias da timeline do cliente para backend sem perder fallback local.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run db:generate` | Passou apos encerrar API dev que segurava o Prisma Client no Windows |
+| `npm run db:deploy` | Passou |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou apos liberar `PUT` no CORS |
+
+Resultado:
+
+- Criado modelo `UserPreference` e tabela `user_preferences` com chave unica por `user_id` e `key`.
+- Criados endpoints autenticados `GET /auth/preferences/:key` e `PUT /auth/preferences/:key`.
+- Smoke test cobre criacao, leitura e isolamento de preferencia entre dono e vendedor.
+- A timeline do cliente passa a sincronizar filtro/busca com backend e mantem `localStorage` como fallback resiliente.
+- CORS da API passou a anunciar explicitamente `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`.
+
+Observacoes:
+
+- O QA visual detectou e validou a correcao do preflight para `PUT`.
+- Proxima melhoria recomendada: criar tela simples de perfil/preferencias para expor e limpar preferencias do usuario.

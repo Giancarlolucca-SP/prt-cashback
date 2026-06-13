@@ -69,6 +69,21 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Ok" }
         "403": { $ref: "#/components/responses/Error" }
+  /auth/preferences/{key}:
+    get:
+      tags: [Auth]
+      summary: Retorna preferencia persistida do usuario autenticado.
+      parameters: [ { $ref: "#/components/parameters/Key" } ]
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
+    put:
+      tags: [Auth]
+      summary: Cria ou atualiza preferencia persistida do usuario autenticado.
+      parameters: [ { $ref: "#/components/parameters/Key" } ]
+      responses:
+        "200": { $ref: "#/components/responses/Ok" }
+        "401": { $ref: "#/components/responses/Error" }
   /health:
     get:
       tags: [Health]
@@ -248,6 +263,13 @@ components:
       schema:
         type: string
         format: uuid
+    Key:
+      name: key
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-zA-Z0-9._:-]{2,120}$"
   responses:
     Ok:
       description: Resposta bem-sucedida.

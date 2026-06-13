@@ -53,7 +53,7 @@ try {
     },
   });
   assert.equal(sellerLogin.statusCode, 200);
-  const sellerBody = sellerLogin.json() as { token: string; user: { role: string } };
+  const sellerBody = sellerLogin.json() as { token: string; user: { id: string; role: string } };
   assert.equal(sellerBody.user.role, "SELLER");
   assert.ok(sellerBody.token);
 
@@ -92,7 +92,14 @@ try {
     },
   });
   assert.equal(ownerLogin.statusCode, 200);
-  const ownerBody = ownerLogin.json() as { token: string; user: { storeId: string } };
+  const ownerBody = ownerLogin.json() as { token: string; user: { id: string; storeId: string } };
+
+  await prisma.userPreference.deleteMany({
+    where: {
+      key: "customer_history_timeline",
+      userId: { in: [ownerBody.user.id, sellerBody.user.id] },
+    },
+  });
 
   const oversizedPayload = await app.inject({
     method: "POST",
@@ -125,6 +132,58 @@ try {
   });
   assert.equal(ownerFinanceCheck.statusCode, 200);
   assert.equal(ownerFinanceCheck.json().allowed, true);
+
+  const missingOwnerPreference = await app.inject({
+    method: "GET",
+    url: "/auth/preferences/customer_history_timeline",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(missingOwnerPreference.statusCode, 200);
+  assert.equal(missingOwnerPreference.json().data.value, null);
+
+  const saveOwnerPreference = await app.inject({
+    method: "PUT",
+    url: "/auth/preferences/customer_history_timeline",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      value: {
+        filter: "appointment",
+        search: "retorno",
+      },
+    },
+  });
+  assert.equal(saveOwnerPreference.statusCode, 200);
+  assert.deepEqual(saveOwnerPreference.json().data.value, {
+    filter: "appointment",
+    search: "retorno",
+  });
+
+  const getOwnerPreference = await app.inject({
+    method: "GET",
+    url: "/auth/preferences/customer_history_timeline",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(getOwnerPreference.statusCode, 200);
+  assert.deepEqual(getOwnerPreference.json().data.value, {
+    filter: "appointment",
+    search: "retorno",
+  });
+
+  const sellerPreferenceIsolation = await app.inject({
+    method: "GET",
+    url: "/auth/preferences/customer_history_timeline",
+    headers: {
+      authorization: `Bearer ${sellerBody.token}`,
+    },
+  });
+  assert.equal(sellerPreferenceIsolation.statusCode, 200);
+  assert.equal(sellerPreferenceIsolation.json().data.value, null);
 
   const healthReady = await app.inject({
     method: "GET",
