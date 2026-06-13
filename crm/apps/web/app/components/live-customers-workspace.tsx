@@ -364,6 +364,7 @@ export function LiveCustomersWorkspace() {
   const [kanbanStatus, setKanbanStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [leadForm, setLeadForm] = useState<MinimalLeadFormState>(emptyMinimalLeadForm);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [purchaseFilter, setPurchaseFilter] = useState("");
@@ -592,6 +593,7 @@ export function LiveCustomersWorkspace() {
 
     setSelectedHistoryStatus("loading");
     setExpandedTimelineItemId(null);
+    setHistoryModalOpen(false);
     setSelectedHistoryTimelineFilter("all");
     setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
@@ -687,6 +689,27 @@ export function LiveCustomersWorkspace() {
 
     const event = selectedHistory.events.find((historyItem) => historyItem.id === item.entityId);
     return event ? [`Tipo: ${event.type}`, event.description ?? "Sem descricao complementar"] : [];
+  }
+
+  function renderTimelineEntry(item: CustomerHistoryTimelineItem) {
+    return (
+      <article className="customer-history-entry" key={item.id}>
+        <div className="customer-history-entry-heading">
+          <strong>{item.title}</strong>
+          <button onClick={() => setExpandedTimelineItemId((current) => (current === item.id ? null : item.id))} type="button">
+            {expandedTimelineItemId === item.id ? "Ocultar" : "Detalhes"}
+          </button>
+        </div>
+        <span>{relativeDate(item.occurredAt)} | {item.description ?? item.kind}</span>
+        {expandedTimelineItemId === item.id ? (
+          <div className="customer-history-entry-details">
+            {timelineItemDetails(item).map((detail) => (
+              <span key={detail}>{detail}</span>
+            ))}
+          </div>
+        ) : null}
+      </article>
+    );
   }
 
   const statusLabel = {
@@ -947,6 +970,54 @@ export function LiveCustomersWorkspace() {
         </div>
       ) : null}
 
+      {selectedHistory && historyModalOpen ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Historico completo do cliente">
+          <section className="dre-modal customer-history-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Historico completo</p>
+                <h3>{selectedHistory.customer.name}</h3>
+              </div>
+              <button aria-label="Fechar historico completo" className="icon-button" onClick={() => setHistoryModalOpen(false)} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="customer-history-modal-body">
+              <div className="customer-history-summary">
+                <span>Vendas<strong>{selectedHistory.sales.length}</strong></span>
+                <span>Compras<strong>{selectedHistory.purchaseLeads.length}</strong></span>
+                <span>Avaliacoes<strong>{selectedHistory.evaluations.length}</strong></span>
+                <span>Agenda<strong>{selectedHistory.appointments.length}</strong></span>
+              </div>
+              <div className="customer-history-filter" aria-label="Filtro do historico completo do cliente">
+                {customerHistoryTimelineFilters.map((filter) => (
+                  <button
+                    className={selectedHistoryTimelineFilter === filter.key ? "active" : ""}
+                    key={filter.key}
+                    onClick={() => {
+                      setExpandedTimelineItemId(null);
+                      setSelectedHistoryTimelineFilter(filter.key);
+                    }}
+                    type="button"
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+              <div className="customer-history-modal-list">
+                {selectedHistoryTimeline.map(renderTimelineEntry)}
+                {selectedHistoryTimeline.length === 0 ? (
+                  <article className="customer-history-entry">
+                    <strong>Sem eventos neste filtro</strong>
+                    <span>Escolha outro tipo de historico para revisar este cliente.</span>
+                  </article>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <section className="module-kanban-panel panel" aria-label="Kanban operacional de clientes">
         <div className="section-heading">
           <div>
@@ -1082,30 +1153,16 @@ export function LiveCustomersWorkspace() {
                       </button>
                     ))}
                   </div>
-                  {selectedHistoryTimeline.slice(0, 8).map((item) => (
-                    <article className="customer-history-entry" key={item.id}>
-                      <div className="customer-history-entry-heading">
-                        <strong>{item.title}</strong>
-                        <button onClick={() => setExpandedTimelineItemId((current) => (current === item.id ? null : item.id))} type="button">
-                          {expandedTimelineItemId === item.id ? "Ocultar" : "Detalhes"}
-                        </button>
-                      </div>
-                      <span>{relativeDate(item.occurredAt)} | {item.description ?? item.kind}</span>
-                      {expandedTimelineItemId === item.id ? (
-                        <div className="customer-history-entry-details">
-                          {timelineItemDetails(item).map((detail) => (
-                            <span key={detail}>{detail}</span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </article>
-                  ))}
+                  {selectedHistoryTimeline.slice(0, 8).map(renderTimelineEntry)}
                   {selectedHistoryTimeline.length === 0 ? (
                     <article className="customer-history-entry">
                       <strong>Sem eventos neste filtro</strong>
                       <span>Escolha outro tipo de historico para revisar este cliente.</span>
                     </article>
                   ) : null}
+                  <button className="customer-history-open" onClick={() => setHistoryModalOpen(true)} type="button">
+                    Abrir historico completo
+                  </button>
                 </div>
               </li>
             ) : null}

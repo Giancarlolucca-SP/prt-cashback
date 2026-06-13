@@ -873,3 +873,34 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: mover o historico do cliente para um painel/modal maior quando a densidade da timeline crescer.
+
+## 2026-06-13 - Modal amplo do historico do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rastreabilidade comercial.
+- Foco: manter o card lateral como resumo e oferecer leitura ampla quando a timeline ficar densa.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- O card de historico do cliente ganhou acao `Abrir historico completo`.
+- O modal amplo reutiliza os mesmos filtros e detalhes expansíveis da timeline.
+- A lista do modal exibe todos os itens filtrados da timeline carregada, enquanto o card lateral segue resumido.
+- A leitura extensa ganhou area rolavel para evitar quebrar o layout da tela de clientes.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: adicionar busca textual dentro da timeline do cliente.
