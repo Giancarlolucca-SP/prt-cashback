@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, CarFront, FileText, History, Phone, Plus, Search, UserRoundCheck, X } from "lucide-react";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../auth/auth-client";
 import { useAuth } from "../auth/auth-provider";
@@ -407,12 +407,15 @@ export function LiveCustomersWorkspace() {
   const [selectedHistory, setSelectedHistory] = useState<CustomerHistoryResponse | null>(null);
   const [selectedHistoryTimelineSearch, setSelectedHistoryTimelineSearch] = useState("");
   const [selectedHistoryTimelineFilter, setSelectedHistoryTimelineFilter] = useState<CustomerHistoryTimelineFilter>("all");
+  const [clearingHistoryPreference, setClearingHistoryPreference] = useState(false);
   const [historyPreferenceLoaded, setHistoryPreferenceLoaded] = useState(false);
   const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<"idle" | "loading" | "loaded" | "error" | "locked">("idle");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
   const [total, setTotal] = useState(fallbackCustomers.length);
   const [visitFilter, setVisitFilter] = useState("");
   const historyPreferenceKey = user?.id ? `gt3-crm-customer-history:${user.id}` : null;
+  const skipNextHistoryPreferenceSync = useRef(false);
+  const hasCustomHistoryPreference = selectedHistoryTimelineFilter !== "all" || selectedHistoryTimelineSearch.trim().length > 0;
 
   useEffect(() => {
     if (!token) {
@@ -527,6 +530,11 @@ export function LiveCustomersWorkspace() {
       return;
     }
 
+    if (skipNextHistoryPreferenceSync.current) {
+      skipNextHistoryPreferenceSync.current = false;
+      return;
+    }
+
     const preference = {
       filter: selectedHistoryTimelineFilter,
       search: selectedHistoryTimelineSearch.slice(0, 80),
@@ -544,6 +552,34 @@ export function LiveCustomersWorkspace() {
 
     apiPut(`/auth/preferences/${customerHistoryPreferenceApiKey}`, token, { value: preference }).catch(() => undefined);
   }, [historyPreferenceKey, historyPreferenceLoaded, selectedHistoryTimelineFilter, selectedHistoryTimelineSearch, token]);
+
+  async function clearCustomerHistoryPreference() {
+    if (clearingHistoryPreference) {
+      return;
+    }
+
+    skipNextHistoryPreferenceSync.current = true;
+    setClearingHistoryPreference(true);
+    setExpandedTimelineItemId(null);
+    setSelectedHistoryTimelineFilter("all");
+    setSelectedHistoryTimelineSearch("");
+
+    if (historyPreferenceKey) {
+      try {
+        window.localStorage.removeItem(historyPreferenceKey);
+      } catch {
+        // Local fallback cleanup is best-effort; backend cleanup remains authoritative.
+      }
+    }
+
+    try {
+      if (token) {
+        await apiDelete(`/auth/preferences/${customerHistoryPreferenceApiKey}`, token).catch(() => undefined);
+      }
+    } finally {
+      setClearingHistoryPreference(false);
+    }
+  }
 
   useEffect(() => {
     if (!token) {
@@ -1142,6 +1178,11 @@ export function LiveCustomersWorkspace() {
                   value={selectedHistoryTimelineSearch}
                 />
               </label>
+              <div className="customer-history-actions">
+                <button disabled={!hasCustomHistoryPreference || clearingHistoryPreference} onClick={() => void clearCustomerHistoryPreference()} type="button">
+                  {clearingHistoryPreference ? "Limpando preferencia..." : "Limpar preferencia"}
+                </button>
+              </div>
               <div className="customer-history-modal-list">
                 {selectedHistoryTimeline.map(renderTimelineEntry)}
                 {selectedHistoryTimeline.length === 0 ? (
@@ -1300,6 +1341,11 @@ export function LiveCustomersWorkspace() {
                       value={selectedHistoryTimelineSearch}
                     />
                   </label>
+                  <div className="customer-history-actions">
+                    <button disabled={!hasCustomHistoryPreference || clearingHistoryPreference} onClick={() => void clearCustomerHistoryPreference()} type="button">
+                      {clearingHistoryPreference ? "Limpando..." : "Limpar preferencia"}
+                    </button>
+                  </div>
                   {selectedHistoryTimeline.slice(0, 8).map(renderTimelineEntry)}
                   {selectedHistoryTimeline.length === 0 ? (
                     <article className="customer-history-entry">

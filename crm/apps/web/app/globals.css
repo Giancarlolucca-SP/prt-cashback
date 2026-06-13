@@ -3182,6 +3182,28 @@ input:focus-visible {
   width: 100%;
 }
 
+.customer-history-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.customer-history-actions button {
+  background: transparent;
+  border: 0;
+  color: var(--teal);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0;
+}
+
+.customer-history-actions button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 .customer-history-entry {
   background: var(--surface);
   border: 1px solid var(--border);

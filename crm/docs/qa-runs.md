@@ -1032,3 +1032,32 @@ Observacoes:
 
 - O contrato OpenAPI e o mapa da API foram atualizados.
 - Proxima melhoria recomendada: permitir reset seletivo de preferencias direto dos modais onde elas sao usadas.
+
+## 2026-06-13 - Reset seletivo na timeline do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento de usabilidade com controle direto no fluxo.
+- Foco: permitir limpar a preferencia da timeline no proprio historico do cliente.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- Card lateral e modal completo do historico do cliente ganharam acao `Limpar preferencia`.
+- A acao remove a preferencia do backend e do `localStorage`.
+- O filtro volta para `Todos`, a busca e limpa e o item expandido fecha.
+- A sincronizacao automatica e suprimida apenas no reset para nao recriar a preferencia default logo apos excluir.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: adicionar indicador visual discreto quando a timeline estiver usando preferencia salva.
