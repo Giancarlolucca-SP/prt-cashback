@@ -374,6 +374,7 @@ export function LiveCustomersWorkspace() {
   const [search, setSearch] = useState("");
   const [expandedTimelineItemId, setExpandedTimelineItemId] = useState<string | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<CustomerHistoryResponse | null>(null);
+  const [selectedHistoryTimelineSearch, setSelectedHistoryTimelineSearch] = useState("");
   const [selectedHistoryTimelineFilter, setSelectedHistoryTimelineFilter] = useState<CustomerHistoryTimelineFilter>("all");
   const [selectedHistoryStatus, setSelectedHistoryStatus] = useState<"idle" | "loading" | "loaded" | "error" | "locked">("idle");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
@@ -594,6 +595,7 @@ export function LiveCustomersWorkspace() {
     setSelectedHistoryStatus("loading");
     setExpandedTimelineItemId(null);
     setHistoryModalOpen(false);
+    setSelectedHistoryTimelineSearch("");
     setSelectedHistoryTimelineFilter("all");
     setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
@@ -648,12 +650,20 @@ export function LiveCustomersWorkspace() {
       return [];
     }
 
-    if (selectedHistoryTimelineFilter === "all") {
-      return selectedHistory.timeline;
+    const filteredByKind =
+      selectedHistoryTimelineFilter === "all"
+        ? selectedHistory.timeline
+        : selectedHistory.timeline.filter((item) => item.kind === selectedHistoryTimelineFilter);
+    const searchTerm = selectedHistoryTimelineSearch.trim().toLowerCase();
+
+    if (!searchTerm) {
+      return filteredByKind;
     }
 
-    return selectedHistory.timeline.filter((item) => item.kind === selectedHistoryTimelineFilter);
-  }, [selectedHistory, selectedHistoryTimelineFilter]);
+    return filteredByKind.filter((item) =>
+      [item.title, item.description, item.kind, item.occurredAt].some((value) => value?.toLowerCase().includes(searchTerm)),
+    );
+  }, [selectedHistory, selectedHistoryTimelineFilter, selectedHistoryTimelineSearch]);
 
   function timelineItemDetails(item: CustomerHistoryTimelineItem) {
     if (!selectedHistory) {
@@ -1004,6 +1014,15 @@ export function LiveCustomersWorkspace() {
                   </button>
                 ))}
               </div>
+              <label className="customer-history-search">
+                <Search aria-hidden="true" size={15} />
+                <input
+                  aria-label="Buscar na timeline completa"
+                  onChange={(event) => setSelectedHistoryTimelineSearch(event.target.value)}
+                  placeholder="Buscar por titulo, origem, status..."
+                  value={selectedHistoryTimelineSearch}
+                />
+              </label>
               <div className="customer-history-modal-list">
                 {selectedHistoryTimeline.map(renderTimelineEntry)}
                 {selectedHistoryTimeline.length === 0 ? (
@@ -1153,6 +1172,15 @@ export function LiveCustomersWorkspace() {
                       </button>
                     ))}
                   </div>
+                  <label className="customer-history-search">
+                    <Search aria-hidden="true" size={15} />
+                    <input
+                      aria-label="Buscar na timeline do cliente"
+                      onChange={(event) => setSelectedHistoryTimelineSearch(event.target.value)}
+                      placeholder="Buscar historico..."
+                      value={selectedHistoryTimelineSearch}
+                    />
+                  </label>
                   {selectedHistoryTimeline.slice(0, 8).map(renderTimelineEntry)}
                   {selectedHistoryTimeline.length === 0 ? (
                     <article className="customer-history-entry">

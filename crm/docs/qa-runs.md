@@ -904,3 +904,34 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: adicionar busca textual dentro da timeline do cliente.
+
+## 2026-06-13 - Busca textual na timeline do cliente
+
+Contexto:
+
+- Etapa BMAP: refinamento do fluxo Clientes/Leads e rastreabilidade comercial.
+- Foco: encontrar rapidamente eventos dentro da timeline consolidada do cliente.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:api` | Passou |
+| `npm run build:web` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+
+Resultado:
+
+- A timeline do cliente ganhou campo de busca textual no card lateral e no modal completo.
+- A busca filtra por titulo, descricao, tipo e data textual do item.
+- A busca combina com os filtros por tipo ja existentes.
+- Ao abrir historico de outro cliente, a busca e o item expandido sao limpos.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: persistir preferencia de filtro/busca por usuario quando houver perfil de uso.
