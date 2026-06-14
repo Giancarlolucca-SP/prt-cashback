@@ -38,7 +38,9 @@
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "smoke:local": "node scripts/smoke-local.mjs",
     "test": "npm run test:unit && npm run test:smoke",
-    "test:smoke": "node --test --test-concurrency=1 tests/auth-api.test.mjs tests/rate-limit.test.mjs",
+    "test:smoke": "npm run test:smoke:auth && npm run test:smoke:rate",
+    "test:smoke:auth": "node --test tests/auth-api.test.mjs",
+    "test:smoke:rate": "node --test tests/rate-limit.test.mjs",
     "test:unit": "node --test tests/dev-check.test.mjs tests/prisma-log-level.test.mjs tests/prisma-schema-contract.test.mjs tests/qa-daily-auto-local.test.mjs tests/sql-injection-guard.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

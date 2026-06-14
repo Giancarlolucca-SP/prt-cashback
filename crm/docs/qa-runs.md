@@ -1342,3 +1342,34 @@ Observacoes:
 
 - O auth smoke segue sendo o trecho mais caro da suite.
 - Proxima melhoria recomendada: avaliar particionamento do auth smoke por dominio para reduzir tempo de feedback sem perder cobertura.
+
+## 2026-06-14 - Smokes executaveis por alvo
+
+Contexto:
+
+- Etapa BMAP: ergonomia de QA para smokes pesados.
+- Foco: permitir rodar apenas o smoke afetado pela mudanca sem perder o agregado completo.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run test:smoke:rate` | Passou: 1 teste, runner ~21,6s |
+| `npm run test:smoke:auth` | Passou: 1 teste, runner ~121,3s |
+| `npm run test:smoke` | Passou: auth + rate em sequencia |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `npm run test:smoke:auth`.
+- Criado `npm run test:smoke:rate`.
+- `npm run test:smoke` agora encadeia os dois comandos, mantendo execucao serial.
+- README documenta os smokes especificos.
+
+Observacoes:
+
+- Esta etapa separa por alvo de smoke, mas o auth smoke ainda e monolitico internamente.
+- Proxima melhoria recomendada: adicionar marcadores ou checkpoints no auth smoke para identificar quais dominios consomem mais tempo antes de particionar o arquivo.

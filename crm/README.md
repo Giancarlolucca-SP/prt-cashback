@@ -109,6 +109,13 @@ Para os smokes de API mais pesados, com seed e fluxos in-process:
 npm run test:smoke
 ```
 
+Para rodar apenas um smoke especifico:
+
+```bash
+npm run test:smoke:auth
+npm run test:smoke:rate
+```
+
 Atalho equivalente:
 
 ```bash
