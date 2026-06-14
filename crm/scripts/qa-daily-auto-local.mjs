@@ -9,7 +9,9 @@ import { resolve } from "node:path";
 const preferredApiPort = Number(process.env.QA_AUTO_API_PORT || process.env.API_PORT || 3333);
 const preferredWebPort = Number(process.env.QA_AUTO_WEB_PORT || 3001);
 const logDir = resolve(process.cwd(), ".dev-logs");
-const runId = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+const runId = (process.env.QA_AUTO_RUN_ID || new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14))
+  .replace(/[^A-Za-z0-9_-]/g, "")
+  .slice(0, 64) || "run";
 const logLines = [];
 const maxLogChars = 500000;
 
@@ -174,6 +176,10 @@ async function stopService(child) {
 async function main() {
   console.log("qa:daily:auto:local preflight");
   appendLog("qa:daily:auto:local preflight");
+  if (process.env.QA_AUTO_FAIL_FAST === "true") {
+    throw new Error("Forced QA daily auto failure for log test");
+  }
+
   await run(process.execPath, npmRunArgs("typecheck"), { label: "typecheck" });
   await run(process.execPath, npmRunArgs("build:api"), { label: "build:api" });
   await run(process.execPath, npmRunArgs("build:web"), { label: "build:web" });

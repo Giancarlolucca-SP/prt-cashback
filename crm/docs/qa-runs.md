@@ -1252,3 +1252,34 @@ Observacoes:
 
 - Execucoes bem-sucedidas continuam sem gerar arquivo novo em `.dev-logs/`.
 - Proxima melhoria recomendada: adicionar um teste automatizado pequeno para exercitar o caminho de falha do helper sem rodar toda a suite.
+
+## 2026-06-14 - Teste automatizado do log de falha do helper
+
+Contexto:
+
+- Etapa BMAP: regressao automatizada da observabilidade operacional.
+- Foco: garantir que o helper diario continue gerando diagnostico quando falhar.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-daily-auto-local.mjs` | Passou |
+| `node --test tests/qa-daily-auto-local.test.mjs` | Passou |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Adicionado teste `tests/qa-daily-auto-local.test.mjs`.
+- O helper aceita `QA_AUTO_FAIL_FAST=true` para exercitar falha controlada antes de builds/servidores.
+- O teste usa `QA_AUTO_RUN_ID` para gerar um arquivo previsivel, valida o conteudo diagnostico e remove o log ao final.
+- O smoke de auth passou a usar identificadores unicos por execucao para reduzir colisao com massa QA acumulada.
+- A listagem de follow-ups concluidos no smoke usa `page_size=100` para nao depender da primeira pagina quando ha historico de rodadas anteriores.
+
+Observacoes:
+
+- O caminho de sucesso do helper nao muda.
+- Proxima melhoria recomendada: reduzir ruidos `prisma:error` esperados nos testes de concorrencia/idempotencia, mantendo a validacao de comportamento.

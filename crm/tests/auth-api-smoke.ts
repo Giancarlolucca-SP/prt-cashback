@@ -10,6 +10,18 @@ execSync("npm run db:seed", {
 });
 
 const app = buildApp();
+const runToken = `${Date.now().toString(36)}-${process.pid.toString(36)}`;
+let uniqueCounter = 0;
+
+function uniqueToken(prefix: string) {
+  uniqueCounter += 1;
+  return `${prefix}-${runToken}-${uniqueCounter}`;
+}
+
+function uniquePlate(prefix: string) {
+  uniqueCounter += 1;
+  return `${prefix}${Date.now().toString(36).slice(-4)}${(uniqueCounter % 36).toString(36)}`.toUpperCase();
+}
 
 try {
   const invalidLogin = await app.inject({
@@ -333,7 +345,7 @@ try {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      email: `cliente.email.${Date.now()}@gt3.local`,
+      email: `${uniqueToken("cliente.email")}@gt3.local`,
       name: "Cliente Somente Email API",
       origin: "qa-email",
     },
@@ -341,7 +353,7 @@ try {
   assert.equal(emailOnlyCustomer.statusCode, 201);
   assert.equal(emailOnlyCustomer.json().data.phone, null);
 
-  const document = `QA-${Date.now()}`;
+  const document = uniqueToken("QA-DOC");
   const createCustomer = await app.inject({
     method: "POST",
     url: "/customers",
@@ -375,7 +387,7 @@ try {
   assert.equal(duplicatedCustomer.statusCode, 409);
   assert.equal(duplicatedCustomer.json().error.code, "CONFLICT");
 
-  const concurrentDocument = `QA-RACE-${Date.now()}`;
+  const concurrentDocument = uniqueToken("QA-RACE");
   const concurrentCustomerPayload = {
     document: concurrentDocument,
     name: "Cliente Concorrente API",
@@ -472,7 +484,7 @@ try {
   assert.equal(updateCustomer.statusCode, 200);
   assert.equal(updateCustomer.json().data.email, "cliente.contrato.api@gt3.local");
 
-  const serviceToken = `QA-${Date.now()}`;
+  const serviceToken = uniqueToken("QA");
   const createProvider = await app.inject({
     method: "POST",
     url: "/services/providers",
@@ -597,7 +609,7 @@ try {
   assert.equal(invalidLead.statusCode, 400);
   assert.equal(invalidLead.json().error.code, "VALIDATION_ERROR");
 
-  const leadSearchToken = `Civic-${Date.now()}`;
+  const leadSearchToken = uniqueToken("Civic");
   const createLead = await app.inject({
     method: "POST",
     url: "/leads",
@@ -850,7 +862,7 @@ try {
 
   const listCompletedLeadFollowUps = await app.inject({
     method: "GET",
-    url: "/leads/follow-ups?include_completed=true&from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    url: "/leads/follow-ups?include_completed=true&page_size=100&from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -964,7 +976,7 @@ try {
     },
     payload: {
       type: "whatsapp",
-      name: `WhatsApp QA ${Date.now()}`,
+      name: uniqueToken("WhatsApp QA"),
       settings: {
         defaultSender: "5511999999999",
       },
@@ -982,7 +994,7 @@ try {
     },
     payload: {
       name: "Instancia QA",
-      instanceKey: `whatsapp-qa-${Date.now()}`,
+      instanceKey: uniqueToken("whatsapp-qa"),
       settings: {
         provider: "dev",
       },
@@ -998,7 +1010,7 @@ try {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      email: `qa-${Date.now()}@gt3.local`,
+      email: `${uniqueToken("qa")}@gt3.local`,
       name: "Atendimento QA",
       settings: {
         provider: "smtp-dev",
@@ -1369,7 +1381,7 @@ try {
       vehicle: {
         brand: "Honda",
         model: "Civic",
-        plate: `QA${Date.now().toString().slice(-5)}`,
+        plate: uniquePlate("QA"),
       },
       ownershipType: "OWN",
       askingPrice: 125000,
@@ -1378,7 +1390,7 @@ try {
   assert.equal(sellerInventoryCreate.statusCode, 403);
   assert.equal(sellerInventoryCreate.json().error.code, "FORBIDDEN");
 
-  const inventoryPlate = `QA${Date.now().toString().slice(-5)}`;
+  const inventoryPlate = uniquePlate("QA");
   const createInventory = await app.inject({
     method: "POST",
     url: "/inventory",
@@ -1493,7 +1505,7 @@ try {
   assert.equal(sellerServices.statusCode, 403);
   assert.equal(sellerServices.json().error.code, "FORBIDDEN");
 
-  const providerName = `Oficina QA ${Date.now()}`;
+  const providerName = uniqueToken("Oficina QA");
   const createServiceProvider = await app.inject({
     method: "POST",
     url: "/services/providers",
@@ -1511,7 +1523,7 @@ try {
   assert.equal(createServiceProvider.json().data.name, providerName);
   const serviceProviderId = createServiceProvider.json().data.id as string;
 
-  const catalogName = `Polimento QA ${Date.now()}`;
+  const catalogName = uniqueToken("Polimento QA");
   const createServiceCatalog = await app.inject({
     method: "POST",
     url: "/services/catalog",
@@ -1601,7 +1613,7 @@ try {
     },
     payload: {
       providerId: serviceProviderId,
-      number: `NF-QA-${Date.now()}`,
+      number: uniqueToken("NF-QA"),
       amount: 600,
       issuedAt: "2026-06-06T18:00:00.000Z",
       snapshot: {
@@ -1828,7 +1840,7 @@ try {
     },
     payload: {
       channelId: listingChannelId,
-      externalId: `qa-listing-${Date.now()}`,
+      externalId: uniqueToken("qa-listing"),
       status: "PUBLISHED",
       metadata: {
         source: "smoke-test",
@@ -1880,7 +1892,7 @@ try {
   assert.equal(sellerCampaigns.statusCode, 403);
   assert.equal(sellerCampaigns.json().error.code, "FORBIDDEN");
 
-  const campaignName = `Campanha QA ${Date.now()}`;
+  const campaignName = uniqueToken("Campanha QA");
   const createCampaign = await app.inject({
     method: "POST",
     url: "/campaigns",
@@ -1982,7 +1994,7 @@ try {
   assert.equal(getCampaign.json().costs.length, 1);
   assert.equal(getCampaign.json().results.length, 1);
 
-  const repassePlate = `RP${Date.now().toString().slice(-5)}`;
+  const repassePlate = uniquePlate("RP");
   const createRepasseInventory = await app.inject({
     method: "POST",
     url: "/inventory",
@@ -2579,7 +2591,7 @@ try {
       status: "OPEN",
       channel: "detran-sp",
       metadata: {
-        protocol: `DSP-QA-${Date.now()}`,
+        protocol: uniqueToken("DSP-QA"),
         vehicleId: inventoryVehicleId,
       },
     },
@@ -3168,7 +3180,7 @@ try {
   assert.equal(getOcrJob.statusCode, 200);
   assert.equal(getOcrJob.json().fields.length, 1);
 
-  const idempotencyKey = `qa-job-${Date.now()}`;
+  const idempotencyKey = uniqueToken("qa-job");
   const enqueueJob = await app.inject({
     method: "POST",
     url: "/jobs/enqueue",
@@ -3203,7 +3215,7 @@ try {
   assert.equal(duplicateJob.json().idempotentHit, true);
   assert.equal(duplicateJob.json().data.id, enqueueJob.json().data.id);
 
-  const concurrentJobKey = `qa-job-race-${Date.now()}`;
+  const concurrentJobKey = uniqueToken("qa-job-race");
   const concurrentJobs = await Promise.all([
     app.inject({
       method: "POST",
@@ -3293,7 +3305,7 @@ try {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      name: `Follow-up QA ${Date.now()}`,
+      name: uniqueToken("Follow-up QA"),
       trigger: "lead.stage_changed",
       status: "DRAFT",
       definition: {
@@ -3469,7 +3481,7 @@ try {
     },
     payload: {
       domain: "vehicle_cost",
-      name: `Preparacao QA ${Date.now()}`,
+      name: uniqueToken("Preparacao QA"),
       metadata: {
         capitalizedDefault: true,
       },
@@ -3485,7 +3497,7 @@ try {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      name: `Contrato QA ${Date.now()}`,
+      name: uniqueToken("Contrato QA"),
       module: "sales",
       content: "Contrato {{sale.id}}",
       snapshot: {
@@ -3503,7 +3515,7 @@ try {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      name: `Followup QA ${Date.now()}`,
+      name: uniqueToken("Followup QA"),
       channel: "whatsapp",
       content: "Ola {{customer.name}}, tudo bem?",
       variables: {
@@ -3630,7 +3642,7 @@ try {
   assert.equal(sellerUsers.statusCode, 403);
   assert.equal(sellerUsers.json().error.code, "FORBIDDEN");
 
-  const qaUserEmail = `usuario.qa.${Date.now()}@gt3.local`;
+  const qaUserEmail = `${uniqueToken("usuario.qa")}@gt3.local`;
   const createUser = await app.inject({
     method: "POST",
     url: "/users",
@@ -3974,7 +3986,7 @@ try {
   assert.equal(webhookWithoutIdempotency.statusCode, 400);
   assert.equal(webhookWithoutIdempotency.json().error.code, "VALIDATION_ERROR");
 
-  const webhookKey = `qa-webhook-${Date.now()}`;
+  const webhookKey = uniqueToken("qa-webhook");
   const webhook = await app.inject({
     method: "POST",
     url: "/webhooks/evolution",
