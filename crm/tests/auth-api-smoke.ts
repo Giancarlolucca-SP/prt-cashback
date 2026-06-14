@@ -12,6 +12,9 @@ execSync("npm run db:seed", {
 const app = buildApp();
 const runToken = `${Date.now().toString(36)}-${process.pid.toString(36)}`;
 let uniqueCounter = 0;
+const timingEnabled = process.env.AUTH_SMOKE_TIMING === "true";
+const timingStartedAt = Date.now();
+let checkpointStartedAt = timingStartedAt;
 
 function uniqueToken(prefix: string) {
   uniqueCounter += 1;
@@ -21,6 +24,16 @@ function uniqueToken(prefix: string) {
 function uniquePlate(prefix: string) {
   uniqueCounter += 1;
   return `${prefix}${Date.now().toString(36).slice(-4)}${(uniqueCounter % 36).toString(36)}`.toUpperCase();
+}
+
+function checkpoint(label: string) {
+  if (!timingEnabled) {
+    return;
+  }
+
+  const now = Date.now();
+  console.log(`[auth-smoke] ${label}: +${now - checkpointStartedAt}ms (${now - timingStartedAt}ms total)`);
+  checkpointStartedAt = now;
 }
 
 try {
@@ -230,6 +243,7 @@ try {
   });
   assert.equal(deletedOwnerPreference.statusCode, 200);
   assert.equal(deletedOwnerPreference.json().data.value, null);
+  checkpoint("auth/preferences");
 
   const healthReady = await app.inject({
     method: "GET",
@@ -303,6 +317,7 @@ try {
     },
   });
   assert.equal(revokedMe.statusCode, 401);
+  checkpoint("ops/session");
 
   const unauthenticatedCustomers = await app.inject({
     method: "GET",
@@ -588,6 +603,7 @@ try {
   assert.equal(createPostSaleOrder.statusCode, 201);
   assert.equal(createPostSaleOrder.json().data.postSaleCustomerId, postSaleCustomerId);
   assert.equal(createPostSaleOrder.json().data.totalAmount, "990");
+  checkpoint("customers/services-base");
 
   const unauthenticatedLeads = await app.inject({
     method: "GET",
@@ -946,6 +962,7 @@ try {
           item.entityId === convertedAppointment.id && item.kind === "appointment" && item.description.includes("Origem follow-up"),
       ),
   );
+  checkpoint("leads/follow-ups");
 
   const appraiserLogin = await app.inject({
     method: "POST",
@@ -1234,6 +1251,7 @@ try {
   });
   assert.equal(getAiSuggestion.statusCode, 200);
   assert.equal(getAiSuggestion.json().feedback.length, 1);
+  checkpoint("communication/ai");
 
   const unauthenticatedAppointments = await app.inject({
     method: "GET",
@@ -1651,6 +1669,7 @@ try {
   assert.ok(getServiceOrder.json().items.some((item: { catalogItemId: string }) => item.catalogItemId === serviceCatalogId));
   assert.ok(getServiceOrder.json().costs.some((cost: { providerId: string }) => cost.providerId === serviceProviderId));
   assert.ok(getServiceOrder.json().invoices.some((invoice: { providerId: string }) => invoice.providerId === serviceProviderId));
+  checkpoint("appointments/inventory/services");
 
   const sellerPurchases = await app.inject({
     method: "GET",
@@ -2111,6 +2130,7 @@ try {
   assert.equal(getRepasse.statusCode, 200);
   assert.equal(getRepasse.json().data.status, "REVENUE_RECOGNIZED");
   assert.ok(getRepasse.json().revenues.some((revenue: { amount: string }) => revenue.amount === "2500"));
+  checkpoint("purchases/listings/repasse");
 
   const unauthenticatedSales = await app.inject({
     method: "GET",
@@ -2655,6 +2675,7 @@ try {
   assert.equal(getDispatch.statusCode, 200);
   assert.equal(getDispatch.json().data.id, dispatchId);
   assert.equal(getDispatch.json().data.metadata.stage, "completed");
+  checkpoint("sales/finance/contracts/dispatch");
 
   const prepareUpload = await app.inject({
     method: "POST",
@@ -3095,6 +3116,7 @@ try {
     },
   });
   assert.equal(deletedDownload.statusCode, 404);
+  checkpoint("files/rbac");
 
   const ocrJob = await app.inject({
     method: "POST",
@@ -3287,6 +3309,7 @@ try {
   });
   assert.equal(retryJob.statusCode, 202);
   assert.equal(retryJob.json().data.status, "QUEUED");
+  checkpoint("ocr/jobs");
 
   const sellerAutomations = await app.inject({
     method: "GET",
@@ -3631,6 +3654,7 @@ try {
   assert.equal(settingsSummary.statusCode, 200);
   assert.ok(settingsSummary.json().storeSettings.some((setting: { key: string }) => setting.key === "commercial"));
   assert.ok(settingsSummary.json().operationalParameters.some((parameter: { key: string }) => parameter.key === "sales_policy"));
+  checkpoint("automations/settings");
 
   const sellerUsers = await app.inject({
     method: "GET",
@@ -3781,6 +3805,7 @@ try {
   assert.equal(getUser.json().overrides.length, 1);
   assert.ok(getUser.json().scopes.some((scope: { entityId: string }) => scope.entityId === createdCustomerId));
   assert.ok(getUser.json().transfersTo.some((transfer: { id: string }) => transfer.id === transferResponsibility.json().data.id));
+  checkpoint("users/access");
 
   const executiveSummary = await app.inject({
     method: "GET",
@@ -4035,6 +4060,7 @@ try {
     },
   });
   assert.equal(deletedCustomer.statusCode, 404);
+  checkpoint("analytics/compliance/audit/webhooks");
 } finally {
   await app.close();
   await prisma.$disconnect();

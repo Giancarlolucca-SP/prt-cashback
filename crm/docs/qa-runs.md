@@ -1373,3 +1373,47 @@ Observacoes:
 
 - Esta etapa separa por alvo de smoke, mas o auth smoke ainda e monolitico internamente.
 - Proxima melhoria recomendada: adicionar marcadores ou checkpoints no auth smoke para identificar quais dominios consomem mais tempo antes de particionar o arquivo.
+
+## 2026-06-14 - Checkpoints de tempo do auth smoke
+
+Contexto:
+
+- Etapa BMAP: diagnostico de performance da regressao pesada.
+- Foco: medir blocos internos do auth smoke antes de particionar por dominio.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/run-auth-smoke-timed.mjs` | Passou |
+| `node --check tests/auth-api-smoke.ts` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run test:smoke:auth:timed` | Passou: runner ~49,6s |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `npm run test:smoke:auth:timed`.
+- O comando ativa checkpoints via `AUTH_SMOKE_TIMING=true` sem alterar a saida normal de `test:smoke:auth`.
+- Checkpoints medidos nesta rodada:
+  - `auth/preferences`: ~2,5s.
+  - `ops/session`: ~0,7s.
+  - `customers/services-base`: ~3,3s.
+  - `leads/follow-ups`: ~3,2s.
+  - `communication/ai`: ~2,3s.
+  - `appointments/inventory/services`: ~5,0s.
+  - `purchases/listings/repasse`: ~2,6s.
+  - `sales/finance/contracts/dispatch`: ~1,6s.
+  - `files/rbac`: ~1,9s.
+  - `ocr/jobs`: ~0,5s.
+  - `automations/settings`: ~0,9s.
+  - `users/access`: ~1,5s.
+  - `analytics/compliance/audit/webhooks`: ~0,8s.
+
+Observacoes:
+
+- Os checkpoints somaram ~26,8s, enquanto o runner reportou ~49,6s; isso indica custo relevante antes do primeiro checkpoint, principalmente seed/bootstrap.
+- Proxima melhoria recomendada: medir explicitamente seed/bootstrap do auth smoke e avaliar um modo de seed reutilizavel para desenvolvimento local.

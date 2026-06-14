@@ -116,6 +116,12 @@ npm run test:smoke:auth
 npm run test:smoke:rate
 ```
 
+Para diagnosticar quais blocos do auth smoke estao mais lentos:
+
+```bash
+npm run test:smoke:auth:timed
+```
+
 Atalho equivalente:
 
 ```bash
