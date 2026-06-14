@@ -1172,3 +1172,28 @@ Observacoes:
 
 - Mudanca apenas documental; contrato da API e codigo de produto nao mudaram.
 - Proxima melhoria recomendada: criar um comando agregado curto para esses QAs diarios.
+
+## 2026-06-14 - Atalho de QA diario
+
+Contexto:
+
+- Etapa BMAP: automacao operacional para reduzir passos manuais.
+- Foco: transformar o roteiro diario de QA em um comando unico.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado comando `npm run qa:daily:local`.
+- README passou a recomendar o atalho e manteve a lista expandida dos comandos equivalentes.
+
+Observacoes:
+
+- O comando exige API e Web ja rodando, como os demais QAs de navegador.
+- Proxima melhoria recomendada: criar um helper para subir API/Web em portas livres e rodar o QA diario automaticamente.

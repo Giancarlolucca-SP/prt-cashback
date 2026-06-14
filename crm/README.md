@@ -185,7 +185,13 @@ O smoke local usa por padrao:
 
 Variaveis opcionais: `SMOKE_API_URL`, `SMOKE_WEB_URL`, `SMOKE_EMAIL` e `SMOKE_PASSWORD`.
 
-QAs locais recomendados para desenvolvimento diario:
+Atalho recomendado para desenvolvimento diario, com API e Web ja rodando:
+
+```bash
+npm run qa:daily:local
+```
+
+Ele equivale a:
 
 ```bash
 npm run typecheck
