@@ -2,10 +2,12 @@
 
 import { spawn } from "node:child_process";
 
+const startedAt = Date.now();
 const child = spawn(process.execPath, ["--test", "tests/auth-api.test.mjs"], {
   cwd: process.cwd(),
   env: {
     ...process.env,
+    AUTH_SMOKE_PROCESS_STARTED_AT: String(startedAt),
     AUTH_SMOKE_TIMING: "true",
   },
   stdio: "inherit",

@@ -1417,3 +1417,37 @@ Observacoes:
 
 - Os checkpoints somaram ~26,8s, enquanto o runner reportou ~49,6s; isso indica custo relevante antes do primeiro checkpoint, principalmente seed/bootstrap.
 - Proxima melhoria recomendada: medir explicitamente seed/bootstrap do auth smoke e avaliar um modo de seed reutilizavel para desenvolvimento local.
+
+## 2026-06-14 - Medicao de seed/bootstrap do auth smoke
+
+Contexto:
+
+- Etapa BMAP: diagnostico fino da regressao pesada.
+- Foco: separar tempo de startup/imports, seed e bootstrap da aplicacao do tempo dos blocos de dominio.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check tests/auth-api-smoke.ts` | Passou |
+| `node --check scripts/run-auth-smoke-timed.mjs` | Passou |
+| `npm run test:smoke:auth:timed` | Passou: runner ~10,0s |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- O wrapper `run-auth-smoke-timed.mjs` passou a enviar `AUTH_SMOKE_PROCESS_STARTED_AT`.
+- O auth smoke agora registra `module-load`, `db:seed` e `app-bootstrap` antes dos checkpoints de dominio.
+- Medicao desta rodada:
+  - `module-load`: ~3,1s.
+  - `db:seed`: ~1,8s.
+  - `app-bootstrap`: ~0,3s.
+  - Blocos de dominio juntos: ~4,7s.
+
+Observacoes:
+
+- A rodada foi bem mais rapida que a anterior, indicando variacao relevante do ambiente Windows/banco local.
+- Proxima melhoria recomendada: salvar historico dos timings em arquivo opcional para comparar varias rodadas antes de otimizar seed ou particionar o auth smoke.

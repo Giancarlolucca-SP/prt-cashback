@@ -3,28 +3,11 @@ import { execSync } from "node:child_process";
 import { buildApp } from "../apps/api/src/app.js";
 import { prisma } from "../apps/api/src/lib/db.js";
 
-execSync("npm run db:seed", {
-  cwd: process.cwd(),
-  stdio: "ignore",
-  env: process.env,
-});
-
-const app = buildApp();
-const runToken = `${Date.now().toString(36)}-${process.pid.toString(36)}`;
-let uniqueCounter = 0;
 const timingEnabled = process.env.AUTH_SMOKE_TIMING === "true";
-const timingStartedAt = Date.now();
+const processStartedAt = Number(process.env.AUTH_SMOKE_PROCESS_STARTED_AT);
+const scriptStartedAt = Date.now();
+const timingStartedAt = Number.isFinite(processStartedAt) && processStartedAt > 0 ? processStartedAt : scriptStartedAt;
 let checkpointStartedAt = timingStartedAt;
-
-function uniqueToken(prefix: string) {
-  uniqueCounter += 1;
-  return `${prefix}-${runToken}-${uniqueCounter}`;
-}
-
-function uniquePlate(prefix: string) {
-  uniqueCounter += 1;
-  return `${prefix}${Date.now().toString(36).slice(-4)}${(uniqueCounter % 36).toString(36)}`.toUpperCase();
-}
 
 function checkpoint(label: string) {
   if (!timingEnabled) {
@@ -34,6 +17,30 @@ function checkpoint(label: string) {
   const now = Date.now();
   console.log(`[auth-smoke] ${label}: +${now - checkpointStartedAt}ms (${now - timingStartedAt}ms total)`);
   checkpointStartedAt = now;
+}
+
+checkpoint("module-load");
+
+execSync("npm run db:seed", {
+  cwd: process.cwd(),
+  stdio: "ignore",
+  env: process.env,
+});
+checkpoint("db:seed");
+
+const app = buildApp();
+checkpoint("app-bootstrap");
+const runToken = `${Date.now().toString(36)}-${process.pid.toString(36)}`;
+let uniqueCounter = 0;
+
+function uniqueToken(prefix: string) {
+  uniqueCounter += 1;
+  return `${prefix}-${runToken}-${uniqueCounter}`;
+}
+
+function uniquePlate(prefix: string) {
+  uniqueCounter += 1;
+  return `${prefix}${Date.now().toString(36).slice(-4)}${(uniqueCounter % 36).toString(36)}`.toUpperCase();
 }
 
 try {
