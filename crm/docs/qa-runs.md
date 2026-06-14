@@ -1283,3 +1283,33 @@ Observacoes:
 
 - O caminho de sucesso do helper nao muda.
 - Proxima melhoria recomendada: reduzir ruidos `prisma:error` esperados nos testes de concorrencia/idempotencia, mantendo a validacao de comportamento.
+
+## 2026-06-14 - Reducao de ruido Prisma nos testes
+
+Contexto:
+
+- Etapa BMAP: higiene da regressao automatizada.
+- Foco: manter testes de conflito/idempotencia sem imprimir `prisma:error` esperado como falso alerta.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --test tests/prisma-log-level.test.mjs` | Passou |
+| `node --test tests/qa-daily-auto-local.test.mjs` | Passou |
+| `npm test` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- `apps/api/src/lib/db.ts` passou a aceitar `PRISMA_LOG_LEVEL=silent`.
+- O smoke de auth roda com `PRISMA_LOG_LEVEL=silent`, mantendo `LOG_LEVEL=fatal`.
+- Adicionado teste de contrato para confirmar logs Prisma silenciosos, defaults de desenvolvimento e defaults fora de desenvolvimento.
+- `npm test` passou com 13 testes e sem ruido `prisma:error` na saida.
+
+Observacoes:
+
+- Producao e ambientes sem `PRISMA_LOG_LEVEL=silent` continuam logando erros do Prisma.
+- Proxima melhoria recomendada: medir tempo da suite `npm test` e separar smoke pesado de testes unitarios se a regressao local ficar lenta.
