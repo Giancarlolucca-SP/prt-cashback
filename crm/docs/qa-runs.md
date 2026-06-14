@@ -1147,3 +1147,28 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: documentar no README a lista de QAs locais recomendados para desenvolvimento diario.
+
+## 2026-06-14 - README com QAs diarios
+
+Contexto:
+
+- Etapa BMAP: documentacao operacional e reducao de atrito para validacao local.
+- Foco: deixar explicitos os QAs recomendados para desenvolvimento diario.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- README passou a citar `qa:customer-history-preferences:local` e `qa:profile-preferences:local`.
+- Adicionado roteiro de QAs locais recomendados para desenvolvimento diario.
+- Documentada a variavel `QA_WEB_URL` para rodar QAs de navegador quando a Web estiver em porta alternativa.
+
+Observacoes:
+
+- Mudanca apenas documental; contrato da API e codigo de produto nao mudaram.
+- Proxima melhoria recomendada: criar um comando agregado curto para esses QAs diarios.

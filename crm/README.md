@@ -121,6 +121,18 @@ Para validar o fluxo Comercial com perfil Vendedor:
 npm run qa:commercial:local
 ```
 
+Para validar a preferencia da timeline do cliente ponta a ponta:
+
+```bash
+npm run qa:customer-history-preferences:local
+```
+
+Para validar a tela de Perfil listando e limpando preferencias pessoais:
+
+```bash
+npm run qa:profile-preferences:local
+```
+
 Para validar o fluxo Administrativo com triagem, repasse, documentos e prestadores:
 
 ```bash
@@ -172,6 +184,29 @@ O smoke local usa por padrao:
 - Endpoints principais da API e rotas navegaveis do menu.
 
 Variaveis opcionais: `SMOKE_API_URL`, `SMOKE_WEB_URL`, `SMOKE_EMAIL` e `SMOKE_PASSWORD`.
+
+QAs locais recomendados para desenvolvimento diario:
+
+```bash
+npm run typecheck
+npm run build:api
+npm run build:web
+npm run qa:commercial:local
+npm run qa:customer-history-preferences:local
+npm run qa:profile-preferences:local
+npm run qa:visual:local
+```
+
+Quando a Web estiver rodando fora da porta padrao, informe a URL nos QAs de navegador. Exemplo no PowerShell:
+
+```powershell
+$env:QA_WEB_URL="http://localhost:3001"
+npm run qa:commercial:local
+npm run qa:customer-history-preferences:local
+npm run qa:profile-preferences:local
+npm run qa:visual:local
+Remove-Item Env:\QA_WEB_URL
+```
 
 ## Massa demo
 
