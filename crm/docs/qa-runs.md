@@ -1197,3 +1197,30 @@ Observacoes:
 
 - O comando exige API e Web ja rodando, como os demais QAs de navegador.
 - Proxima melhoria recomendada: criar um helper para subir API/Web em portas livres e rodar o QA diario automaticamente.
+
+## 2026-06-14 - Helper automatico de QA diario
+
+Contexto:
+
+- Etapa BMAP: automacao operacional para reduzir preparacao manual de ambiente.
+- Foco: subir API/Web em portas livres e executar o conjunto diario de QA.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-daily-auto-local.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run qa:daily:auto:local` | Passou |
+
+Resultado:
+
+- Criado helper `scripts/qa-daily-auto-local.mjs`.
+- Criado comando `npm run qa:daily:auto:local`.
+- README documenta o atalho automatico.
+
+Observacoes:
+
+- O helper roda typecheck/builds antes de subir os servidores, para evitar conflito entre `next build` e `next dev`.
+- Proxima melhoria recomendada: consolidar logs de execucao do helper em `.dev-logs/` quando houver falha.

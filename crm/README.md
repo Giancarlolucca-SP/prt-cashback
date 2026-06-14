@@ -191,6 +191,12 @@ Atalho recomendado para desenvolvimento diario, com API e Web ja rodando:
 npm run qa:daily:local
 ```
 
+Para deixar o proprio script subir API/Web em portas livres e executar esse conjunto:
+
+```bash
+npm run qa:daily:auto:local
+```
+
 Ele equivale a:
 
 ```bash

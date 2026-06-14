@@ -23,6 +23,7 @@
     "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
     "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
     "qa:administrative:local": "node scripts/qa-administrative-local.mjs",
+    "qa:daily:auto:local": "node scripts/qa-daily-auto-local.mjs",
     "qa:local": "npm run qa && npm run qa:regression:local",
     "qa:commercial:local": "node scripts/qa-commercial-local.mjs",
     "qa:customer-history-preferences:local": "node scripts/qa-customer-history-preferences-local.mjs",
