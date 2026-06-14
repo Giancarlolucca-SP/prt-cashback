@@ -1117,3 +1117,33 @@ Observacoes:
 
 - O contrato da API nao mudou nesta etapa.
 - Proxima melhoria recomendada: ampliar esse padrao para outras preferencias quando novas telas persistirem estado do usuario.
+
+## 2026-06-13 - QA funcional da tela de perfil
+
+Contexto:
+
+- Etapa BMAP: reforco de regressao automatizada para preferencias de usuario.
+- Foco: validar listagem e limpeza de preferencias pela tela `/perfil`.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:profile-preferences:local` | Passou |
+| `npm run qa:customer-history-preferences:local` | Passou |
+| `npm run qa:commercial:local` | Passou |
+| `npm run qa:visual:local` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+
+Resultado:
+
+- Criado script `scripts/qa-profile-preferences-local.mjs`.
+- O QA cria preferencia via API, abre `/perfil`, valida a linha `Timeline do cliente`, limpa pela UI e confirma remocao no backend.
+- O novo comando `qa:profile-preferences:local` entrou na regressao local.
+
+Observacoes:
+
+- O contrato da API nao mudou nesta etapa.
+- Proxima melhoria recomendada: documentar no README a lista de QAs locais recomendados para desenvolvimento diario.
