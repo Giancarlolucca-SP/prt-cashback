@@ -1224,3 +1224,31 @@ Observacoes:
 
 - O helper roda typecheck/builds antes de subir os servidores, para evitar conflito entre `next build` e `next dev`.
 - Proxima melhoria recomendada: consolidar logs de execucao do helper em `.dev-logs/` quando houver falha.
+
+## 2026-06-14 - Logs de falha do helper diario
+
+Contexto:
+
+- Etapa BMAP: observabilidade operacional do QA local.
+- Foco: facilitar diagnostico quando o helper automatico falhar antes, durante ou depois de subir API/Web.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-daily-auto-local.mjs` | Passou |
+| `git diff --check -- crm` | Passou |
+| `npm run qa:daily:auto:local` | Passou |
+
+Resultado:
+
+- O helper `qa:daily:auto:local` passou a capturar saida dos comandos de preflight, API, Web e QAs executados.
+- Em caso de falha, o helper grava `.dev-logs/qa-daily-auto-*.failure.log`.
+- O arquivo de falha inclui timestamp, cwd, versao do Node, portas preferidas, stack do erro e saida capturada.
+- A documentacao do README passou a indicar onde encontrar o diagnostico.
+
+Observacoes:
+
+- Execucoes bem-sucedidas continuam sem gerar arquivo novo em `.dev-logs/`.
+- Proxima melhoria recomendada: adicionar um teste automatizado pequeno para exercitar o caminho de falha do helper sem rodar toda a suite.

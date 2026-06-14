@@ -197,6 +197,8 @@ Para deixar o proprio script subir API/Web em portas livres e executar esse conj
 npm run qa:daily:auto:local
 ```
 
+Se o helper automatico falhar, ele grava um diagnostico em `.dev-logs/qa-daily-auto-*.failure.log` com erro, portas tentadas e saida capturada dos comandos/servicos.
+
 Ele equivale a:
 
 ```bash
