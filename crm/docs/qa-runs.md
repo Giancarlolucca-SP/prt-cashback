@@ -1313,3 +1313,32 @@ Observacoes:
 
 - Producao e ambientes sem `PRISMA_LOG_LEVEL=silent` continuam logando erros do Prisma.
 - Proxima melhoria recomendada: medir tempo da suite `npm test` e separar smoke pesado de testes unitarios se a regressao local ficar lenta.
+
+## 2026-06-14 - Separacao de testes unitarios e smokes
+
+Contexto:
+
+- Etapa BMAP: ergonomia e estabilidade da regressao local.
+- Foco: dar feedback rapido para testes de contrato/unitarios e deixar smokes pesados explicitos.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run test:unit` | Passou: 11 testes, runner ~3,3s na validacao final |
+| `npm run test:smoke` | Passou: 2 testes, runner ~104,5s isolado |
+| `npm test` | Passou: `test:unit` + `test:smoke`, runner smoke ~92,6s na validacao final |
+
+Resultado:
+
+- Criado script `npm run test:unit` para testes rapidos de contrato, configuracao e guardrails.
+- Criado script `npm run test:smoke` para smokes pesados de API e rate-limit.
+- `npm test` passou a encadear `test:unit` e `test:smoke`.
+- `test:smoke` roda com `--test-concurrency=1` para evitar disputa de seed/estado entre smokes que usam banco.
+- README documenta quando usar cada nivel.
+
+Observacoes:
+
+- O auth smoke segue sendo o trecho mais caro da suite.
+- Proxima melhoria recomendada: avaliar particionamento do auth smoke por dominio para reduzir tempo de feedback sem perder cobertura.

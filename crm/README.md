@@ -97,6 +97,18 @@ npm run build:api
 npm run build:web
 ```
 
+Para feedback rapido durante desenvolvimento, rode apenas os testes de contrato/unitarios:
+
+```bash
+npm run test:unit
+```
+
+Para os smokes de API mais pesados, com seed e fluxos in-process:
+
+```bash
+npm run test:smoke
+```
+
 Atalho equivalente:
 
 ```bash
