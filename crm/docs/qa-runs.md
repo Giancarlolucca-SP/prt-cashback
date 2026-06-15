@@ -2155,3 +2155,30 @@ Observacoes:
 - A API local existente foi reutilizada em `http://localhost:3333`.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: revisar se outras regras de CSP precisam de testes de contrato, especialmente `img-src`, `frame-src` e `connect-src`.
+
+## 2026-06-15 - Contratos de CSP contra embeds remotos
+
+Contexto:
+
+- Etapa BMAP: reforcar controles contra carregamento remoto indevido no frontend.
+- Foco: proteger as regras de CSP que reduzem risco de tracker, iframe, object embed e conexoes fora do backend configurado.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --test tests/web-csp-contract.test.mjs` | Passou: 3 testes |
+| `npm run test:unit` | Passou: 17 testes |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- `tests/web-csp-contract.test.mjs` passou a validar `default-src`, `img-src`, `media-src`, `frame-src`, `object-src`, `base-uri` e `form-action`.
+- O teste tambem valida que `connect-src` permite apenas `'self'` e a origem normalizada de `NEXT_PUBLIC_API_URL`.
+- A regra de `unsafe-eval` continua limitada a ambiente fora de producao.
+
+Observacoes:
+
+- Nao houve mudanca funcional no CSP nesta rodada; a politica existente foi protegida por contrato automatizado.
+- Proxima melhoria recomendada: adicionar QA negativo de conteudo remoto em campos do usuario quando houver UI de cadastro/edicao cobrindo esses campos.
