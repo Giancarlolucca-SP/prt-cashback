@@ -2242,3 +2242,30 @@ Observacoes:
 
 - O smoke de auth/API passou apos as mudancas nos schemas.
 - Proxima melhoria recomendada: adicionar casos negativos de API para pelo menos um endpoint novo protegido fora de mensagens, por exemplo follow-up ou estoque.
+
+## 2026-06-15 - Negativos de API para follow-up com tracker
+
+Contexto:
+
+- Etapa BMAP: provar em endpoint real que follow-ups bloqueiam recursos remotos carregaveis.
+- Foco: agendamento e conclusao de follow-up de lead.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run test:smoke:auth` | Passou |
+| `npm run test:unit` | Passou: 21 testes no total |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- O smoke de API agora tenta criar follow-up com `<img src="https://tracker.example/...">` e espera `400 VALIDATION_ERROR`.
+- O smoke tambem tenta concluir follow-up com CSS `url(https://tracker.example/...)` e espera `400 VALIDATION_ERROR`.
+- O follow-up valido continua sendo criado, listado, concluido e usado no restante do fluxo.
+
+Observacoes:
+
+- Esta rodada cobre endpoint real fora de mensagens, complementando o contrato unitario do detector central.
+- Proxima melhoria recomendada: adicionar caso negativo semelhante para estoque ou servicos, que tambem receberam guards novos.

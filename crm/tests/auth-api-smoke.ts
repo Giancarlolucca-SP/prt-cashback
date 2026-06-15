@@ -851,6 +851,21 @@ try {
   );
 
   const followUpDueAt = "2026-06-09T14:30:00.000Z";
+  const blockedFollowUpTracker = await app.inject({
+    method: "POST",
+    url: `/leads/${createdLeadId}/follow-ups`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      dueAt: followUpDueAt,
+      notes: '<img src="https://tracker.example/follow-up.png">',
+      type: "Retorno WhatsApp",
+    },
+  });
+  assert.equal(blockedFollowUpTracker.statusCode, 400);
+  assert.equal(blockedFollowUpTracker.json().error.code, "VALIDATION_ERROR");
+
   const scheduleLeadFollowUp = await app.inject({
     method: "POST",
     url: `/leads/${createdLeadId}/follow-ups`,
@@ -888,6 +903,19 @@ try {
       .json()
       .items.some((followUp: { id: string; lead: { id: string } | null }) => followUp.id === createdFollowUp.id && followUp.lead?.id === createdLeadId),
   );
+
+  const blockedCompleteFollowUpTracker = await app.inject({
+    method: "POST",
+    url: `/leads/follow-ups/${createdFollowUp.id}/complete`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      notes: "background-image: url(https://tracker.example/follow-up.png)",
+    },
+  });
+  assert.equal(blockedCompleteFollowUpTracker.statusCode, 400);
+  assert.equal(blockedCompleteFollowUpTracker.json().error.code, "VALIDATION_ERROR");
 
   const completeLeadFollowUp = await app.inject({
     method: "POST",
