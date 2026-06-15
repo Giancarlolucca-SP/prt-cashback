@@ -21,9 +21,9 @@ async function findByCpf(req, res, next) {
 
 async function listAll(req, res, next) {
   try {
-    const { page, limit } = req.query;
+    const { page, limit, includeUnregistered } = req.query;
     const result = await customerService.listAll(
-      { page: parseInt(page) || 1, limit: parseInt(limit) || 20 },
+      { page: parseInt(page) || 1, limit: parseInt(limit) || 20, includeUnregistered: includeUnregistered === '1' || includeUnregistered === 'true' },
       req.operator.establishmentId
     );
     res.status(200).json(result);
@@ -34,9 +34,9 @@ async function listAll(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const { search = '', page, limit } = req.query;
+    const { search = '', page, limit, includeUnregistered } = req.query;
     const result = await customerService.list(
-      { search, page: parseInt(page) || 1, limit: parseInt(limit) || 20 },
+      { search, page: parseInt(page) || 1, limit: parseInt(limit) || 20, includeUnregistered: includeUnregistered === '1' || includeUnregistered === 'true' },
       req.operator.establishmentId
     );
     res.status(200).json(result);

@@ -67,12 +67,13 @@ export default function Clientes() {
   const [search, setSearch] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [includeUnregistered, setIncludeUnregistered] = useState(false);
   const debounceRef = useRef(null);
 
-  const fetchCustomers = useCallback(async (searchTerm, pageNum) => {
+  const fetchCustomers = useCallback(async (searchTerm, pageNum, includeUnreg) => {
     setLoading(true);
     try {
-      const { data } = await customersAPI.list(searchTerm, pageNum);
+      const { data } = await customersAPI.list(searchTerm, pageNum, includeUnreg);
       setCustomers(data.customers);
       setTotal(data.total);
     } catch {
@@ -84,8 +85,8 @@ export default function Clientes() {
   }, []);
 
   useEffect(() => {
-    fetchCustomers(activeSearch, page);
-  }, [activeSearch, page, fetchCustomers]);
+    fetchCustomers(activeSearch, page, includeUnregistered);
+  }, [activeSearch, page, includeUnregistered, fetchCustomers]);
 
   function handleSearchChange(e) {
     const value = e.target.value;
@@ -140,6 +141,17 @@ export default function Clientes() {
           </button>
         )}
       </div>
+
+      {/* Stub filter toggle */}
+      <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={includeUnregistered}
+          onChange={(e) => { setIncludeUnregistered(e.target.checked); setPage(1); }}
+          className="rounded border-gray-300 text-amber-500 focus:ring-amber-400"
+        />
+        Mostrar CPFs não cadastrados (acúmulos da pista sem conta)
+      </label>
 
       {/* Loading */}
       {loading ? (

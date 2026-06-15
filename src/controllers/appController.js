@@ -2,6 +2,7 @@ const appService          = require('../services/appService');
 const nfceService         = require('../services/nfceService');
 const photoValidationService = require('../services/photoValidationService');
 const establishmentService   = require('../services/establishmentService');
+const pistaService           = require('../services/pistaService');
 
 async function register(req, res, next) {
   try {
@@ -185,6 +186,23 @@ async function getEstablishmentQRCodeData(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Pista redemption requests (customer side) ─────────────────────────────────
+
+async function createRedemptionRequest(req, res, next) {
+  try { res.status(201).json(await pistaService.createRequest(req.body, req.customer)); }
+  catch (err) { next(err); }
+}
+
+async function getRedemptionRequest(req, res, next) {
+  try { res.status(200).json(await pistaService.getMyRequest(req.customer)); }
+  catch (err) { next(err); }
+}
+
+async function cancelRedemptionRequest(req, res, next) {
+  try { res.status(200).json(await pistaService.cancelMyRequest(req.customer)); }
+  catch (err) { next(err); }
+}
+
 module.exports = {
   register,
   registerSelfie,
@@ -207,4 +225,7 @@ module.exports = {
   validateNfce,
   validatePhoto,
   getEstablishmentQRCodeData,
+  createRedemptionRequest,
+  getRedemptionRequest,
+  cancelRedemptionRequest,
 };

@@ -37,6 +37,10 @@ pista-agent/data/
 *.backup
 supabase_backup*
 pg_dump*
+# Exports/arquivos locais que podem conter segredos (nunca commitar)
+Tempevo-api.json
+qr-expo.png
+.claude/
 
 # CRM automotivo MVP
 crm/node_modules/

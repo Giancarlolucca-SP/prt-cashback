@@ -8,6 +8,7 @@ const { formatDateBR } = require('../utils/dateFormatter');
 const fraudService     = require('./fraudService');
 const audit            = require('./auditService');
 const { computeCashback } = require('./transactionService');
+const attendantService = require('./attendantService');
 
 const prisma = new PrismaClient();
 
@@ -130,6 +131,26 @@ function parseBRL(s) {
   return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
 }
 
+// Split a raw "code-name" attendant string into { code, name }
+function splitAttendantRaw(raw) {
+  const s = String(raw || '');
+  const i = s.indexOf('-');
+  return i === -1 ? { code: '', name: s.trim() } : { code: s.slice(0, i).trim(), name: s.slice(i + 1).trim() };
+}
+
+// Build the attendant payload returned to the mobile app (or null when the
+// cupom carried no attendant). Includes the registered photo when matched.
+function buildAtendentePayload(matched, rawAttendant) {
+  if (matched) {
+    return { key: matched.attendantKey, name: matched.name, code: matched.code, photoUrl: matched.photoUrl, matched: true };
+  }
+  if (rawAttendant) {
+    const { code, name } = splitAttendantRaw(rawAttendant);
+    return { key: rawAttendant, name, code, photoUrl: null, matched: false };
+  }
+  return null;
+}
+
 // ── Extract NFCe data from SP SEFAZ HTML consultation page ────────────────────
 // SP SEFAZ QR codes link to a page that renders receipt HTML instead of XML.
 // We use best-effort regex extraction; cnpjFromKey is the authoritative identifier.
@@ -237,7 +258,9 @@ function parseHtmlNfceData(html, urlParams) {
   const infoMatch = html.match(/<li>(#CF:[^<]+)<\/li>/);
   const infoText  = infoMatch ? infoMatch[1] : '';
 
-  const attendantMatch = infoText.match(/Atendente:\s*([\w\-]+)/i);
+  // Capture the full attendant value (supports spaces and accents, e.g. "27-JOÃO SILVA")
+  // up to the next " - " field delimiter or end of the info string.
+  const attendantMatch = infoText.match(/Atendente:\s*(.+?)(?:\s+-\s+|$)/i);
   const attendant      = attendantMatch ? attendantMatch[1].trim() : null;
   if (attendant) console.log('[NFCE] Atendente:', attendant);
 
@@ -606,6 +629,18 @@ async function validateNfce(qrCodeUrl, customerId, establishmentId) {
   });
   if (!operator) throw createError('Posto sem operadores cadastrados.', 500);
 
+  // 7b. Match the cupom's attendant to the registry (for photo + canonical key)
+  let matchedAttendant = null;
+  if (nfce.atendente) {
+    try {
+      matchedAttendant = await attendantService.matchByRaw(establishmentId, nfce.atendente);
+    } catch (e) {
+      console.error('[NFCE] Falha ao casar atendente:', e.message);
+    }
+  }
+  // Store the canonical registry key when matched, else the raw cupom value
+  const attendantNameToStore = matchedAttendant ? matchedAttendant.attendantKey : (nfce.atendente ?? null);
+
   // 8. Calculate cashback (full logic: fuel type, bonuses, caps)
   const { cashbackValue, effectivePercent } = await computeCashback(
     nfce.valorTotal,
@@ -636,7 +671,7 @@ async function validateNfce(qrCodeUrl, customerId, establishmentId) {
         nfceKey:          nfce.chaveAcesso,
         source:           'NFCE_QR',
         status:           'CONFIRMED',
-        attendantName:    nfce.atendente        ?? null,
+        attendantName:    attendantNameToStore,
         encerranteInicial: nfce.encerrante?.inicial ?? null,
         encerranteFinal:  nfce.encerrante?.final    ?? null,
       },
@@ -682,6 +717,9 @@ async function validateNfce(qrCodeUrl, customerId, establishmentId) {
       novoSaldo:      formatBRL(updated.balance),
       novoSaldoNum:   parseFloat(updated.balance),
     },
+    // Attendant auto-detected from the cupom (null when none). Drives the
+    // "Avaliar atendimento" step on the mobile app.
+    atendente: buildAtendentePayload(matchedAttendant, nfce.atendente),
   };
 }
 

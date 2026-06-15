@@ -13,6 +13,7 @@ const fraudAlert = require('./fraudAlertService');
 const notify     = require('./notificationService');
 const faceService   = require('./faceService');
 const selfieService = require('./selfieService');
+const attendantService = require('./attendantService');
 
 const prisma = new PrismaClient();
 
@@ -93,6 +94,7 @@ async function register({ cpf, name, phone, establishmentCnpj, deviceId, selfieB
   const updateData = {
     name:  name.trim(),
     phone: phone.replace(/\D/g, ''),
+    registered: true, // claim any pista stub row (CPF without account) and keep its balance
   };
   if (deviceId)      updateData.deviceId   = deviceId;
   if (thumbToStore)  updateData.selfieData  = thumbToStore; // legacy field for Rekognition
@@ -384,6 +386,32 @@ async function getHistory({ customerId, establishmentId }, { page = 1, limit = 2
     prisma.transaction.count({ where: { customerId, establishmentId } }),
   ]);
 
+  // Enrich with attendant info (photo from the registry) + whether already rated,
+  // so the history can offer "Avaliar atendimento" for past visits.
+  const [photoMap, existingRatings] = await Promise.all([
+    attendantService.photoMap(establishmentId),
+    prisma.attendantRating.findMany({
+      where:  { transactionId: { in: transactions.map((t) => t.id) } },
+      select: { transactionId: true },
+    }),
+  ]);
+  const ratedIds = new Set(existingRatings.map((r) => r.transactionId));
+
+  function attendantOf(attendantName) {
+    if (!attendantName) return null;
+    const reg = photoMap.get(attendantName);
+    const dash = attendantName.indexOf('-');
+    const code = dash === -1 ? '' : attendantName.slice(0, dash);
+    const name = dash === -1 ? attendantName : attendantName.slice(dash + 1);
+    return {
+      key:      attendantName,
+      name:     reg?.name || name,
+      code,
+      photoUrl: reg?.photoUrl || null,
+      matched:  !!reg,
+    };
+  }
+
   return {
     mensagem: 'Histórico de abastecimentos.',
     total,
@@ -402,6 +430,8 @@ async function getHistory({ customerId, establishmentId }, { page = 1, limit = 2
       litros:             t.liters ? parseFloat(t.liters) : null,
       data:               formatDateBR(t.createdAt),
       dataISO:            t.createdAt.toISOString(),
+      atendente:          attendantOf(t.attendantName),
+      jaAvaliado:         ratedIds.has(t.id),
     })),
   };
 }
