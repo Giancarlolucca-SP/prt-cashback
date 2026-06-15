@@ -149,6 +149,12 @@ Para validar perfis seedados, permissoes criticas de RBAC, endpoints sensiveis e
 npm run qa:functional:local
 ```
 
+Para validar a trilha central do CRM com API e Web rodando, agrupando RBAC, clientes, negociacao e veiculos:
+
+```bash
+npm run qa:core:local
+```
+
 Para validar o fluxo Comercial com perfil Vendedor:
 
 ```bash

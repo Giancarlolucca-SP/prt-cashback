@@ -1794,3 +1794,35 @@ Observacoes:
 
 - A cobertura dos smokes nao mudou; a alteracao reduziu duplicacao e risco de divergencia entre wrappers.
 - Proxima melhoria recomendada: iniciar QA funcional/manual dos fluxos centrais do CRM usando a base de smoke estabilizada.
+
+## 2026-06-15 - Agregador de QA central do CRM
+
+Contexto:
+
+- Etapa BMAP: preparar QA funcional/manual dos fluxos centrais do CRM.
+- Foco: agrupar validacoes ja existentes de RBAC, clientes, negociacao, veiculos e avaliacoes em um comando unico.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-core-local.mjs` | Passou |
+| `node scripts/qa-core-local.mjs --list` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `rg -n "qa:core:local|qa-core-local" README.md package.json scripts docs` | Passou |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- Criado `scripts/qa-core-local.mjs`.
+- Criado comando `npm run qa:core:local`.
+- A trilha central executa, em ordem: `qa:functional:local`, `qa:commercial:local` e `qa:vehicles:local`.
+- README passou a documentar o comando como QA central com API e Web rodando.
+
+Observacoes:
+
+- A execucao completa de `npm run qa:core:local` nao foi rodada nesta etapa porque exige API e Web locais ativos.
+- O modo `--list` valida a composicao do agregador sem depender dos servicos.
+- Proxima melhoria recomendada: subir API/Web pelo fluxo local e executar `npm run qa:core:local` de ponta a ponta.
