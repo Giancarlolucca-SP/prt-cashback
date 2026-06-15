@@ -1,0 +1,244 @@
+# S11-US05: Storage de Anexos e Documentos
+
+## Epic
+Arquitetura Tecnica, Banco de Dados e Base do MVP
+
+## Objetivo
+Definir como o MVP deve armazenar arquivos, documentos, imagens, comprovantes, notas fiscais, laudos, contratos e anexos operacionais, mantendo controle de permissao, vinculos com entidades do sistema, rastreabilidade, exclusao permitida e possibilidade de migracao futura.
+
+## Historia de Usuario
+**Como** equipe de desenvolvimento,
+**quero** uma arquitetura clara para anexos e documentos,
+**para** garantir que arquivos importantes fiquem seguros, privados, vinculados aos processos corretos e acessiveis apenas aos perfis autorizados.
+
+## Principios de Storage
+- Arquivos nao devem ser salvos diretamente no PostgreSQL.
+- PostgreSQL deve guardar metadados, vinculos, permissoes, status, historico e logs dos arquivos.
+- Arquivos fisicos devem ficar em Supabase Storage no MVP.
+- Buckets devem ser privados por padrao.
+- Acesso a arquivo deve passar pelo backend, respeitando RBAC, escopo, entidade vinculada e regras de negocio.
+- O frontend nao deve exibir botao, link, miniatura, aba ou possibilidade visual de arquivo quando o usuario nao tiver permissao.
+- Exclusao de documento permitida deve deixar trilha de auditoria.
+
+## Storage Escolhido para o MVP
+O MVP deve usar Supabase Storage para anexos e documentos.
+
+Responsabilidades:
+
+- Supabase Storage armazena o arquivo fisico.
+- PostgreSQL armazena metadados e vinculos.
+- Backend controla upload, download, visualizacao, exclusao e auditoria.
+- Frontend apenas apresenta as acoes permitidas conforme permissao recebida da API.
+
+## Tipos de Arquivos Suportados
+O MVP deve aceitar, no minimo:
+
+- PDF.
+- JPEG/JPG.
+- PNG.
+- Imagens escaneadas.
+- Arquivos gerados pelo sistema, como contratos, recibos e documentos de entrega.
+
+OCR/leitura assistida pode ser acoplado depois do upload, mas o foco inicial e permitir anexo manual de arquivos.
+
+## Buckets Sugeridos
+Buckets privados sugeridos:
+
+- `customer-documents`: documentos de clientes, como RG/CNH, comprovante de residencia, comprovantes de renda, documentos de financiamento e documentos pessoais anexados manualmente.
+- `vehicle-documents`: documentos de veiculos, laudos, CRLV, consultas, vistorias e documentos de entrada/estoque.
+- `sale-documents`: contratos, recibos, comprovantes de pagamento, documentos de entrega e anexos da venda.
+- `service-documents`: notas fiscais, comprovantes, fotos, laudos e anexos de servicos/prestadores vinculados a OS, preparacao, oficina, polimento, PPF, insulfilm, vistorias e despachante.
+- `listing-media`: fotos e midias de anuncios quando forem controladas pelo sistema.
+- `system-generated`: arquivos gerados pelo sistema, como PDFs de contratos, relatorios exportados e documentos temporarios autorizados.
+
+A divisao exata dos buckets pode ser ajustada na implementacao, desde que mantenha privacidade, permissao e rastreabilidade.
+
+## Metadados no PostgreSQL
+Tabela principal sugerida: `file_attachments`.
+
+Campos conceituais:
+
+- `id` UUID.
+- `store_id`.
+- `bucket`.
+- `storage_path`.
+- `original_filename`.
+- `mime_type`.
+- `file_size`.
+- `checksum` quando viavel.
+- `category`.
+- `description`.
+- `uploaded_by_user_id`.
+- `uploaded_at`.
+- `status` ativo, excluido, substituido, bloqueado ou arquivado.
+- `deleted_by_user_id` quando aplicavel.
+- `deleted_at` quando aplicavel.
+- `deletion_reason` quando aplicavel.
+- `ocr_status` quando aplicavel.
+- `ocr_result_id` ou referencia equivalente quando aplicavel.
+
+Tabela de vinculos sugerida: `file_attachment_links`.
+
+Campos conceituais:
+
+- `id` UUID.
+- `file_attachment_id`.
+- `entity_type`.
+- `entity_id`.
+- `link_type`.
+- `created_by_user_id`.
+- `created_at`.
+
+Exemplos de `entity_type`:
+
+- `customer`.
+- `lead`.
+- `vehicle`.
+- `inventory_item`.
+- `sale`.
+- `purchase_evaluation`.
+- `repasse`.
+- `service_order`.
+- `vehicle_cost`.
+- `provider`.
+- `invoice`.
+- `financial_entry`.
+- `listing`.
+
+## Vinculos Importantes
+Anexos devem poder ser vinculados a uma ou mais partes do processo quando fizer sentido.
+
+Exemplos:
+
+- Nota fiscal de terceiro vinculada ao prestador, OS, custo do veiculo e veiculo.
+- Laudo/vistoria vinculada ao veiculo, avaliacao, estoque e venda quando aplicavel.
+- Contrato vinculado a venda, cliente, veiculo e snapshot da negociacao.
+- Comprovante de pagamento vinculado a venda, financeiro e cliente.
+- Documento pessoal vinculado a cliente e card/processo especifico quando aplicavel.
+- Foto de servico vinculada a OS, veiculo e prestador.
+
+## Permissoes de Acesso
+Acesso a arquivos deve respeitar:
+
+- Perfil do usuario.
+- Modulo de origem.
+- Acao solicitada: upload, visualizar, baixar, substituir, excluir ou auditar.
+- Escopo: propria carteira, propria loja, processo vinculado ou acesso global.
+- Sensibilidade do documento.
+
+Regras base:
+
+- Dono/Gestor pode acessar documentos conforme regra da loja e necessidade de gestao.
+- Administrativo pode acessar documentos operacionais, financeiros e de conciliacao conforme permissao.
+- Vendedor/SDR so ve documentos quando fizerem parte de um cliente/card/processo sob sua responsabilidade e quando a categoria for permitida.
+- Vendedor nao deve ver documentos financeiros, margem, custo, NF de prestador ou dados sensiveis sem permissao.
+- Prestadores externos nao acessam storage interno no MVP, salvo decisao futura.
+
+## Upload
+Fluxo recomendado:
+
+1. Usuario solicita upload pelo modulo permitido.
+2. Backend valida permissao, entidade vinculada e categoria.
+3. Backend gera caminho seguro no bucket privado.
+4. Arquivo e enviado para Supabase Storage.
+5. Backend grava metadados em `file_attachments`.
+6. Backend grava vinculos em `file_attachment_links`.
+7. Backend gera audit log e evento interno `document.uploaded`.
+8. Se configurado, cria job de OCR/leitura assistida.
+
+## Visualizacao e Download
+Fluxo recomendado:
+
+1. Frontend solicita arquivo ou link temporario.
+2. Backend valida RBAC, escopo, entidade vinculada e status do arquivo.
+3. Backend retorna visualizacao permitida ou URL assinada temporaria.
+4. Acesso sensivel pode gerar log de auditoria.
+
+URLs publicas permanentes nao devem ser usadas para documentos privados.
+
+## Exclusao e Retencao
+Regras iniciais:
+
+- Documentos de cliente podem ser excluidos do sistema quando permitido pela regra de negocio e LGPD operacional definida.
+- Cadastros, dados historicos, logs, contratos finais, registros financeiros e transacionais nao devem ser apagados fisicamente quando houver obrigacao operacional, legal ou contratual de retencao.
+- Exclusao permitida deve remover ou invalidar o arquivo fisico no storage e manter registro de auditoria no PostgreSQL.
+- O sistema deve registrar quem excluiu, quando excluiu, motivo e entidade vinculada.
+- Se um documento estiver vinculado a venda concluida, contrato, financeiro ou auditoria obrigatoria, a exclusao deve ser bloqueada ou exigir regra especifica.
+
+## Substituicao de Arquivos
+Quando substituir arquivo:
+
+- Novo arquivo deve gerar novo `file_attachment`.
+- Arquivo anterior deve ficar com status `substituido`, `arquivado` ou seguir regra de exclusao permitida.
+- Historico deve preservar quem substituiu e quando.
+- Se houver OCR, resultado antigo nao deve sobrescrever automaticamente o novo.
+
+## OCR e Leitura Assistida
+OCR nao e requisito obrigatorio para anexar documento, mas deve ser previsto tecnicamente.
+
+Quando habilitado:
+
+- Upload cria job assicrono de leitura.
+- Resultado fica em tabela propria ou campo controlado.
+- Dados sugeridos por OCR devem ser revisados por humano quando afetarem cadastro ou processo sensivel.
+- Excecao aprovada em sprint anterior: data de aniversario pode ser lida automaticamente quando houver documento valido e regra configurada.
+
+## Auditoria
+Eventos de arquivo devem gerar audit log quando aplicavel:
+
+- Upload.
+- Visualizacao sensivel.
+- Download sensivel.
+- Substituicao.
+- Exclusao.
+- Tentativa bloqueada de acesso.
+- Alteracao de categoria ou vinculo.
+- OCR executado.
+- Erro de storage ou reprocessamento.
+
+Logs de auditoria devem ser append-only e nao editaveis.
+
+## Evolucao Futura
+Possibilidades documentadas:
+
+- Trocar Supabase Storage por S3 compativel ou Cloudflare R2 se houver necessidade de custo, escala, controle ou portabilidade.
+- Criar CDN para midias publicas de anuncios, mantendo documentos privados protegidos.
+- Separar storage de documentos sensiveis e midias publicas em politicas diferentes.
+- Adicionar antivirus/scan de malware antes de liberar arquivo.
+- Adicionar classificacao automatica por IA/OCR.
+- Adicionar retencao automatica por categoria de documento.
+- Adicionar cofre digital ou criptografia adicional por categoria sensivel.
+
+## Decisoes a Confirmar
+1. Confirmamos Supabase Storage como storage oficial do MVP para documentos e anexos?
+2. Confirmamos buckets privados por padrao, com acesso sempre controlado pelo backend?
+3. Confirmamos que PostgreSQL guarda metadados e vinculos, enquanto o arquivo fisico fica fora do banco?
+4. Confirmamos que documentos de cliente podem ser excluidos quando permitido, mas mantendo log de auditoria?
+5. Confirmamos que contratos finais, financeiro, logs, historicos e registros transacionais nao devem ser apagados fisicamente quando houver dever de retencao?
+6. Confirmamos que vendedor/SDR so ve anexos permitidos dentro dos seus proprios cards/processos, sem acesso a NF de prestadores, custos, margens ou documentos financeiros sensiveis?
+7. Confirmamos que OCR/leitura assistida fica previsto, mas anexo manual de PDF/JPEG/PNG e o foco principal do MVP?
+
+## Decisoes Registradas
+1. Aprovado: Supabase Storage sera o storage oficial do MVP para documentos e anexos.
+2. Em esclarecimento: bucket significa uma area/pasta/cofre dentro do storage, usada para separar tipos de arquivos; a confirmacao pendente e se todos esses buckets devem ser privados por padrao e acessados somente pelo backend.
+3. Aprovado: PostgreSQL guarda metadados e vinculos, enquanto o arquivo fisico fica fora do banco.
+4. Aprovado: documentos de cliente podem ser excluidos quando permitido, mantendo log de auditoria.
+5. Aprovado: contratos finais, financeiro, logs, historicos e registros transacionais nao devem ser apagados fisicamente quando houver dever de retencao.
+6. Aprovado: vendedor/SDR so ve anexos permitidos dentro dos seus proprios cards/processos, sem acesso a NF de prestadores, custos, margens ou documentos financeiros sensiveis.
+7. Aprovado: OCR/leitura assistida fica previsto, mas anexo manual de PDF/JPEG/PNG e o foco principal do MVP.
+## Criterios de Aceite
+- Dado que usuario anexa arquivo, quando backend validar permissao, entao arquivo deve ser salvo no storage privado e metadados/vinculos no PostgreSQL.
+- Dado que usuario sem permissao tenta acessar arquivo, quando solicitar, entao backend deve bloquear sem revelar dados indevidos.
+- Dado que usuario nao tem permissao no frontend, quando acessar a tela, entao botao/link/aba de documentos sensiveis nao deve aparecer.
+- Dado que documento e excluido conforme regra permitida, quando concluir, entao arquivo deve ser removido ou invalidado e auditoria deve registrar quem, quando, motivo e vinculos.
+- Dado que documento esta vinculado a processo com retencao obrigatoria, quando solicitar exclusao, entao sistema deve bloquear ou exigir fluxo especifico.
+- Dado que NF de terceiro e anexada, quando vinculada, entao deve poder relacionar prestador, OS, custo, veiculo e financeiro quando aplicavel.
+- Dado que OCR for configurado, quando arquivo elegivel for enviado, entao deve criar job assicrono sem impedir o upload manual.
+
+## Fora de Escopo
+- Storage publico irrestrito para documentos privados.
+- Migracao para S3/R2 no MVP.
+- OCR obrigatorio para todos os documentos.
+- Portal externo de prestadores para acesso direto a arquivos no MVP.
+- Assinatura digital completa, salvo historia especifica futura.
+- Politica juridica definitiva de retencao documental fora das regras operacionais do produto.

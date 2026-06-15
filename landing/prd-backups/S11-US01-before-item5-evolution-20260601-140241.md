@@ -1,0 +1,197 @@
+﻿# S11-US01: Arquitetura Geral do Sistema e Stack Tecnica
+
+## Epic
+Arquitetura Tecnica, Banco de Dados e Base do MVP
+
+## Objetivo
+Definir a arquitetura geral do MVP e a stack tecnica recomendada para implementar o sistema da loja com modulos integrados, permissoes fortes, auditoria, anexos, automacoes, integracoes e evolucao futura.
+
+## Historia de Usuario
+**Como** Dono/Gestor e equipe de desenvolvimento,
+**quero** uma arquitetura tecnica clara e economica,
+**para** construir o MVP com seguranca, velocidade, manutencao simples e capacidade de evoluir conforme a loja cresce.
+
+## Principios Tecnicos do MVP
+- Priorizar simplicidade operacional e custo baixo.
+- Usar uma arquitetura modular, mas sem complexidade desnecessaria de microservicos no MVP.
+- Centralizar regras de permissao no backend.
+- Preservar historico, snapshots e logs de acoes sensiveis.
+- Separar dados transacionais, arquivos/anexos, jobs e logs.
+- Projetar integracoes externas de forma desacoplada do provedor.
+- Permitir evolucao futura para mais unidades, mais canais e mais automacoes.
+- Evitar decisoes irreversiveis quando uma solucao simples resolver o MVP.
+
+## Arquitetura Recomendada para o MVP
+A arquitetura recomendada para iniciar:
+
+- Aplicacao web responsiva.
+- Frontend em camada separada do backend.
+- Backend API central.
+- Banco relacional principal.
+- Storage de arquivos para anexos/documentos.
+- Worker/job runner para tarefas assicronas.
+- Camada de integracoes para WhatsApp, e-mail, OCR, IA, marketplaces, consultas externas e webhooks.
+- Camada de auditoria/logs transversal.
+
+
+## Decisao Aprovada: Arquitetura Base
+A arquitetura base aprovada para o MVP e:
+
+- Aplicacao web com frontend separado.
+- Backend API central como ponto unico de regras de negocio, permissoes, auditoria e integracoes.
+- PostgreSQL como banco relacional principal.
+- PostgreSQL tambem suporta mensagens, automacoes, logs, resultados de consultas, status de jobs e dados operacionais do MVP.
+- Tarefas de IA, chatbots, OCR, envio WhatsApp/e-mail, consultas externas, sincronizacoes e webhooks devem rodar por filas/jobs, sem travar a interface.
+- Arquivos pesados como PDFs, imagens, documentos escaneados, laudos, fotos e anexos ficam em storage externo.
+- Busca vetorial/pgvector ou banco vetorial dedicado fica como evolucao futura, apenas se houver necessidade real.
+## Stack Sugerida
+Stack sugerida para avaliacao inicial:
+
+- Frontend: Next.js/React ou framework web equivalente.
+- Backend: Node.js com NestJS/Fastify ou equivalente.
+- Banco de dados: PostgreSQL.
+- ORM/migrations: Prisma ou equivalente.
+- Storage de arquivos: S3 compativel, Supabase Storage, Cloudflare R2 ou outro storage economico.
+- Fila/jobs: BullMQ/Redis, pg-boss ou alternativa simples compativel com o deploy escolhido.
+- Cache/filas leves: Redis quando necessario.
+- Autenticacao: login proprio com senha hash forte e sessoes/JWT conforme decisao tecnica.
+- Logs/auditoria: tabela append-only no banco para auditoria de negocio, logs tecnicos separados para suporte.
+- IA/OCR: camada desacoplada para permitir trocar provedor conforme custo e qualidade.
+
+
+## Decisao Aprovada: Infraestrutura do MVP
+O MVP deve priorizar infraestrutura gerenciada e economica.
+
+- Preferir provedores gerenciados para reduzir manutencao de servidor.
+- Evitar VPS propria no inicio, salvo necessidade forte de custo/controle depois da validacao.
+- Infra deve facilitar deploy, SSL, variaveis de ambiente, logs, backup e escalabilidade inicial.
+- Arquitetura deve permitir migracao futura para VPS ou infraestrutura propria se fizer sentido.
+- Avaliar combinacoes como Supabase, Render, Railway, Fly, Cloudflare ou equivalentes conforme custo, limites e facilidade operacional.
+
+## Decisao Aprovada: Storage de Arquivos
+O MVP deve usar Supabase Storage para anexos e documentos, por familiaridade e velocidade de implementacao.
+
+- Arquivos pesados ficam fora do PostgreSQL.
+- PostgreSQL guarda metadados, vinculos, permissao, classificacao, status e historico do arquivo.
+- Supabase Storage guarda PDFs, imagens, documentos escaneados, laudos, fotos e anexos.
+- Buckets devem ser privados, com acesso controlado pelo backend.
+- Downloads/visualizacoes devem respeitar permissao do usuario.
+- Exclusao de documento do cliente deve gerar log.
+- Backup e continuidade devem considerar banco de dados e storage.
+- S3 compativel/Cloudflare R2 fica como alternativa futura se custo, volume ou arquitetura exigirem.
+
+## Decisao Aprovada: Jobs e Filas
+O MVP deve iniciar com jobs/filas baseados em PostgreSQL, preferencialmente pg-boss ou solucao equivalente.
+
+- Evita adicionar Redis no inicio.
+- Reduz custo e complexidade operacional.
+- Jobs devem processar WhatsApp/e-mail, OCR, IA, consultas externas, webhooks, sincronizacoes, alertas e reprocessamentos.
+- Cada job deve registrar status, tentativas, erro, resultado e vinculo com processo quando existir.
+- Redis/BullMQ fica como evolucao futura se houver alto volume, filas mais complexas ou necessidade especifica de performance.
+## Justificativa da Arquitetura
+- Banco relacional atende bem cadastros, vendas, financeiro, estoque, documentos, permissoes e auditoria.
+- API central facilita aplicar RBAC, escopos e logs em um unico ponto.
+- Worker separado evita travar a interface em envios, OCR, IA, webhooks, sincronizacoes e consultas externas.
+- Storage externo evita banco pesado com PDFs/imagens.
+- Integracoes por adaptadores reduzem dependencias com fornecedores especificos.
+- Monolito modular no MVP e mais simples de manter que microservicos.
+
+## Modulos Tecnicos Principais
+O MVP deve separar, no minimo, os seguintes dominios/modulos internos:
+
+- Autenticacao e usuarios.
+- RBAC/permissoes.
+- Clientes e leads.
+- Veiculos e estoque.
+- Kanban comercial.
+- Venda/documentacao/entrega.
+- Pos-venda/relacionamento.
+- Avaliacao/compra/repasse.
+- Financeiro/DRE/margem/comissoes.
+- Anuncios/marketplaces/campanhas.
+- Servicos/prestadores/OS/NFs.
+- Configuracoes administrativas.
+- Anexos/documentos.
+- Automacoes/alertas/notificacoes.
+- Integracoes externas.
+- IA/OCR/leitura assistida.
+- Auditoria/logs.
+
+## Regras de Separacao
+- Frontend nao deve decidir permissao sozinho; sempre consultar backend.
+- Backend valida permissao, escopo, status e regras de negocio.
+- Jobs assicronos executam tarefas demoradas e gravam resultado/log.
+- Integracoes externas passam por adaptadores internos.
+- Logs de auditoria de negocio nao devem ser editaveis pelo usuario.
+- Arquivos devem ficar fora do banco, com metadados e vinculos no banco.
+
+## Integracoes Previstas
+A arquitetura deve prever adaptadores para:
+
+- Evolution API / WhatsApp.
+- E-mail operacional.
+- OCR/leitura assistida de documentos.
+- IA para consultas internas/sugestoes.
+- Marketplaces/anuncios.
+- Consultas externas autorizadas em orgaos/TJ quando aplicavel.
+- Despachantes/prestadores quando houver canal configurado.
+- Webhooks de terceiros quando necessario.
+
+## Seguranca e Auditoria
+- RBAC e escopos devem ser aplicados no backend.
+- Acoes sensiveis devem gerar audit log.
+- Dados financeiros, documentos pessoais, logs e configuracoes devem respeitar perfil/permissao.
+- Usuario inativo nao acessa o sistema.
+- Dono/Gestor pode forcar troca de senha.
+- Sessao nao expira por inatividade no MVP, conforme Sprint 10.
+- Documentos do cliente podem ser excluidos por perfil autorizado, com log.
+- Dados que precisam de retencao legal/contratual devem manter historico/motivo.
+
+## Escalabilidade Planejada
+O MVP deve nascer preparado para:
+
+- Mais unidades/lojas no futuro.
+- Mais canais de WhatsApp/e-mail no futuro.
+- Mais marketplaces.
+- Mais prestadores e despachantes.
+- Crescimento de arquivos/documentos.
+- Evolucao de jobs e automacoes.
+- Relatorios e dashboards mais pesados.
+
+## Decisoes a Confirmar
+Antes de congelar a story, confirmar:
+
+1. Aprovado: arquitetura web com frontend separado + backend API central + PostgreSQL.
+2. Aprovado: priorizar infraestrutura economica gerenciada no MVP; VPS propria fica como opcao futura.
+3. Aprovado: usar Supabase Storage para anexos/documentos no MVP; S3 compativel/Cloudflare R2 fica como alternativa futura.
+4. Aprovado: jobs devem comecar com pg-boss/PostgreSQL ou solucao equivalente; Redis/BullMQ fica como evolucao futura.
+5. Se o MVP deve ser monolito modular, deixando microservicos fora do inicio.
+6. Se a stack final deve priorizar Node/TypeScript ou outra linguagem/plataforma.
+
+## Criterios de Aceite
+- Dado que a arquitetura e definida, quando iniciar implementacao, entao frontend, backend, banco, storage e jobs devem estar separados por responsabilidade.
+- Dado que usuario acessa modulo, quando solicitar dados, entao backend deve validar permissao e escopo.
+- Dado que tarefa demorada e solicitada, quando executar, entao deve ir para job/worker ou rotina assicrona.
+- Dado que arquivo e anexado, quando salvar, entao arquivo deve ir para storage e metadados/vinculos para o banco.
+- Dado que integracao externa e usada, quando chamar provedor, entao deve passar por adaptador interno.
+- Dado que acao sensivel acontece, quando salvar, entao deve gerar audit log.
+- Dado que stack for escolhida, quando documentar, entao deve indicar justificativa e trade-offs principais.
+
+## Fora de Escopo
+- Microservicos no MVP.
+- Aplicativo mobile nativo no MVP.
+- Data warehouse dedicado no MVP.
+- Infraestrutura multi-regiao.
+- SSO corporativo avancado.
+- IA autonoma executando acoes sensiveis sem aprovacao humana.
+
+## Observacoes Tecnicas
+- A decisao final de stack deve considerar custo mensal, familiaridade, manutencao, deploy e disponibilidade de desenvolvedores.
+- Separar audit logs de logs tecnicos.
+- Usar migrations versionadas desde o inicio.
+- Criar padrao de modulos antes de implementar telas.
+- Evitar acoplamento direto do dominio com fornecedores externos.
+
+
+
+

@@ -1,0 +1,63 @@
+﻿# S8-US02: Ordens de Servico por Veiculo
+
+## Epic
+Servicos, Oficina, Prestadores e Notas Fiscais
+
+## Objetivo
+Criar ordens de servico vinculadas ao veiculo, permitindo controlar itens vindos da avaliacao ou lancados manualmente, custos previstos/realizados, prestadores, evidencias e impacto financeiro.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** criar ordens de servico por veiculo,
+**para** acompanhar preparacao, custos e execucao antes do carro ir para estoque/anuncio/entrega.
+
+## Origem da OS
+- Item aprovado pelo Gestor/Administrador na avaliacao.
+- Lancamento manual pelo Administrativo/Gestor.
+- Servico vendido ao cliente.
+- Garantia/retrabalho quando aplicavel.
+
+## Campos Minimos
+- `service_order_id`.
+- `vehicle_id`.
+- Origem da OS.
+- Categoria/servico.
+- Descricao.
+- Prioridade.
+- Prestador.
+- Responsavel interno.
+- Custo previsto.
+- Custo realizado.
+- Status.
+- Data de abertura.
+- Data de envio ao prestador/oficina.
+- Data prevista de conclusao.
+- Data de conclusao.
+- Evidencias/fotos.
+- NF/recibo vinculado.
+
+## Status
+- Rascunho.
+- Aberta.
+- Enviada ao prestador.
+- Em andamento.
+- Aguardando peca.
+- Aguardando aprovacao.
+- Concluida.
+- Cancelada.
+- Reprovada/retrabalho.
+
+## Criterios de Aceite
+- Dado que Gestor aprova item da avaliacao, quando gerar OS, entao a OS deve carregar descricao, evidencia e custo previsto do item.
+- Dado que OS tem custo realizado, quando salvar, entao deve alimentar DRE do veiculo e DRE da loja conforme regra financeira.
+- Dado que OS muda status, quando salvar, entao deve registrar historico de movimentacao.
+- Dado que NF e anexada, quando consultar OS, entao NF deve aparecer vinculada.
+
+## Fora de Escopo
+- Pagamento automatico.
+- Portal do prestador.
+- Controle fiscal completo.
+
+## Observacoes Tecnicas
+- OS deve se integrar com Sprint 5 para custos/DRE.
+- OS deve alimentar kanban de servicos.

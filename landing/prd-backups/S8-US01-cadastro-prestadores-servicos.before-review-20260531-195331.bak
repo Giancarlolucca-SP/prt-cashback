@@ -1,0 +1,72 @@
+﻿# S8-US01: Cadastro de Prestadores de Servicos
+
+## Epic
+Servicos, Oficina, Prestadores e Notas Fiscais
+
+## Objetivo
+Permitir cadastrar prestadores de servicos por categoria, com dados de contato, historico e vinculos com veiculos, ordens de servico, notas fiscais e garantias.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** cadastrar prestadores de servicos por categoria,
+**para** acionar rapidamente fornecedores, controlar servicos por veiculo e manter historico financeiro/operacional.
+
+## Categorias Iniciais
+- Funilaria.
+- Mecanica.
+- Pintura.
+- Rodas.
+- Tapeceiro.
+- Vidros.
+- Vitrificacao.
+- Pintura de bancos.
+- Despachante.
+- Outros.
+
+## Categorias Configuraveis
+- Permitir criar nova categoria.
+- Permitir editar categoria conforme permissao.
+- Categoria `Outros` deve exigir descricao manual quando usada.
+
+## Campos Minimos
+- `service_provider_id`.
+- Nome/empresa.
+- Categoria principal.
+- Categorias secundarias quando aplicavel.
+- CNPJ/CPF quando necessario.
+- Contato principal.
+- Telefone/WhatsApp.
+- E-mail.
+- Endereco.
+- Observacoes.
+- Status.
+- Prazo medio quando conhecido.
+- Historico de servicos.
+- Criado por/em.
+- Atualizado por/em.
+
+## Vinculos
+Prestador pode ser vinculado a:
+
+- Veiculo.
+- Ordem de servico.
+- NF/recibo.
+- Garantia.
+- Laudo/servico documental quando aplicavel.
+- Mensagens enviadas.
+- Historico financeiro.
+
+## Criterios de Aceite
+- Dado que Administrativo/Gestor cadastra prestador, quando salvar, entao prestador deve ficar disponivel para OS e mensagens.
+- Dado que usuario cria nova categoria, quando salvar, entao categoria deve poder ser reutilizada.
+- Dado que prestador esta inativo, quando criar OS, entao sistema deve alertar ou impedir conforme configuracao.
+- Dado que prestador possui historico, quando abrir cadastro, entao deve mostrar servicos, veiculos e NFs vinculadas.
+
+## Fora de Escopo
+- Portal externo do prestador.
+- Pagamento automatico.
+- Avaliacao publica do prestador.
+
+## Observacoes Tecnicas
+- Categorias devem ser configuraveis.
+- Manter historico estruturado para metricas futuras.

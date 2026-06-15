@@ -1,0 +1,38 @@
+﻿# S7-US04: Analise de Risco do Proprietario
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Registrar consulta e analise de risco do proprietario/fornecedor antes de compra, incluindo processos judiciais/compliance quando aplicavel e parecer de risco.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** consultar e registrar riscos do proprietario,
+**para** apoiar a decisao de compra com rastreabilidade e validacao juridica quando necessario.
+
+## Escopo Inicial
+- Registrar dados do proprietario/fornecedor consultado.
+- Localizar possiveis processos judiciais ou alertas de compliance quando houver fonte/autorizacao.
+- Registrar parecer juridico/compliance.
+- Classificar risco: baixo, medio, alto, bloqueado ou requer analise.
+- Guardar fonte, data/hora, responsavel e evidencia.
+
+## Regras
+- O sistema apoia decisao, nao substitui parecer juridico humano quando necessario.
+- Consultas devem respeitar LGPD, bases legais, finalidade e minimizacao.
+- Dados sensiveis devem ter permissao restrita.
+
+## Criterios de Aceite
+- Dado que existe proposta de compra, quando consultar risco, entao resultado deve ficar vinculado ao processo.
+- Dado que houver risco relevante, quando classificar, entao deve aparecer alerta para Gestor/Administrativo.
+- Dado que parecer for registrado, quando consultar historico, entao deve mostrar responsavel, data/hora e fonte.
+
+## Fora de Escopo
+- Decisao juridica automatica final.
+- Consulta a bases sem autorizacao.
+- Relatorio juridico formal completo.
+
+## Observacoes Tecnicas
+- Restringir acesso por perfil.
+- Guardar logs de consulta.

@@ -1,0 +1,75 @@
+﻿# S6-US04: Postagens Instagram/Facebook e Thumbnails
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Controlar postagens de veiculos em Instagram e Facebook, permitindo modo manual ou automatizado, controle de thumbnail e registro de metricas de visualizacao, curtidas e quantidade de postagens.
+
+## Historia de Usuario
+**Como** Gestor Administrativo,
+**quero** decidir se a postagem e o thumbnail serao manuais ou automatizados,
+**para** controlar a divulgacao dos veiculos nas redes sociais sem perder rastreabilidade.
+
+## Contexto Operacional
+Os veiculos podem ser postados em Instagram e Facebook. O sistema deve registrar quantas vezes cada veiculo foi postado, quais posts foram feitos, qual thumbnail foi usada e quais metricas retornaram.
+
+Quando houver automacao, deve respeitar API/fornecedor autorizado. Quando nao houver, o usuario pode registrar postagem manual e evidencias.
+
+## Modos
+- Manual.
+- Automatizado.
+- Assistido.
+
+## Thumbnail
+- Thumbnail manual: usuario seleciona ou envia a imagem.
+- Thumbnail automatizada: sistema gera/sugere com base nas fotos/videos.
+- Gestor Administrativo decide qual modo utilizar.
+- Deve ser possivel substituir thumbnail antes da postagem.
+
+## Metricas
+- Quantidade de postagens por veiculo.
+- Visualizacoes.
+- Curtidas.
+- Comentarios.
+- Compartilhamentos quando disponivel.
+- Cliques quando disponivel.
+- Leads gerados quando identificavel.
+- Canal: Instagram ou Facebook.
+
+## Dados Minimos
+- `social_post_id`.
+- `ad_id`.
+- `vehicle_id`.
+- `channel`: Instagram/Facebook.
+- `post_mode`: manual/automatizado/assistido.
+- `thumbnail_mode`: manual/automatizado.
+- `thumbnail_file_id`.
+- `post_url`.
+- `posted_at`.
+- `posted_by`.
+- `automation_id`.
+- `views_count`.
+- `likes_count`.
+- `comments_count`.
+- `shares_count`.
+- `leads_count`.
+- `metrics_captured_at`.
+
+## Criterios de Aceite
+- Dado que um anuncio existe, quando o usuario registrar uma postagem, entao o sistema deve vincular postagem ao anuncio e ao veiculo.
+- Dado que o Gestor escolher modo manual, quando postar fora do sistema, entao deve ser possivel registrar URL/evidencia manualmente.
+- Dado que o Gestor escolher modo automatizado, quando houver integracao autorizada, entao o sistema deve registrar automacao responsavel.
+- Dado que houver metricas, quando consultar o anuncio, entao o sistema deve mostrar visualizacoes, curtidas e quantidade de postagens.
+- Dado que a thumbnail foi alterada, quando salvar, entao o sistema deve registrar a versao usada na postagem.
+
+## Fora de Escopo
+- Criacao avancada de arte publicitaria.
+- Edicao avancada de video.
+- Compra automatica de midia.
+- Automacao sem API/fornecedor autorizado.
+
+## Observacoes Tecnicas
+- Nem todos canais disponibilizam todas as metricas por API.
+- Permitir metricas manuais no MVP quando necessario.
+- Guardar data/hora de captura das metricas.

@@ -1,0 +1,152 @@
+﻿# Sprint 08: Servicos, Oficina, Prestadores e Notas Fiscais
+
+## Status
+Em definicao.
+
+## Objetivo da Sprint
+Construir o fluxo operacional de servicos, oficina, prestadores, ordens de servico, mensagens, recebimento de notas fiscais, pastas por veiculo e metricas de preparacao.
+
+A Sprint 8 conecta a avaliacao e compra de veiculos aos custos reais de preparacao, execucao de servicos, comunicacao com prestadores, lancamentos no DRE da loja e DRE do veiculo, armazenamento documental e acompanhamento operacional dos carros em oficina.
+
+## Ponto de Entrada
+A Sprint 8 usa dados e decisoes anteriores:
+
+- Avaliacao mobile e itens de preparacao/melhorias aprovados pelo Gestor/Administrador.
+- Veiculos cadastrados ou em processo de entrada/preparacao.
+- DRE da loja e DRE por veiculo.
+- Prestadores de servico citados no PRD.
+- Necessidade de envio de mensagens pelo sistema.
+- Recebimento de NF por e-mail/WhatsApp.
+- Pasta documental por veiculo.
+
+## Ponto de Saida
+A Sprint 8 termina quando:
+
+- Prestadores de servico podem ser cadastrados por categoria configuravel.
+- Ordens de servico podem ser criadas por veiculo a partir da avaliacao ou manualmente.
+- Existe kanban/pagina operacional de carros na oficina.
+- O sistema permite enviar mensagens para prestadores com historico.
+- NF/recibos de servicos podem ser recebidos/lancados e vinculados ao DRE da loja, DRE do carro, contabilidade e pasta do veiculo.
+- Pasta do veiculo possui estrutura para servicos, garantias, laudos, NFs e documentos.
+- Retencao/exclusao automatica de arquivos esta definida por tipo documental.
+- Metricas de preparacao e servicos ficam estruturadas para relatorios e IA futura.
+
+## Stories Macro Propostas
+
+### S8-US01: Cadastro de Prestadores de Servicos
+Cadastrar prestadores de servicos por categoria, com categorias editaveis e contato para acionamento.
+
+Arquivo detalhado: `stories/S8-US01-cadastro-prestadores-servicos.md`.
+
+Escopo inicial:
+- Categorias: funilaria, mecanica, pintura, rodas, tapeceiro, vidros, vitrificacao, pintura de bancos, despachante e outras.
+- Permitir criar novas categorias.
+- Dados de contato, WhatsApp, e-mail, endereco, observacoes, status e historico.
+- Prestador pode ser vinculado a OS, NF, garantia e veiculo.
+
+### S8-US02: Ordens de Servico por Veiculo
+Criar ordens de servico vinculadas ao veiculo, vindas da avaliacao ou lancadas manualmente.
+
+Arquivo detalhado: `stories/S8-US02-ordens-servico-veiculo.md`.
+
+Escopo inicial:
+- Criar OS por veiculo.
+- Gerar OS a partir dos itens aprovados pelo Gestor/Administrador na avaliacao.
+- Permitir OS manual.
+- Campos: servico, descricao, prioridade, prestador, custo previsto, custo realizado, status, evidencias, datas.
+- Alimentar DRE do veiculo e DRE da loja quando houver custo realizado.
+
+### S8-US03: Kanban de Servicos e Oficina
+Acompanhar carros em oficina e servicos em andamento.
+
+Arquivo detalhado: `stories/S8-US03-kanban-servicos-oficina.md`.
+
+Escopo inicial:
+- Pagina/menu para ver carros na oficina.
+- Data de entrada.
+- Oficina/prestador.
+- O que esta sendo feito.
+- Status do servico.
+- Previsao de entrega.
+- Historico e alertas de atraso.
+
+### S8-US04: Mensagens para Prestadores
+Enviar mensagens para prestadores pelo sistema, vinculadas a OS, veiculo e prestador.
+
+Arquivo detalhado: `stories/S8-US04-mensagens-prestadores.md`.
+
+Escopo inicial:
+- Envio por WhatsApp/e-mail quando integracao estiver configurada.
+- Registro manual/assistido quando necessario.
+- Historico por prestador, veiculo e OS.
+- Templates de mensagem simples.
+- Logs e status de envio.
+
+### S8-US05: Recebimento de NF e Lancamento Financeiro
+Receber NF/recibos de servicos por e-mail/WhatsApp ou upload manual e lancar no DRE.
+
+Arquivo detalhado: `stories/S8-US05-recebimento-nf-servicos.md`.
+
+Escopo inicial:
+- Receber NF por e-mail, WhatsApp ou upload manual.
+- Vincular NF a veiculo, OS, prestador e categoria.
+- Lancar automaticamente/assistido no DRE da loja e DRE do carro.
+- Separar via para contabilidade.
+- Guardar arquivo na pasta do veiculo.
+
+### S8-US06: Pastas e Retencao de Arquivos do Veiculo
+Organizar arquivos por veiculo e definir regras de retencao/exclusao.
+
+Arquivo detalhado: `stories/S8-US06-pastas-retencao-arquivos-veiculo.md`.
+
+Escopo inicial:
+- Pasta por veiculo.
+- Subpastas/tipos: servicos, NFs, garantias, laudos, documentos, fotos/evidencias.
+- Laudo cautelar com retencao de 2 anos.
+- Arquivos operacionais de servicos e preparacao com regra de exclusao automatica apos baixa/venda conforme configuracao.
+- Regras de excecao para documentos que devem ser mantidos por prazo maior.
+
+### S8-US07: Metricas de Servicos e Preparacao
+Criar metricas de custos, tempo e performance dos servicos/prestadores.
+
+Arquivo detalhado: `stories/S8-US07-metricas-servicos-preparacao.md`.
+
+Escopo inicial:
+- Previsto vs realizado.
+- Tempo em oficina.
+- Prestadores mais usados.
+- Servicos mais caros.
+- Impacto na margem do veiculo.
+- Ranking de custos por veiculo/prestador/categoria.
+
+## Decisoes Ja Confirmadas do Produto
+- S8-US02 revisada: OS pode nascer de item aprovado na avaliacao, lancamento manual, servico vendido ao cliente ou garantia/retrabalho.
+- Todos os perfis internos autorizados podem gerar OS; Administrativo/Gestor revisa/complementa prestador, custos e encaminhamentos.
+- Custo realizado alimenta DRE do veiculo e DRE da loja quando lancado/confirmado por perfil permitido.
+- Status aprovados: rascunho, aberta, enviada ao prestador, em andamento, aguardando peca, aguardando aprovacao, concluida, cancelada e reprovada/retrabalho.
+- Vendedor pode acompanhar status operacional quando houver cliente potencial ou venda sendo preparada, mas nao visualiza custos/margem.- S8-US01 revisada: categorias iniciais incluem funilaria, mecanica, pintura, rodas, tapeceiro, vidros, vitrificacao, pintura de bancos, vistoria, despachante e outros.
+- Categorias sao editaveis e novas categorias podem ser criadas.
+- Campos aprovados: nome/empresa, categoria, CNPJ/CPF quando necessario, contato, telefone/WhatsApp, e-mail, endereco, observacoes, status e prazo medio.
+- Prestadores podem ser vinculados a veiculo, OS, NF/recibo, garantia, laudo/servico documental, mensagens e historico financeiro.
+- Vendedor nao tem acesso ao cadastro de prestadores.
+- Despachante entra como prestador e tambem nos fluxos documentais/transferencia; vistoria entra como categoria propria.- Deve haver cadastro de prestadores como funilaria, mecanica, pintura, rodas, tapeceiro, vidros, vitrificacao, pintura de bancos e despachantes.
+- Deve permitir separar por categoria e criar categoria.
+- Pode enviar mensagem direta para prestadores pelo sistema.
+- NF recebida por e-mail ou WhatsApp deve lancar no DRE da loja, DRE do carro, separar via para contabilidade e armazenar na pasta do veiculo.
+- Pasta por veiculo deve armazenar servicos realizados, garantias, laudos e documentos relacionados.
+- Veiculos na oficina devem ser visualizados com data de entrada, o que foi feito e qual oficina esta.
+- Laudo cautelar deve ficar armazenado por 2 anos, com exclusao automatica depois do prazo.
+- Dados devem ser armazenados de forma estruturada para IA consumir futuramente e extrair insights.
+
+## Fora de Escopo Inicial da Sprint 8
+- Emissao fiscal completa de NF.
+- Integracao definitiva com todos provedores de e-mail/WhatsApp sem fornecedor definido.
+- OCR fiscal perfeito sem revisao humana.
+- Pagamento automatico a prestadores.
+- Portal externo para prestador.
+- Controle fiscal/contabil completo alem do envio para contabilidade.
+
+## Proximo Passo
+Revisar a S8-US01 e confirmar categorias, campos e permissoes de prestadores de servico.
+
+

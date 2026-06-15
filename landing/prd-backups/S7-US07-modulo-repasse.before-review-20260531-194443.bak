@@ -1,0 +1,65 @@
+﻿# S7-US07: Modulo de Repasse
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Criar modulo separado para carros de repasse, sem entrada no estoque da loja, mas com controle de fornecedores, compradores, historico, receita e retransmissao para grupos de WhatsApp.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** cadastrar carros de repasse em modulo proprio,
+**para** controlar uma operacao separada do estoque, mas com receita registrada no DRE da loja.
+
+## Regras Principais
+- Carro de repasse nao entra no estoque da loja.
+- Repasse tem modulo/pagina exclusiva.
+- Fornecedores de repasse e compradores de repasse devem ser cadastrados separadamente.
+- Historico de repasses deve registrar compradores, vendedores, valores e receita.
+- Receita de repasse entra no DRE da loja.
+- Ao cadastrar carro de repasse, sistema pode retransmitir para grupos de WhatsApp.
+
+## Campos Minimos
+- `repasse_id`.
+- Veiculo.
+- Origem/fornecedor de repasse.
+- Comprador de repasse.
+- Responsavel/vendedor.
+- Valor de entrada/custo quando aplicavel.
+- Valor vendido.
+- Receita/spread.
+- Status.
+- Grupos de WhatsApp selecionados.
+- Data de envio/retransmissao.
+- Historico de interessados/ofertas.
+
+## Status
+- Rascunho.
+- Disponivel para repasse.
+- Enviado para grupos.
+- Em negociacao.
+- Vendido.
+- Cancelado.
+- Arquivado.
+
+## WhatsApp
+- Permitir selecionar grupos cadastrados/autorizados.
+- Registrar mensagem enviada, data/hora, responsavel/automacao e resultado.
+- Usar integracao autorizada, como Evolution API, quando definida.
+- Manter logs e nao enviar sem autorizacao/configuracao.
+
+## Criterios de Aceite
+- Dado que um carro de repasse e cadastrado, quando salvar, entao ele nao deve aparecer no estoque da loja.
+- Dado que o usuario seleciona grupos, quando confirmar envio, entao o sistema deve retransmitir ou gerar pendencia conforme integracao.
+- Dado que o repasse e vendido, quando finalizar, entao receita deve alimentar DRE da loja.
+- Dado que consultar historico, quando abrir repasse, entao deve exibir fornecedor, comprador, vendedor e valores.
+
+## Fora de Escopo
+- Estoque publico da loja.
+- Anuncio normal em marketplaces.
+- Envio WhatsApp sem integracao autorizada.
+
+## Observacoes Tecnicas
+- Separar entidades de estoque e repasse.
+- Integrar receita com Sprint 5.
+- Auditar envios por WhatsApp.

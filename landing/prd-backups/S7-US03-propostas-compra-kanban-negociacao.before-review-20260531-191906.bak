@@ -1,0 +1,50 @@
+﻿# S7-US03: Propostas de Compra e Kanban de Negociacao
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Controlar veiculos avaliados que receberam proposta de compra, registrando ofertas, status, responsaveis e historico de negociacao em kanban.
+
+## Historia de Usuario
+**Como** Gestor/Comprador,
+**quero** acompanhar propostas de compra em kanban,
+**para** saber quais veiculos estao em avaliacao, negociacao, aguardando retorno, concluidos ou recusados.
+
+## Status do Kanban
+- Avaliacao aberta.
+- Oferta enviada.
+- Em negociacao.
+- Aguardando retorno.
+- Compra aprovada.
+- Compra concluida.
+- Recusado.
+- Cancelado.
+
+## Dados Minimos
+- `purchase_proposal_id`.
+- `evaluation_id`.
+- Veiculo.
+- Proprietario/fornecedor.
+- Responsavel.
+- Valor da ultima oferta.
+- Historico de ofertas.
+- Condicao proposta.
+- Status atual.
+- Data da ultima interacao.
+- Observacoes.
+
+## Criterios de Aceite
+- Dado que uma avaliacao recebeu oferta, quando salvar proposta, entao deve criar card no kanban de compras.
+- Dado que nova oferta e feita, quando registrar valor, entao deve manter historico das ofertas anteriores.
+- Dado que status muda, quando mover card, entao deve registrar responsavel e data/hora.
+- Dado que compra e concluida, quando finalizar, entao deve indicar se vai para estoque, consignado ou repasse conforme fluxo posterior.
+
+## Fora de Escopo
+- Contrato de compra completo.
+- Pagamento ao proprietario.
+- Entrada automatica no estoque sem aprovacao.
+
+## Observacoes Tecnicas
+- Kanban deve manter historico de movimentacoes.
+- Integrar com avaliacao e futuro cadastro/entrada do veiculo.

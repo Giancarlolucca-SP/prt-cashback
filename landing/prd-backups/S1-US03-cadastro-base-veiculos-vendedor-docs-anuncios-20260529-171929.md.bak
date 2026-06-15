@@ -1,0 +1,480 @@
+﻿---
+title: 'S1-US03: Cadastro Base de Veiculos'
+status: draft
+created: 2026-05-29
+sprint: 'Sprint 1: Cadastros Base, Clientes, Veiculos e Estoque Minimo'
+source_sprint: '../sprint-01.md'
+source_prd: '../../prds/prd-projeto-2-2026-05-25/prd.md'
+related_frs:
+  - FR-049
+  - FR-050
+  - FR-051
+  - FR-051B
+  - FR-051D
+  - FR-112B
+  - FR-112F
+  - NFR-002
+  - NFR-003
+  - NFR-005
+---
+
+# S1-US03: Cadastro Base de Veiculos
+
+## Historia
+
+**Como** Administrativo, Administrador/Gestor ou Avaliador autorizado,  
+**quero** cadastrar e consultar veiculos com dados minimos, tipo de estoque, status e informacoes comerciais iniciais,  
+**para** formar a base do estoque interno e preparar os fluxos futuros de anuncios, vendas, consignacao, preparacao e relatorios.
+
+## Objetivo da Entrega
+
+Criar a primeira versao funcional do cadastro interno de veiculos da loja, separando corretamente veiculos de estoque da loja de oportunidades/modulo de repasse.
+
+Nesta sprint, o cadastro deve cobrir veiculos proprios, consignados, troca, avaliacao e outros tipos configuraveis que possam entrar no estoque interno. Carros de repasse nao devem entrar no estoque da loja; devem ser tratados em modulo/fluxo proprio de repasse.
+
+## Requisitos Cobertos
+
+| FR/NFR | Aplicacao nesta historia |
+|---|---|
+| FR-049 | Cadastro de veiculos com dados principais, status, documentacao inicial, valores e anexos futuros. |
+| FR-050 | Status comercial basico do veiculo. |
+| FR-051 | Base para estoque em tempo real para dono/usuarios permitidos. |
+| FR-051B | Preparar vitrine interna/lista simples de estoque. |
+| FR-051D | Identificar tipo de estoque: proprio, consignado e outros tipos permitidos. |
+| FR-112B | Consignado deve registrar valor liquido/valor acordado com proprietario. |
+| FR-112F | Preparar campos de consignado para valor acordado, preco anunciado, responsavel e historico futuro. |
+| NFR-002 | Dados consistentes e auditaveis. |
+| NFR-003 | Rastreabilidade de alteracoes principais. |
+| NFR-005 | Permissoes por papel. |
+
+## Fora de Escopo
+
+- FIPE/RPA e consultas externas.
+- Avaliacao tecnica completa do veiculo.
+- Laudos, documentos de transferencia e contrato final de venda.
+- Anuncios em site, marketplaces ou redes sociais.
+- Fotos avancadas, videos e modo foto.
+- Preparacao/oficina e ordens de servico.
+- Margem detalhada, DRE do carro e calculos financeiros completos.
+- Modulo completo de repasse.
+- Envio de repasse por WhatsApp.
+- Historico completo de compradores/vendedores de repasse.
+- Contrato completo de consignacao gerado automaticamente; nesta sprint fica previsto o anexo/copia do contrato na pasta do veiculo.
+
+## Distincao Importante: Estoque da Loja x Repasse
+
+Veiculo de repasse nao deve entrar no estoque da loja.
+
+### Estoque da Loja
+
+Entram no estoque interno:
+
+- veiculo proprio;
+- veiculo consignado;
+- veiculo recebido em troca, quando a loja decidir incorporar ao estoque;
+- veiculo em avaliacao que pode entrar no estoque;
+- outro tipo configuravel aprovado pela loja.
+
+### Modulo de Repasse
+
+Veiculo de repasse deve ser tratado como outra especie de negocio:
+
+- nao aparece como veiculo de estoque da loja;
+- nao entra no total de veiculos disponiveis da loja;
+- nao entra em tempo medio de estoque da loja;
+- nao aparece como proprio/consignado no estoque;
+- deve possuir modulo/fluxo proprio de repasse em historia futura;
+- pode gerar receita para a loja;
+- receita de repasse deve entrar futuramente no DRE da loja;
+- historico de repasses deve permitir acompanhar vendedor/origem, comprador de repasse, valor, receita, status e data.
+
+Nesta S1-US03, a regra minima e impedir que repasse seja misturado com estoque comum.
+
+## Quem Pode Cadastrar
+
+| Papel | Criar veiculo | Editar veiculo | Inativar/baixar | Consultar estoque | Ver custo/valor compra | Ver preco anunciado |
+|---|---|---|---|---|---|---|
+| Administrador | sim | sim | sim | sim, completo | sim | sim |
+| Dono/Gestor | sim | sim | sim | sim, completo | sim | sim |
+| Administrativo | sim | sim | sim, conforme permissao | sim, completo | sim | sim |
+| Avaliador | sim, em avaliacao | sim, campos de avaliacao/cadastro inicial | nao | conforme permissao | nao, salvo permissao | sim, se permitido |
+| Vendedor | nao nesta sprint | nao | nao | sim, estoque permitido | nao | sim |
+| SDR | nao | nao | nao | sim, estoque permitido | nao | sim, se permitido |
+| Cliente final | nao | nao | nao | nao | nao | nao |
+
+## Tela Principal: Base de Veiculos
+
+### Funcao
+
+Listar veiculos cadastrados no estoque interno da loja, com busca, filtros e acesso ao detalhe.
+
+### Colunas Minimas
+
+- Placa, quando informada.
+- Marca/modelo.
+- Versao.
+- Ano/modelo.
+- Cor.
+- Km.
+- Tipo de estoque: proprio, consignado, troca, avaliacao, outro.
+- Status comercial.
+- Data de entrada.
+- Dias em estoque, quando aplicavel.
+- Responsavel.
+- Preco anunciado.
+- Indicador de pendencia inicial, quando houver.
+- Acoes: ver/editar/inativar conforme permissao.
+
+### Busca
+
+A busca deve aceitar:
+
+- placa;
+- marca;
+- modelo;
+- versao;
+- ano;
+- cor;
+- responsavel.
+
+### Filtros Iniciais
+
+- Status comercial.
+- Tipo de estoque.
+- Origem/forma de entrada.
+- Responsavel.
+- Periodo de entrada.
+- Patio/localizacao, se ja existir campo.
+- Proprio/consignado/outro.
+
+## Tela/Formulario: Criar ou Editar Veiculo
+
+### Campos Obrigatorios
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| Marca | texto/select | obrigatorio |
+| Modelo | texto/select | obrigatorio |
+| Ano modelo | numero | obrigatorio |
+| Tipo de estoque | select | obrigatorio |
+| Status comercial | select | obrigatorio |
+| Data de entrada | data | obrigatorio para veiculos que entram no estoque |
+| Responsavel | usuario | obrigatorio ou padrao conforme usuario criador |
+
+### Campos Recomendados
+
+| Campo | Tipo | Observacao |
+|---|---|---|
+| Placa | texto | opcional no inicio, mas recomendada; validar formato se preenchida |
+| Versao | texto | livre ou catalogo futuro |
+| Ano fabricacao | numero | opcional, validar coerencia |
+| Cor | texto/select | opcional |
+| Cambio | select | manual, automatico, automatizado, CVT, outro |
+| Combustivel | select | flex, gasolina, diesel, eletrico, hibrido, outro |
+| Km | numero | opcional, sem valor negativo |
+| Chassi | texto | opcional/restrito por permissao |
+| Renavam | texto | opcional/restrito por permissao |
+| Patio/localizacao | texto/select | opcional |
+| Origem/forma de entrada | select | compra, consignacao, troca, avaliacao, outro |
+| Preco anunciado | decimal | visivel conforme permissao |
+| Custo de compra/entrada | decimal | restrito a administrativo/gestao |
+| Observacoes internas | texto longo | restrito conforme permissao |
+| Opcionais relevantes | texto/input livre | campo para preencher opcionais importantes do veiculo |
+
+### Opcionais Relevantes
+
+O cadastro deve possuir um campo com input livre para informar opcionais relevantes do veiculo, por exemplo:
+
+- teto solar;
+- multimidia;
+- bancos em couro;
+- camera de re;
+- sensor de estacionamento;
+- controle de estabilidade;
+- chave presencial;
+- pacote de opcionais;
+- outros itens relevantes para precificacao e anuncio.
+
+Nesta sprint, esse campo pode ser texto livre. Em sprint futura pode evoluir para lista estruturada/checklist de opcionais.
+
+## Status Comercial Inicial
+
+- Em avaliacao.
+- Em preparacao.
+- Pronto para venda.
+- Anunciado/publicado.
+- Reservado.
+- Em negociacao.
+- Vendido.
+- Baixado/inativo.
+
+## Tipos de Estoque/Entrada
+
+### Tipos Permitidos no Estoque
+
+- Proprio.
+- Consignado.
+- Troca incorporada ao estoque.
+- Avaliacao.
+- Terceiro/outro configuravel.
+
+### Tipo Nao Permitido no Estoque
+
+- Repasse.
+
+Repasse deve ser tratado em modulo separado. Se o sistema receber um veiculo como oportunidade de repasse, ele deve ser cadastrado/encaminhado para o modulo de repasse, nao para o estoque interno da loja.
+
+## Regras para Veiculo Proprio
+
+1. Veiculo proprio deve permitir registrar custo de compra/entrada.
+2. Custo de compra/entrada deve ser restrito a usuarios autorizados.
+3. Veiculo proprio entra no estoque interno e conta nos indicadores de estoque.
+4. Data de entrada deve iniciar contagem de dias em estoque.
+5. Preco anunciado pode ser informado no cadastro ou futuramente no modulo de anuncio.
+
+## Regras para Veiculo Consignado
+
+1. Veiculo consignado entra no estoque interno da loja como consignado.
+2. Cadastro deve registrar proprietario/cliente vinculado quando disponivel.
+3. Cadastro deve registrar valor acordado com o cliente/proprietario.
+4. Valor acordado representa o valor minimo/liquido a repassar ao proprietario em caso de venda, salvo regra futura mais detalhada.
+5. Cadastro deve permitir anexar ou referenciar 1 copia do contrato de consignacao na pasta do veiculo.
+6. A pasta do veiculo deve ficar preparada para armazenar documentos do veiculo, incluindo contrato de consignacao, laudos, garantias, fotos e anexos futuros.
+7. Contrato de consignacao completo, assinatura e fluxo fiscal ficam para historias futuras.
+8. Vendedor pode ver que o veiculo e consignado e o preco anunciado, mas nao necessariamente o valor acordado com proprietario, conforme permissao definida pela loja.
+
+## Regras para Troca
+
+1. Veiculo recebido em troca pode entrar como `troca incorporada ao estoque` quando a loja decidir manter o carro.
+2. Vinculo com venda original, cliente e valor atribuido na troca fica preparado para historia futura.
+3. Se a troca for marcada para repasse, deve ir para modulo de repasse e nao entrar no estoque comum.
+
+## Regras para Repasse
+
+1. Repasse nao entra no estoque da loja.
+2. Repasse nao deve aparecer em relatorios de estoque como proprio, consignado ou disponivel para venda da loja.
+3. Repasse deve possuir modulo futuro proprio para registrar vendedor/origem, comprador de repasse, valores, receita e historico.
+4. Receita de repasse deve ser considerada futuramente no DRE da loja.
+5. Acompanhamento de historico de repasses deve mostrar respectivos compradores e vendedores/origens.
+6. Nesta sprint, se o usuario tentar cadastrar tipo `repasse` no estoque, o sistema deve orientar que o fluxo correto e o modulo de repasse.
+
+## Modelo de Dados Sugerido
+
+### Tabela/Entidade `vehicles`
+
+| Campo | Tipo sugerido | Obrigatorio | Observacao |
+|---|---|---|---|
+| id | uuid | sim | identificador interno |
+| plate | string | nao | placa, unica quando informada |
+| brand | string | sim | marca |
+| model | string | sim | modelo |
+| version | string | nao | versao |
+| manufacture_year | integer | nao | ano fabricacao |
+| model_year | integer | sim | ano modelo |
+| color | string | nao | cor |
+| transmission | enum/string | nao | cambio |
+| fuel_type | enum/string | nao | combustivel |
+| mileage | integer | nao | km |
+| chassis | string | nao | restrito por permissao |
+| renavam | string | nao | restrito por permissao |
+| stock_type | enum/string | sim | proprio, consignado, troca, avaliacao, outro |
+| entry_origin | enum/string | nao | compra, consignacao, troca, avaliacao, outro |
+| commercial_status | enum/string | sim | status comercial |
+| entry_date | date | sim | data de entrada no estoque |
+| location | string | nao | patio/localizacao |
+| responsible_user_id | uuid | sim | responsavel interno |
+| advertised_price | decimal | nao | preco anunciado |
+| purchase_cost | decimal | nao | custo restrito |
+| relevant_options | text | nao | opcionais relevantes em input livre |
+| internal_notes | text | nao | observacoes internas |
+| created_by | uuid | sim | usuario criador |
+| updated_by | uuid | nao | ultimo usuario editor |
+| created_at | datetime | sim | criacao |
+| updated_at | datetime | sim | atualizacao |
+| inactive_at | datetime | nao | baixa/inativacao logica |
+| inactive_by | uuid | nao | responsavel pela baixa/inativacao |
+
+### Tabela/Entidade `vehicle_consignment_details`
+
+| Campo | Tipo sugerido | Obrigatorio | Observacao |
+|---|---|---|---|
+| id | uuid | sim | identificador interno |
+| vehicle_id | uuid | sim | veiculo consignado |
+| owner_customer_id | uuid | nao | cliente/proprietario vinculado |
+| owner_name | string | nao | nome do proprietario quando ainda nao vinculado |
+| agreed_owner_value | decimal | sim | valor acordado/liquido com proprietario |
+| announced_price | decimal | nao | preco anunciado de referencia |
+| contract_file_id | uuid | nao | copia do contrato de consignacao na pasta do veiculo |
+| contract_status | enum/string | nao | pendente, anexado, assinado, cancelado |
+| notes | text | nao | observacoes |
+| created_at | datetime | sim | criacao |
+| updated_at | datetime | sim | atualizacao |
+
+### Tabela/Entidade `vehicle_folders`
+
+| Campo | Tipo sugerido | Obrigatorio | Observacao |
+|---|---|---|---|
+| id | uuid | sim | identificador interno |
+| vehicle_id | uuid | sim | veiculo vinculado |
+| folder_path_or_key | string | sim | referencia logica/fisica ao armazenamento |
+| created_at | datetime | sim | criacao |
+| created_by | uuid | sim | usuario criador |
+
+### Tabela/Entidade Futura `repasse_deals`
+
+Esta tabela/modulo nao precisa ser implementada completamente nesta historia, mas a modelagem deve preservar a separacao:
+
+| Campo | Tipo sugerido | Observacao |
+|---|---|---|
+| id | uuid | negocio de repasse |
+| vehicle_description | text | dados do veiculo de repasse |
+| seller_or_origin_id | uuid | vendedor/origem/fornecedor |
+| repasse_buyer_id | uuid | comprador de repasse |
+| repasse_price | decimal | valor do repasse |
+| store_revenue | decimal | receita da loja no repasse |
+| dre_entry_id | uuid | lancamento futuro no DRE |
+| status | enum/string | aberto, ofertado, vendido, cancelado |
+
+## Acoes/Endpoints Sugeridos
+
+| Acao | Descricao |
+|---|---|
+| `createVehicle` | criar veiculo no estoque interno |
+| `listVehicles` | listar veiculos com busca/filtros e permissao |
+| `getVehicleById` | detalhe do veiculo |
+| `updateVehicle` | editar veiculo conforme permissao |
+| `deactivateVehicle` | baixar/inativar veiculo conforme permissao |
+| `createVehicleFolder` | criar/preparar pasta do veiculo |
+| `attachConsignmentContract` | anexar copia do contrato de consignacao na pasta do veiculo |
+| `validateVehicleStockType` | bloquear/orientar quando tipo repasse for usado como estoque |
+| `checkVehicleDuplicate` | verificar possivel duplicidade por placa/chassi quando informado |
+
+## Auditoria
+
+Devem gerar log:
+
+- criacao do veiculo;
+- edicao de dados principais;
+- alteracao de status comercial;
+- alteracao de tipo de estoque;
+- alteracao de preco anunciado;
+- alteracao de custo de compra/entrada;
+- cadastro/alteracao de valor acordado de consignado;
+- anexo ou remocao de copia do contrato de consignacao;
+- tentativa de cadastrar repasse como estoque comum;
+- inativacao/baixa do veiculo.
+
+### Campos Minimos do Log
+
+- usuario;
+- data/hora;
+- entidade: vehicle;
+- id do veiculo;
+- acao;
+- resumo da alteracao;
+- campos sensiveis alterados, quando aplicavel;
+- origem da acao: web/app/admin.
+
+## Criterios de Aceite Funcional
+
+1. Administrativo consegue criar veiculo proprio com marca, modelo, ano modelo, tipo de estoque, status e data de entrada.
+2. Administrativo consegue criar veiculo consignado informando valor acordado com proprietario.
+3. Veiculo consignado permite anexar/referenciar 1 copia do contrato de consignacao na pasta do veiculo.
+4. Sistema cria/prepara pasta do veiculo ao cadastrar veiculo no estoque.
+5. Cadastro possui campo de input livre para opcionais relevantes.
+6. Vendedor consegue consultar estoque permitido e ver preco anunciado.
+7. Vendedor nao visualiza custo de compra/entrada sem permissao.
+8. SDR consegue consultar estoque permitido conforme regra.
+9. Veiculo proprio entra nos indicadores/listagem de estoque.
+10. Veiculo consignado entra nos indicadores/listagem de estoque como consignado.
+11. Veiculo de repasse nao entra no estoque da loja.
+12. Tentativa de cadastrar tipo repasse como estoque comum mostra orientacao para usar modulo de repasse.
+13. Repasse nao aparece em contagem de estoque, dias em estoque ou relatorio de veiculos disponiveis da loja.
+14. Alterar status comercial gera auditoria.
+15. Alterar tipo de estoque gera auditoria.
+16. Anexar contrato de consignacao gera auditoria.
+17. Cliente final nao acessa cadastro interno de veiculos.
+18. Busca por placa retorna veiculo esperado quando placa existir.
+19. Filtro por tipo de estoque diferencia proprio e consignado.
+20. Filtro por status comercial funciona.
+
+## Criterios de Aceite Tecnico
+
+1. Tabela/entidade de veiculos criada por migration ou mecanismo equivalente.
+2. Campos obrigatorios validados no frontend e backend.
+3. Permissoes de custo/valor de compra aplicadas no backend.
+4. Listagem suporta paginacao ou limite seguro de registros.
+5. Busca/filtros nao quebram com campos vazios.
+6. Placa deve ser normalizada para evitar duplicidade obvia quando informada.
+7. Custo de compra/entrada nao deve ser retornado para vendedor/SDR sem permissao.
+8. Tipo `repasse` nao deve ser aceito como `stock_type` de estoque comum.
+9. Pasta do veiculo deve possuir identificador/referencia estavel para anexos futuros.
+10. Cadastro de consignado deve permitir salvar `agreed_owner_value`.
+11. Logs de auditoria sao gravados em transacoes principais.
+12. O codigo diferencia estoque comum de modulo futuro de repasse.
+13. Estados de carregamento, vazio, erro e sem permissao existem na interface.
+
+## Testes Minimos
+
+### Testes de Unidade/Validador
+
+- Marca obrigatoria.
+- Modelo obrigatorio.
+- Ano modelo obrigatorio.
+- Tipo de estoque obrigatorio.
+- Status comercial obrigatorio.
+- Data de entrada obrigatoria para estoque comum.
+- Km nao aceita valor negativo.
+- Preco/custo nao aceita valor negativo.
+- Tipo repasse nao e aceito como estoque comum.
+- Consignado exige valor acordado com proprietario.
+
+### Testes de Permissao
+
+- Administrativo cria/edita/inativa veiculo.
+- Avaliador cria veiculo em avaliacao conforme permissao.
+- Vendedor consulta estoque permitido, mas nao cria veiculo.
+- Vendedor nao ve custo de compra/entrada sem permissao.
+- SDR consulta estoque permitido, mas nao ve custo.
+- Cliente final nao acessa endpoint/tela interna.
+
+### Testes de Integracao
+
+- Criar veiculo proprio e listar no estoque.
+- Criar veiculo consignado e listar como consignado.
+- Criar veiculo consignado com valor acordado e contrato anexado/referenciado.
+- Criar pasta do veiculo ao cadastrar.
+- Buscar veiculo por placa.
+- Filtrar por tipo proprio.
+- Filtrar por tipo consignado.
+- Alterar status comercial e verificar auditoria.
+- Tentar cadastrar repasse no estoque e verificar bloqueio/orientacao.
+- Garantir que repasse nao entra na contagem de estoque.
+
+## Dados Seed/Demo
+
+Criar pelo menos:
+
+- 1 veiculo proprio pronto para venda.
+- 1 veiculo proprio em preparacao.
+- 1 veiculo consignado com valor acordado e contrato anexado/referenciado.
+- 1 veiculo em avaliacao.
+- 1 veiculo recebido em troca incorporado ao estoque.
+- 1 tentativa/fixture de repasse fora do estoque comum, para validar separacao.
+
+## Observacoes para UX
+
+A tela deve ser operacional, com informacoes densas mas legiveis. O usuario deve entender rapidamente se o veiculo e proprio, consignado ou outro tipo de estoque.
+
+O sistema deve evitar que repasse seja confundido com estoque. Se o usuario tentar selecionar repasse no cadastro de estoque, a interface deve orientar: "Repasse e um modulo separado e nao entra no estoque da loja".
+
+O campo de opcionais relevantes deve ser simples nesta sprint, mas visivel o suficiente para apoiar precificacao, atendimento e anuncios futuros.
+
+## Pronto Para Desenvolvimento Quando
+
+- Esta historia estiver aprovada pelo gestor.
+- Tipos de estoque permitidos estiverem confirmados.
+- Regra de que repasse nao entra no estoque estiver mantida.
+- Permissoes de custo/valor de compra estiverem aceitas.
+- Regra de consignado com valor acordado e copia do contrato na pasta do veiculo estiver aceita.
+- O desenvolvedor tiver acesso ao padrao de armazenamento de anexos/pastas do projeto.

@@ -1,0 +1,249 @@
+# S11-US07: Ambientes, Deploy, Backup e Observabilidade
+
+## Epic
+Arquitetura Tecnica, Banco de Dados e Base do MVP
+
+## Objetivo
+Definir a estrutura minima de ambientes, deploy, variaveis de configuracao, backup, logs tecnicos, monitoramento, alertas de erro e plano inicial de recuperacao para operar o MVP com seguranca e baixo custo.
+
+## Historia de Usuario
+**Como** equipe tecnica e Dono/Gestor,
+**quero** uma base clara de ambientes, deploy, backup e observabilidade,
+**para** que o sistema possa entrar em producao com controle, rastreabilidade, recuperacao de dados e capacidade de evoluir sem depender de improviso.
+
+## Principios
+- MVP deve priorizar infraestrutura gerenciada, economica e simples de manter.
+- Producao deve ser separada de desenvolvimento/testes.
+- Dados reais de cliente, venda, financeiro, documentos e logs devem ficar protegidos.
+- Backup deve ser previsto desde o inicio.
+- Logs tecnicos devem ajudar a investigar falhas sem expor dados sensiveis indevidamente.
+- Erros criticos devem ser visiveis para quem administra o sistema.
+- Toda escolha tecnica com chance de mudanca futura deve documentar alternativa, gatilho e cuidado de migracao.
+
+## Ambientes Minimos
+Ambientes recomendados:
+
+- `development`: ambiente local dos desenvolvedores.
+- `staging` ou `homologacao`: ambiente para testar versoes antes de producao.
+- `production`: ambiente real da loja.
+
+Regras:
+
+- Producao nao deve usar dados de teste misturados.
+- Homologacao nao deve expor dados reais sem anonimizar ou sem autorizacao especifica.
+- Variaveis, chaves, tokens e credenciais devem ser diferentes por ambiente.
+- Integracoes externas podem ter modo sandbox/mock quando disponivel.
+
+## Deploy do MVP
+Modelo recomendado para o MVP:
+
+- Frontend Next.js em infraestrutura gerenciada adequada ao framework.
+- Backend Node.js em ambiente gerenciado, container ou plataforma com deploy controlado.
+- PostgreSQL gerenciado.
+- Supabase Storage para arquivos.
+- Workers/jobs rodando junto ao backend ou em processo separado simples quando necessario.
+
+O desenho exato do provedor pode ser decidido na implementacao, desde que preserve:
+
+- baixo custo inicial;
+- facilidade de deploy;
+- backup e recuperacao;
+- logs acessiveis;
+- variaveis seguras;
+- possibilidade de crescer.
+
+## Variaveis e Segredos
+Devem ficar fora do codigo-fonte:
+
+- URL do banco.
+- Chaves JWT/sessao.
+- Credenciais Supabase Storage.
+- Credenciais Evolution API.
+- SMTP/e-mail.
+- Chaves de IA/OCR.
+- Tokens de marketplaces.
+- Tokens de webhooks.
+- Segredos de assinatura.
+- Configuracoes de ambiente.
+
+Regras:
+
+- Nunca versionar `.env` real.
+- Usar `.env.example` sem segredos.
+- Rotacionar credenciais quando houver vazamento, desligamento de fornecedor/funcionario tecnico ou troca critica.
+- Dono/Gestor deve ter clareza de quais fornecedores possuem credenciais ativas.
+
+## Banco de Dados
+PostgreSQL deve ter:
+
+- migrations versionadas.
+- backup automatico.
+- rotina de restore testavel.
+- separacao de ambiente.
+- indices revisados conforme consultas principais.
+- logs de erro tecnicos quando aplicavel.
+
+Migrations devem ser aplicadas de forma controlada:
+
+- local/desenvolvimento primeiro;
+- homologacao/staging;
+- producao com plano de rollback quando viavel.
+
+## Backup
+Backup deve cobrir:
+
+- PostgreSQL.
+- Storage/anexos quando suportado pelo provedor ou por rotina complementar.
+- Configuracoes importantes.
+- Templates e regras de automacao.
+- Logs/auditoria conforme politica de retencao.
+
+Regras iniciais:
+
+- Backup automatico diario do banco em producao.
+- Retencao minima inicial definida pelo provedor e revisada antes da producao real.
+- Teste periodico de restore.
+- Procedimento documentado para recuperar banco e arquivos.
+- Logs de backup/restore acessiveis para Dono/Gestor ou tecnico autorizado.
+
+## Observabilidade Inicial
+Observabilidade minima deve permitir responder:
+
+- O sistema esta online?
+- A API esta respondendo?
+- O banco esta acessivel?
+- Jobs estao travando?
+- Integracoes externas estao falhando?
+- Houve erro critico em venda, financeiro, anuncio, documento ou automacao?
+- Houve tentativa bloqueada de acesso sensivel?
+
+Componentes:
+
+- Logs de aplicacao.
+- Logs de jobs.
+- Logs de integracoes.
+- Logs de erro do backend.
+- Healthcheck basico.
+- Painel simples de jobs falhos ou pendentes.
+- Alertas para falhas criticas.
+
+## Logs Tecnicos vs Audit Logs
+Diferenca:
+
+- Log tecnico: usado para diagnosticar erro, tempo de resposta, falha de job, falha de integracao e comportamento do sistema.
+- Audit log: trilha de responsabilidade de acoes sensiveis, alteracoes de dados, acessos bloqueados e eventos de negocio relevantes.
+
+Regras:
+
+- Audit log deve ser append-only e nao editavel.
+- Log tecnico pode ter retencao e limpeza conforme custo e necessidade.
+- Log tecnico nao deve expor documentos, senhas, tokens, CPF completo ou dados sensiveis sem necessidade.
+- Acesso a logs tecnicos deve ser restrito.
+
+## Alertas Criticos
+Alertas criticos sugeridos:
+
+- API fora do ar.
+- Banco indisponivel.
+- Erro repetido em jobs.
+- Falha em backup.
+- Falha ao remover anuncio vendido.
+- Falha em envio importante de WhatsApp/e-mail.
+- Falha em consulta externa obrigatoria.
+- Falha ao salvar documento/anexo.
+- Tentativas repetidas de acesso bloqueado.
+- Erro em fechamento de venda ou lancamento financeiro.
+
+## Deploy Seguro
+Antes de deploy em producao:
+
+- Rodar testes essenciais.
+- Validar migrations.
+- Validar variaveis de ambiente.
+- Validar conexao com banco.
+- Validar acesso ao storage.
+- Validar worker/jobs.
+- Validar permissao/RBAC basico.
+- Ter plano de rollback simples.
+
+## Plano de Recuperacao Inicial
+Em caso de falha grave:
+
+1. Identificar se falha e frontend, backend, banco, storage, job ou integracao externa.
+2. Consultar logs tecnicos.
+3. Pausar automacoes sensiveis se necessario.
+4. Restaurar servico ou fazer rollback.
+5. Se houver perda/corrupcao de dados, avaliar restore de backup.
+6. Registrar incidente tecnico.
+7. Comunicar Dono/Gestor quando afetar operacao.
+
+## Custo e Limites
+O MVP deve monitorar custos relacionados a:
+
+- Banco PostgreSQL.
+- Storage de documentos/fotos.
+- Tráfego/egress de arquivos.
+- IA/OCR.
+- Mensagens WhatsApp/e-mail.
+- Workers/jobs.
+- Logs e observabilidade.
+
+Quando possivel, configurar limites ou alertas de consumo.
+
+## Evolucao Futura: Infraestrutura
+Decisao atual:
+
+- Priorizar infraestrutura gerenciada e economica no MVP.
+
+Alternativas futuras:
+
+- VPS propria.
+- Containers em ambiente dedicado.
+- Separacao de workers.
+- Banco dedicado com plano maior.
+- Storage S3/R2.
+- Observabilidade mais completa com ferramenta dedicada.
+
+Gatilhos para evoluir:
+
+- Crescimento de volume de acessos, jobs ou arquivos.
+- Custo de plataforma gerenciada ficar alto.
+- Necessidade de controle fino de rede, workers ou compliance.
+- Necessidade de alta disponibilidade maior.
+- Necessidade de processamento pesado para IA/OCR/consultas.
+
+Cuidados de migracao:
+
+- Preservar banco, migrations e backups.
+- Preservar arquivos e metadados do storage.
+- Preservar URLs/links internos ou fazer redirecionamento controlado.
+- Preservar logs/auditoria.
+- Revisar variaveis, segredos e credenciais.
+- Testar restore antes de cortar producao.
+
+## Decisoes a Confirmar
+1. Confirmamos ambientes `development`, `staging/homologacao` e `production` como minimo recomendado?
+2. Confirmamos infraestrutura gerenciada/economica no MVP, deixando VPS/infra dedicada como evolucao futura documentada?
+3. Confirmamos backup automatico diario do PostgreSQL em producao e procedimento de restore testavel?
+4. Confirmamos que storage/anexos tambem devem ter estrategia de recuperacao/backup conforme provedor ou rotina complementar?
+5. Confirmamos logs tecnicos separados de audit logs, com audit logs append-only e logs tecnicos restritos?
+6. Confirmamos painel/visao minima de jobs falhos, integracoes com erro e alertas criticos para Dono/Gestor/Admin autorizado?
+7. Confirmamos que segredos e credenciais devem ficar fora do codigo, com `.env.example` sem dados reais e rotacao quando necessario?
+8. Confirmamos que custos de IA/OCR, mensagens, storage, banco e jobs devem ser monitorados com alertas/limites quando possivel?
+
+## Criterios de Aceite
+- Dado que uma nova versao sera publicada, quando passar por staging/homologacao, entao deve ser validada antes da producao sempre que possivel.
+- Dado que banco de producao existe, quando entrar em operacao, entao deve ter backup automatico e procedimento de restore documentado.
+- Dado que arquivo/anexo e armazenado, quando definir recuperacao, entao deve existir estrategia de backup/restore ou dependencia clara do provedor.
+- Dado que erro critico ocorre, quando registrado, entao usuario autorizado deve conseguir identificar modulo, horario e impacto aproximado.
+- Dado que job falha repetidamente, quando abrir painel/visao tecnica, entao deve aparecer status, erro e possibilidade de reprocessamento conforme permissao.
+- Dado que credencial real existe, quando versionar codigo, entao ela nao deve aparecer no repositorio.
+- Dado que audit log e criado, quando usuario tentar editar, entao sistema deve impedir edicao.
+
+## Fora de Escopo
+- Alta disponibilidade complexa no MVP.
+- Multi-regiao no MVP.
+- Data warehouse/BI tecnico dedicado no MVP.
+- Observabilidade corporativa completa no MVP.
+- Infra propria obrigatoria no MVP.
+- Garantia juridica definitiva de retencao documental sem validacao especializada.

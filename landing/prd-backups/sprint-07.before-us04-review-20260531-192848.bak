@@ -1,0 +1,157 @@
+﻿# Sprint 07: Avaliacao, Compra de Veiculos e Repasse
+
+## Status
+Em definicao.
+
+## Objetivo da Sprint
+Construir a porta de entrada de veiculos na loja: avaliacao mobile, consultas de apoio, propostas de compra, analise de risco do proprietario, conferencia de pagamento ao proprietario, fornecedores de compra e modulo de repasse separado do estoque da loja.
+
+A Sprint 7 cobre o processo antes do veiculo virar estoque proprio/consignado ou antes de ser tratado como repasse. O objetivo e dar controle sobre o que esta em avaliacao, negociacao, oferta feita, compra concluida, compra recusada ou repasse.
+
+## Ponto de Entrada
+A Sprint 7 usa dados e decisoes anteriores:
+
+- Cadastro base de clientes e veiculos.
+- Estoque operacional.
+- DRE e receitas de repasse.
+- Logs/auditoria e uso de automacoes autorizadas.
+- Regras de RPA/API validadas para consultas externas.
+- Kanban comercial/operacional como padrao de acompanhamento.
+
+## Ponto de Saida
+A Sprint 7 termina quando:
+
+- Avaliador pode registrar avaliacao mobile do veiculo.
+- O sistema pode apoiar consultas FIPE/marketplaces/historico por API/RPA autorizado.
+- Propostas de compra ficam registradas em kanban.
+- Dados do proprietario e risco juridico/compliance ficam registrados com parecer humano/assistido.
+- Pagamento ao proprietario exige conferencia de dados bancarios contra titularidade/proprietario.
+- Fornecedores de compra podem ser cadastrados.
+- Repasse possui modulo separado do estoque da loja, com historico, compradores, fornecedores, receita no DRE e retransmissao para grupos de WhatsApp.
+
+## Stories Macro Propostas
+
+### S7-US01: Avaliacao Mobile do Veiculo
+Criar fluxo mobile para avaliacao do veiculo, fotos, opcionais, checklist e observacoes comerciais.
+
+Arquivo detalhado: `stories/S7-US01-avaliacao-mobile-veiculo.md`.
+
+Escopo inicial:
+- Cadastro rapido da avaliacao.
+- Fotos do veiculo.
+- Checklist de estado geral.
+- Opcionais relevantes em campo de input.
+- Observacao no processo mobile: veiculos sem opcionais podem valer cerca de 10% menos que o mesmo modelo completo.
+- Registro do avaliador, data/hora e origem.
+
+### S7-US02: Consultas Automaticas na Avaliacao
+Apoiar avaliacao com consultas externas automatizadas/assistidas.
+
+Arquivo detalhado: `stories/S7-US02-consultas-automaticas-avaliacao.md`.
+
+Escopo inicial:
+- Consulta FIPE por API oficial/fornecedor autorizado ou RPA em VM quando juridicamente aprovado.
+- Consulta de anuncios comparaveis em marketplaces/sites informados.
+- Registro de origem, data/hora, responsavel/automacao, evidencia e resultado.
+- Pausa para validacao humana quando houver captcha/validacao.
+- Sem contornar mecanismos de protecao.
+
+### S7-US03: Propostas de Compra e Kanban de Negociacao
+Controlar veiculos avaliados e propostas de compra em kanban.
+
+Arquivo detalhado: `stories/S7-US03-propostas-compra-kanban-negociacao.md`.
+
+Escopo inicial:
+- Registrar veiculos avaliados que receberam proposta.
+- Controlar ofertas feitas e ultimos valores ofertados.
+- Status: avaliacao aberta, oferta enviada, em negociacao, aguardando retorno, concluido, recusado, cancelado.
+- Historico de ofertas, responsavel e observacoes.
+
+### S7-US04: Analise de Risco do Proprietario
+Registrar consulta/analise de risco do proprietario para apoiar decisao de compra.
+
+Arquivo detalhado: `stories/S7-US04-analise-risco-proprietario.md`.
+
+Escopo inicial:
+- Localizar possiveis processos judiciais/compliance quando aplicavel.
+- Registrar parecer juridico/compliance sobre riscos.
+- Parecer deve apoiar decisao, sem substituir validacao juridica humana quando necessario.
+- Guardar fonte, data/hora, responsavel e evidencia.
+
+### S7-US05: Conferencia de Pagamento ao Proprietario
+Adicionar controles para pagamento de compra de veiculo ao proprietario correto.
+
+Arquivo detalhado: `stories/S7-US05-conferencia-pagamento-proprietario.md`.
+
+Escopo inicial:
+- Antes do pagamento, alertar Administrativo que dados bancarios devem bater exatamente com o proprietario do veiculo.
+- Registrar dados de quem recebe deposito.
+- Bloquear/alertar se titularidade divergir.
+- Manter evidencia e responsavel pela liberacao.
+
+### S7-US06: Fornecedores de Compra de Veiculos
+Cadastrar fornecedores de veiculos para compra.
+
+Arquivo detalhado: `stories/S7-US06-fornecedores-compra-veiculos.md`.
+
+Escopo inicial:
+- Locadoras, leiloes, frotistas, portais e outros fornecedores.
+- Link direto para portal/site.
+- Campos para acessos/senhas protegidos por permissao e cofre/criptografia.
+- Historico de compras/ofertas por fornecedor.
+
+### S7-US07: Modulo de Repasse
+Criar modulo separado para carros de repasse, fora do estoque da loja.
+
+Arquivo detalhado: `stories/S7-US07-modulo-repasse.md`.
+
+Escopo inicial:
+- Carro de repasse nao entra no estoque da loja.
+- Registrar fornecedores de repasse e compradores de repasse separadamente.
+- Registrar historico, vendedor, comprador, valor, receita e status.
+- Receita entra no DRE da loja.
+- Retransmissao para grupos de WhatsApp quando cadastrar carro de repasse.
+
+## Decisoes Ja Confirmadas do Produto
+- S7-US03 revisada: proposta de compra e criada/autorizada por Gestor/Administrador; avaliador apenas avalia.
+- Kanban de compras inclui avaliacao aberta, avaliacao concluida, aguardando decisao do gestor, oferta enviada, contraproposta, em negociacao, aguardando retorno, compra aprovada, compra concluida, recusado, vendido por terceiro e arquivado.
+- Historico guarda todos os valores ofertados, data/hora, responsavel e observacao.
+- Condicao da oferta registra compra direta, consignacao proposta, troca/parte de pagamento, repasse ou outro.
+- Apos compra aprovada, seguir para dados completos do proprietario, analise juridica/compliance, conferencia de pagamento e destino do veiculo.
+- Vendedor so visualiza proposta/avaliacao quando vinculada a cliente/card seu ou venda em que participa.- S7-US02 revisada: avaliador aciona consultas pelo app; execucao roda em fila/API/VM e Administrativo/Gestor acompanha resultados/falhas.
+- MVP de consultas inclui FIPE, Informcar, Renainf completa, DETRAN/SP, IPVA/Fazenda SP, divida ativa, PRF/multas, DCC Transito e anuncios comparaveis.
+- Marketplaces comparaveis incluem Webmotors, OLX, Mercado Livre, iCarros e outros configuraveis.
+- Resultado deve preencher campos da avaliacao/card com fonte, data/hora, evidencia e automacao responsavel.
+- Falha de consulta nao bloqueia avaliacao automaticamente; gera pendencia para Administrativo/Gestor.- S7-US01 decisao final: fotos minimas da avaliacao sao obrigatorias, salvo item nao aplicavel com justificativa.
+- Avaliador apenas realiza avaliacao; Gestor/Administrador decide continuidade, proposta, repasse ou arquivamento.
+- Resultado da avaliacao pode ser apto para compra, apto com ressalvas, nao apto, enviar para repasse ou arquivar.
+- Itens de preparacao/melhorias so viram ordem de servico apos Gestor/Administrador selecionar em checklist quais serao executados.- Cadastro completo do proprietario/fornecedor deve ser preenchido apos aprovacao do veiculo para continuidade, antes das checagens juridicas/compliance e pagamento.
+- S7-US01 revisada: vendedor/avaliador autorizado pode iniciar avaliacao; Administrativo/Gestor visualiza todas.
+- Campos obrigatorios da avaliacao devem seguir o checklist detalhado do PRD, incluindo FR-056, FR-057, FR-058 e derivados.
+- Vinculo vindo do lead/card serve apenas como continuidade operacional; nao deve preencher cadastro completo automaticamente.
+- Itens que exigem nota usam escala de 0 a 10.- Na avaliacao mobile, deve haver observacao de que veiculos sem opcionais podem valer cerca de 10% menos que o mesmo modelo completo.
+- A avaliacao pode contar com automacao em computador remoto/VM para consultas nos sites informados.
+- Consultas externas devem respeitar compliance, API oficial/fornecedor autorizado ou RPA sem contornar protecoes.
+- Veiculos com propostas de compra devem ficar registrados, com controle do que esta em negociacao, oferta dada ou concluido.
+- Pode ser usado modelo kanban para acompanhar compras.
+- Fornecedores de repasse e compradores de repasse devem ser separados.
+- Carro de repasse nao entra no estoque da loja; fica em modulo proprio.
+- Repasse gera receita e entra no DRE da loja.
+- Ao cadastrar carro de repasse, sistema pode retransmitir para grupos de WhatsApp.
+- Administrativo deve conferir que dados bancarios do pagamento batem com o proprietario do veiculo.
+
+## Fora de Escopo Inicial da Sprint 7
+- Compra automatica sem aprovacao humana.
+- Parecer juridico definitivo totalmente automatizado.
+- Integracao real com todos tribunais/portais sem fornecedor definido.
+- Automacao anti-captcha.
+- Cofre corporativo definitivo de senhas sem arquitetura definida.
+- Precificacao automatica final por IA.
+
+## Proximo Passo
+Revisar a S7-US01 e confirmar campos/checklist da avaliacao mobile.
+
+
+
+
+

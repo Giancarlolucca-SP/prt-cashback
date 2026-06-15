@@ -1,0 +1,199 @@
+# S3-US03: Contratos, Assinatura Gov.br e ATPV-e Assistida
+
+## Status
+Aprovada para detalhamento inicial da Sprint 3.
+
+## Objetivo
+Gerar o pacote de contratos e documentos da venda a partir do processo ja cadastrado, com cliente, veiculo, documentos e condicoes negociadas anexadas, e orientar o Administrativo no fluxo de assinatura digital, ATPV-e/recibo oficial, Gov.br/CDT ou e-Notariado conforme o caso.
+
+## Historia de Usuario
+**Como** Administrativo,  
+**quero** gerar contratos e acompanhar assinatura/ATPV-e com base no processo da venda,  
+**para** formalizar a negociacao, reduzir retrabalho e garantir que os documentos oficiais sejam assinados antes da liberacao.
+
+## Contexto Operacional
+Ao chegar nesta etapa, o sistema ja deve possuir:
+- Cliente/comprador cadastrado.
+- Veiculo vinculado.
+- Vendedor responsavel.
+- Condicoes negociadas vindas do Kanban Vendas.
+- Documentos e anexos do comprador no card/processo.
+- Conferencia documental em andamento ou concluida.
+- Conferencia de pagamento em andamento ou concluida.
+
+O sistema deve usar esses dados para preencher documentos, reduzir digitacao manual e manter trilha de auditoria.
+
+## Documentos a Gerar ou Controlar
+
+### Contratos principais
+- Contrato de compra e venda do veiculo.
+- Recibo de venda quando aplicavel.
+- Contrato/documento para comprador do veiculo.
+- Contrato/documento para vendedor/proprietario do veiculo quando aplicavel.
+- Procuracao ou fluxo de recibo normal, conforme modalidade definida na S3-US05.
+
+### Documentos complementares do pacote
+- Termo/contrato de garantia de 90 dias quando houver data de entrega ou quando o fluxo de garantia estiver apto, respeitando a S3-US06.
+- Documentos de transferencia/ATPV-e/recibo oficial do carro, conforme regra operacional e Detran/UF.
+- Anexos obrigatorios: laudo cautelar, laudo de transferencia e demais documentos exigidos pela S3-US04.
+
+## Preenchimento Automatico
+O sistema deve preencher automaticamente os documentos com dados ja existentes:
+- Dados da loja.
+- Dados do comprador.
+- Dados do vendedor/proprietario quando aplicavel.
+- Dados do veiculo.
+- Valor da venda.
+- Entrada, forma de pagamento e valor financiado.
+- Servicos, garantia, transferencia e demais itens negociados.
+- Observacoes aprovadas da negociacao.
+- Data da venda e responsaveis.
+
+Antes de gerar/enviar para assinatura, o Administrativo deve revisar os dados e o campo de observacoes.
+
+## Assinatura Gov.br / Senha Gov.br
+A assinatura Gov.br deve ser tratada como fluxo principal gratuito quando o documento e os signatarios forem elegiveis.
+
+O sistema deve:
+- Gerar PDF/documento compativel para assinatura.
+- Orientar o Administrativo sobre o fluxo de assinatura Gov.br.
+- Registrar signatarios, CPF, data/hora de envio, responsavel e status.
+- Permitir anexar o documento assinado retornado pelo Gov.br ou evidencia da assinatura.
+- Registrar hash/identificador quando disponivel.
+- Permitir fluxo manual assistido quando nao houver integracao API aprovada.
+
+Importante: o sistema nao deve prometer que realiza o reconhecimento/assinatura dentro do Gov.br; ele deve orientar, registrar status e armazenar evidencias, salvo integracao oficial aprovada.
+
+## Fluxo ATPV-e / Recibo Oficial Antes da Assinatura
+Antes da conclusao da assinatura dos documentos de transferencia, o Administrativo deve seguir fluxo guiado conforme modalidade disponivel para o veiculo e para as partes.
+
+### Opcao 1: Venda Digital pelo aplicativo CDT
+Usar quando o procedimento oficial estiver disponivel/elegivel.
+
+Regras operacionais:
+- Vendedor e comprador devem possuir conta Gov.br com nivel Prata ou Ouro.
+- O documento do veiculo deve ser elegivel para ATPV-e/Venda Digital, em regra documentos emitidos a partir de 04/01/2021 ou conforme regra vigente do Detran/Senatran.
+- O vendedor acessa a Carteira Digital de Transito (CDT), inicia a Venda Digital, preenche dados do comprador e assina eletronicamente.
+- O comprador recebe notificacao no aplicativo CDT e assina digitalmente.
+- Apos as assinaturas, registrar no sistema status, data/hora, responsavel e evidencia.
+- Etapas finais de vistoria, comunicacao de venda e transferencia devem seguir regras do Detran/UF e podem exigir acao do comprador/despachante.
+
+Campos minimos a orientar/registrar para Venda Digital:
+- CPF do comprador.
+- CEP do comprador quando exigido.
+- UF/municipio da venda.
+- Quilometragem atual.
+- Valor da venda.
+- Data da venda.
+- Status da assinatura do vendedor.
+- Status da assinatura do comprador.
+- Evidencia/anexo do status ou documento final.
+
+### Opcao 2: e-Notariado / e-Not Assina
+Usar quando a loja optar por fluxo de cartorio digital ou quando a Venda Digital/CDT nao for aplicavel.
+
+Regras operacionais:
+- Emitir/obter ATPV-e pelo portal do Detran/UF conforme procedimento local.
+- Encaminhar ATPV-e para assinatura digital/reconhecimento pelo e-Notariado/e-Not Assina quando disponivel.
+- As partes devem possuir ou emitir Certificado Digital Notarizado quando exigido pelo fluxo do cartorio.
+- Registrar status de envio, assinatura das partes, reconhecimento/validacao, custos quando houver e documento final.
+- Anexar documento assinado/reconhecido ao processo, veiculo, comprador e venda.
+
+## Status do Documento/Assinatura
+- Rascunho.
+- Em revisao administrativa.
+- Pronto para assinatura.
+- Enviado para assinatura Gov.br.
+- Enviado para CDT/Venda Digital.
+- Enviado para e-Notariado.
+- Aguardando assinatura do vendedor/proprietario.
+- Aguardando assinatura do comprador.
+- Assinado por uma parte.
+- Assinado por todas as partes.
+- Documento anexado.
+- Recusado/corrigir dados.
+- Cancelado.
+- Bloqueado por pendencia documental, pagamento ou laudo.
+
+## Regras de Bloqueio
+O sistema deve bloquear ou sinalizar bloqueio antes do envio/assinatura quando houver:
+- Cliente/comprador sem documentos obrigatorios conferidos.
+- Pagamento obrigatorio pendente ou divergente quando a regra exigir pagamento antes da assinatura/envio.
+- Laudo cautelar ou laudo de transferencia ausente/concluido como pendente.
+- Dados obrigatorios do comprador, veiculo ou venda incompletos.
+- Modalidade de transferencia nao definida quando exigida.
+- Campo de observacoes do contrato nao revisado.
+
+## Envio/Aviso ao Comprador
+Quando documento estiver pronto para assinatura ou envio:
+- O sistema deve gerar aviso ao comprador pelo canal configurado, preferencialmente WhatsApp.
+- Registrar data/hora, destinatario, responsavel/automacao, status de envio e vinculo com a negociacao.
+- O envio real por WhatsApp pode ser manual assistido nesta sprint se integracao nao estiver pronta.
+
+## Permissoes
+- Administrativo gera, revisa, envia/acompanha assinatura e anexa documentos assinados.
+- Vendedor visualiza status dos documentos da propria venda e pode complementar informacoes/anexos solicitados.
+- Gestor/Administrador pode corrigir, cancelar, reabrir ou aprovar excecoes com auditoria.
+- SDR nao altera contratos/documentos da venda.
+
+## Dados Minimos
+- `sale_process_id`.
+- `document_package_id`.
+- `document_type`.
+- `document_template_id`.
+- `document_status`.
+- `generated_file_id`.
+- `signed_file_id`.
+- `signature_provider`: gov_br, cdt, e_notariado, manual, outro.
+- `seller_signature_status`.
+- `buyer_signature_status`.
+- `sent_at`.
+- `signed_at`.
+- `buyer_notified_at`.
+- `vehicle_transfer_mode`.
+- `atpve_status`.
+- `atpve_file_id`.
+- `atpve_evidence_file_id`.
+- `govbr_level_required`.
+- `vehicle_document_eligible_for_atpve`.
+- `reviewed_by_user_id`.
+- `reviewed_at`.
+- `audit_created_at`, `audit_created_by`, `audit_updated_at`, `audit_updated_by`.
+
+## Criterios de Aceite
+- Dado que o processo possui cliente, veiculo e condicoes negociadas, quando o Administrativo gerar contrato, entao o documento e preenchido automaticamente com os dados existentes.
+- Dado que existem documentos/anexos no processo, quando o pacote contratual for aberto, entao o Administrativo consegue consultar os anexos vinculados.
+- Dado que o campo de observacoes ainda nao foi revisado, quando tentar enviar contrato para assinatura, entao o sistema bloqueia ou exige confirmacao de revisao.
+- Dado que falta laudo obrigatorio, quando tentar enviar contrato para assinatura, entao o sistema bloqueia ou sinaliza pendencia conforme S3-US04.
+- Dado que a venda usara CDT/Venda Digital, quando o Administrativo iniciar o fluxo guiado, entao o sistema exibe requisitos de Gov.br Prata/Ouro, elegibilidade ATPV-e e passos de vendedor/comprador no app CDT.
+- Dado que vendedor e comprador assinaram na CDT, quando o Administrativo registrar evidencia, entao o status do documento passa para assinado/concluido conforme anexos e regras do processo.
+- Dado que a loja usar e-Notariado, quando o Administrativo registrar envio/assinatura, entao o sistema armazena status, documento assinado/reconhecido e evidencias.
+- Dado que documento estiver pronto para comprador, quando acionar aviso, entao o sistema registra destinatario, canal, responsavel, data/hora e status de envio.
+- Dado que o documento assinado for anexado, quando consultar o arquivo digital da venda, entao o documento aparece vinculado ao veiculo, comprador, vendedor/proprietario e negociacao.
+
+## Checklist Tecnico para Desenvolvimento
+- Criar entidade de pacote documental/contratual por venda.
+- Criar geracao de documentos a partir dos dados do processo.
+- Criar revisao obrigatoria de observacoes antes do envio.
+- Criar status por documento e por assinatura.
+- Criar fluxo manual assistido Gov.br/CDT/e-Notariado.
+- Criar anexacao de documento assinado/evidencia.
+- Criar bloqueios por documento, pagamento, laudo e modalidade de transferencia.
+- Criar aviso ao comprador quando documento estiver pronto.
+- Registrar historico/auditoria de geracao, envio, assinatura, cancelamento e anexos.
+- Preparar arquitetura para integracao oficial futura, sem depender dela nesta sprint.
+
+## Fora de Escopo da S3-US03
+- Integracao automatica completa com Gov.br, CDT, Detran ou e-Notariado.
+- Execucao automatica de assinatura em ambiente externo.
+- Validacao juridica automatica do conteudo dos contratos.
+- Emissao fiscal/SAT/NF.
+- Fluxo completo de transferencia no Detran apos vistoria.
+- Termo de garantia detalhado fora da regra especifica da S3-US06.
+
+## Referencias Oficiais para Validacao Operacional
+- Gov.br/Senatran: servico de Venda Digital pela Carteira Digital de Transito (ATPV-e).
+- Ministerio dos Transportes/Gov.br: Venda Digital exige conta Gov.br Prata/Ouro e documento elegivel para ATPV-e.
+- Colégio Notarial do Brasil/e-Notariado: ATPV-e e assinatura digital/reconhecimento via e-Not Assina, quando disponivel.
+
+As regras podem variar por Detran/UF e devem ser validadas juridicamente/operacionalmente antes de automacao real.

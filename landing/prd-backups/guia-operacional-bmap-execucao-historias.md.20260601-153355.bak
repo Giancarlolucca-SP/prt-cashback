@@ -1,0 +1,360 @@
+﻿# Guia Operacional BMAP: Execucao Tecnica de Historias
+
+## Objetivo
+Padronizar a evolucao pratica de historias de usuario no CRM automotivo, cobrindo pipeline de status, seed de dados, QA manual, tratamento de erros de ambiente/dados e troca de modelos de IA durante o desenvolvimento.
+
+Este guia complementa:
+
+- `diretrizes-maestro-bmap.md`;
+- `protocolo-dev-story-ambiente-docker.md`;
+- mapas transversais de automacoes e seguranca;
+- ready-for-dev da sprint em execucao.
+
+## 1. Pipeline do Ciclo de Vida de uma Historia
+No BMAP, o desenvolvimento nao avanca em bloco. Cada item do backlog passa por um pipeline cirurgico, controlado pelo Maestro, pelo harness da IA e pelo desenvolvedor.
+
+Fluxo padrao:
+
+```text
+[In Progress] -> [Manual QA / Seed] -> [In Review] -> [Done]
+```
+
+### In Progress
+Estado em que o agente implementa a historia.
+
+Atividades:
+
+- ler documentacao viva e story alvo;
+- ler codigo real existente;
+- alterar backend, frontend, banco, workers, rotas, controllers, services e helpers quando necessario;
+- criar ou alterar migrations;
+- criar testes automatizados de backend;
+- preservar padroes do repositorio;
+- nao ampliar escopo sem registrar decisao.
+
+Criterio para sair:
+
+- codigo implementado;
+- testes relevantes prontos;
+- ambiente sobe ou limitacao registrada.
+
+### Manual QA / Seed
+Estado em que o desenvolvedor/QA solicita ou cria dados de teste para validar cenarios reais.
+
+Atividades:
+
+- criar seed minima para a historia;
+- preparar usuarios/perfis;
+- preparar clientes, veiculos, vendas, documentos, jobs ou webhooks ficticios;
+- gerar payloads de teste;
+- simular erros controlados;
+- garantir que dados de teste nao sejam confundidos com producao.
+
+Criterio para sair:
+
+- dados de teste prontos;
+- ambiente local/homologacao com estado reproduzivel;
+- cenarios de caminho feliz e erro definidos.
+
+### In Review
+Estado do loop de validacao no navegador, prints, ajustes finos de layout, rotas, mensagens e estados visuais.
+
+Atividades:
+
+- testar no browser;
+- testar perfis diferentes;
+- testar mobile/viewport estreito quando operacional;
+- testar fluxos felizes;
+- testar fluxos de erro;
+- verificar logs/auditoria;
+- validar idempotencia quando houver webhook/integracao;
+- registrar bugs e ajustes.
+
+Criterio para sair:
+
+- QA manual aprovado;
+- code review executado;
+- bloqueios criticos resolvidos ou registrados.
+
+### Done
+Estado de congelamento da historia.
+
+Atividades:
+
+- mover historia formalmente para Done/Revisada;
+- atualizar `sprint_status.yaml` quando existir;
+- registrar follow-ups;
+- preservar evidencias de testes quando necessario;
+- liberar proxima historia da sprint.
+
+Criterio:
+
+- historia atende criterios de aceite;
+- testes e QA conferidos;
+- pendencias nao bloqueantes documentadas.
+
+## 2. Anatomia de uma Historia de Usuario
+Cada historia pronta para execucao deve conter:
+
+- objetivo de negocio;
+- objetivo de UX;
+- ator/perfil;
+- pre-condicoes;
+- comportamento esperado;
+- comportamento degradado/fallback;
+- dados envolvidos;
+- permissoes/RBAC;
+- logs/auditoria;
+- eventos/jobs;
+- criterios de aceite;
+- testes automatizados esperados;
+- QA manual esperado;
+- Frontend Surface esperada ou declaracao de backend-only;
+- fora de escopo.
+
+## 3. Frontend Surface como Entrega Obrigatoria
+A IA tende a limitar tarefas complexas ao backend, entregando apenas endpoints, rotas e regras de API. No BMAP, isso nao e suficiente quando a historia impacta a operacao do usuario.
+
+Regra:
+
+- Toda historia com impacto de uso deve materializar a interface visual correspondente, chamada aqui de Frontend Surface.
+- A entrega deve mostrar onde o usuario ve, cria, edita, acompanha, corrige ou recebe feedback daquela regra.
+- Se a historia for realmente backend-only, isso deve estar declarado no escopo e no fora de escopo.
+- Backend pronto sem superficie de uso nao deve ser considerado Done quando a historia depende de interacao humana.
+
+A Frontend Surface pode ser:
+
+- tela completa;
+- modal;
+- drawer;
+- aba;
+- card;
+- coluna de kanban;
+- status visual;
+- alerta;
+- botao/acao;
+- filtro;
+- historico/log visivel para perfil autorizado;
+- estado vazio, carregando, erro e sucesso.
+
+Checklist minimo:
+
+- o usuario certo enxerga a funcionalidade;
+- quem nao tem permissao nao ve nem a possibilidade de acessar;
+- erros de backend aparecem como mensagem operacional clara;
+- estados de carregamento, sucesso, bloqueio e falha existem quando aplicavel;
+- mobile/viewport estreito foi considerado quando o fluxo e operacional;
+- a UI respeita RBAC, dados sensiveis e escopos;
+- a tela permite continuar o trabalho sem depender de conhecimento tecnico.
+
+Criterio de qualidade:
+
+- Uma story nao deve passar para In Review apenas com endpoint implementado se o criterio de aceite envolve acao, decisao, acompanhamento ou validacao por usuario.
+## 4. Exemplo de Historia: Completacao e Ativacao de Conta Migrada
+
+### Historia 1.2: Completacao e Ativacao da Conta Migrada
+Objetivo de UX:
+
+- Permitir que o usuario vindo da base legada informe o token recebido por e-mail, defina uma nova senha forte e ative sua conta com seguranca.
+
+Fluxo feliz:
+
+1. Usuario acessa link ou tela de ativacao.
+2. Informa token recebido por e-mail.
+3. Define nova senha forte.
+4. Sistema valida token.
+5. Sistema valida senha.
+6. Conta e ativada.
+7. Usuario recebe confirmacao clara.
+8. Login passa a ser permitido.
+
+Comportamento degradado/fallback:
+
+- Se o token estiver expirado, corrompido ou ja utilizado, o sistema rejeita a ativacao sem expor dados internos.
+- A interface oferece rota clara para reenvio de token.
+- O sistema nao confirma se aquele e-mail existe quando isso puder vazar informacao sensivel.
+- Tentativas invalidas devem ser registradas com seguranca.
+
+Testes esperados:
+
+- token valido ativa conta;
+- token expirado rejeita;
+- token ja usado rejeita;
+- token inexistente/corrompido rejeita;
+- senha fraca rejeita;
+- usuario inativo/bloqueado segue regra definida;
+- reenvio de token nao vaza existencia de conta;
+- logs/auditoria registram ativacao e falhas relevantes.
+
+QA manual:
+
+- testar link recebido por e-mail usando SMTP local;
+- testar tela em mobile;
+- testar mensagem de erro;
+- testar reenvio de token;
+- testar login apos ativacao;
+- testar tentativa de reutilizar token.
+
+## 5. Tratamento de Erros de Ambiente
+Problemas de ambiente devem ser tratados como ambiente, nao como regra de negocio.
+
+Exemplos:
+
+- versao errada de Node;
+- dependencia quebrada;
+- Docker sem login;
+- imagem privada inacessivel;
+- porta ocupada;
+- `.env` incompleto;
+- banco local indisponivel;
+- migration pendente;
+- SMTP local fora do ar;
+- storage mockado sem permissao;
+- diferenca Windows/Linux.
+
+Conduta:
+
+1. Identificar se erro e de ambiente, dados, codigo ou requisito.
+2. Corrigir na raiz adequada.
+3. Atualizar `.env.example`, Docker, scripts ou documentacao quando necessario.
+4. Nao remover validacoes para fazer teste passar.
+5. Nao hardcodar credenciais.
+6. Registrar limitacao se nao puder resolver no momento.
+
+## 6. Tratamento de Erros de Dados
+Erros de dados acontecem quando o sistema recebe estado inconsistente, duplicado, ausente ou antigo.
+
+Exemplos:
+
+- CPF duplicado;
+- lead duplicado por webhook;
+- veiculo sem placa;
+- documento sem vinculo;
+- venda sem pagamento conferido;
+- job reprocessado duas vezes;
+- token expirado;
+- migracao de Bubble com campos incompletos;
+- cliente sem telefone/e-mail valido.
+
+Conduta:
+
+- validar entrada no backend;
+- retornar erro claro e sem vazamento interno;
+- preservar log tecnico quando necessario;
+- gerar audit log quando sensivel;
+- usar idempotencia em webhooks/jobs;
+- criar fila de pendencia quando o dado exigir revisao humana;
+- nao apagar historico sem regra de retencao.
+
+## 7. Troca de Modelos de IA no Meio do Desenvolvimento
+Durante o projeto, pode haver troca de modelo de IA por custo, qualidade, disponibilidade, contexto ou especialidade.
+
+Regra principal:
+
+- O modelo pode mudar; a fonte de verdade nao muda. A fonte de verdade sao os arquivos Markdown, codigo real, testes e registros de decisao.
+
+Antes de trocar de modelo/agente:
+
+1. Atualizar a documentacao viva.
+2. Registrar estado atual da story.
+3. Registrar arquivos alterados.
+4. Registrar testes executados e pendentes.
+5. Registrar decisoes abertas.
+6. Orientar o novo modelo a ler Kickoff, sprint, story, mapas e protocolo.
+7. Impedir que o novo modelo continue apenas pela memoria do chat anterior.
+
+Quando usar modelos diferentes:
+
+- Modelo de planejamento: refinamento, arquitetura, requisitos e riscos.
+- Modelo de coding: leitura de codigo, implementacao, testes e correcoes.
+- Modelo de review: bugs, regressao, seguranca, cobertura e riscos.
+- Modelo economico: tarefas repetitivas, sumarizacao, classificacao simples, geracao de seeds.
+
+Cuidados:
+
+- Nao deixar modelos diferentes alterarem a mesma area ao mesmo tempo sem controle.
+- Nao aceitar mudanca de arquitetura apenas porque outro modelo sugeriu.
+- Registrar qualquer divergencia entre modelos como decisao pendente do Maestro.
+- Se o modelo novo parecer perdido, reiniciar com leitura dos artefatos vivos.
+
+## 8. Seed de Dados por Historia
+Cada historia com QA manual deve ter dados de teste minimos.
+
+Seed deve incluir quando aplicavel:
+
+- usuarios por perfil;
+- cliente valido;
+- cliente com dado incompleto;
+- veiculo valido;
+- veiculo com pendencia;
+- lead novo;
+- lead duplicado;
+- venda em andamento;
+- documento/anexo fake;
+- job pendente;
+- job falho;
+- payload de webhook valido;
+- payload duplicado;
+- payload invalido.
+
+Regras:
+
+- Seeds nao podem conter dados reais de cliente.
+- Seeds devem ser reproduziveis.
+- Seeds devem poder ser limpos ou recriados.
+- Dados sensiveis fake devem ser claramente ficticios.
+
+## 9. Idempotencia como Criterio Padrao
+Sempre que houver webhook, job, mensagem, publicacao externa ou reprocessamento, testar idempotencia.
+
+Pergunta padrao:
+
+- O que acontece se a mesma acao chegar duas vezes?
+
+Resposta esperada:
+
+- O sistema nao duplica registro indevido.
+- O sistema reconhece chave externa, hash, idempotency key ou combinacao segura.
+- O sistema registra log de duplicidade ignorada/consolidada.
+- O sistema preserva consistencia operacional.
+
+## 10. Atualizacao do Status da Sprint
+Quando existir `sprint_status.yaml`, ele deve refletir o estado real das historias.
+
+Estados recomendados:
+
+```yaml
+stories:
+  S1-US02:
+    status: In Progress
+  S1-US03:
+    status: Manual QA / Seed
+  S1-US04:
+    status: In Review
+  S1-US05:
+    status: Done
+```
+
+Regras:
+
+- Nao marcar Done sem review.
+- Nao iniciar multiplas historias conflitantes sem controle.
+- Registrar bloqueios de ambiente/dados.
+- Registrar follow-ups que nao bloqueiam a historia.
+
+## 11. Saida Final por Historia
+Ao terminar uma historia, a entrega deve informar:
+
+- status final;
+- arquivos alterados;
+- migrations;
+- testes automatizados;
+- dados de seed usados;
+- QA manual realizado;
+- Frontend Surface entregue ou justificativa backend-only;
+- erros encontrados;
+- como foram resolvidos;
+- pendencias;
+- follow-ups;
+- proxima historia autorizada.
+

@@ -1,0 +1,41 @@
+﻿# S7-US05: Conferencia de Pagamento ao Proprietario
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Garantir que o pagamento da compra do veiculo seja feito ao proprietario correto, com alerta e conferencia dos dados bancarios antes da liberacao.
+
+## Historia de Usuario
+**Como** Administrativo,
+**quero** conferir se os dados bancarios batem com o proprietario do veiculo,
+**para** evitar pagamento indevido ou entrega de valor a terceiro sem validacao.
+
+## Regra Principal
+Na hora de realizar pagamento, os dados de quem vai receber deposito devem ser exatamente os mesmos dados que constam como proprietario do veiculo, salvo excecao formal aprovada e auditada.
+
+## Dados Minimos
+- `purchase_payment_check_id`.
+- Processo de compra/proposta.
+- Proprietario do veiculo.
+- Documento do proprietario.
+- Banco/agencia/conta/chave Pix informada.
+- Titular da conta.
+- Resultado da conferencia.
+- Responsavel pela conferencia.
+- Data/hora.
+- Evidencia/anexo quando aplicavel.
+- Justificativa de excecao quando houver.
+
+## Criterios de Aceite
+- Dado que Administrativo vai liberar pagamento, quando informar dados bancarios, entao o sistema deve exibir alerta de conferencia de titularidade.
+- Dado que titularidade diverge, quando tentar liberar, entao deve bloquear ou exigir aprovacao de Gestor com justificativa.
+- Dado que a conferencia foi concluida, quando consultar processo, entao deve aparecer responsavel, data/hora e resultado.
+
+## Fora de Escopo
+- Integracao bancaria definitiva.
+- Validacao automatica de titularidade via banco sem fornecedor definido.
+
+## Observacoes Tecnicas
+- Registrar logs e evidencias.
+- Reaproveitar dados de cliente/proprietario.

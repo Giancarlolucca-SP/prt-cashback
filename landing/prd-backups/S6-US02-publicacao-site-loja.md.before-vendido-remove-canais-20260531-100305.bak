@@ -1,0 +1,73 @@
+﻿# S6-US02: Publicacao Principal no Site da Loja
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Definir o site da loja como canal principal de publicacao do anuncio, servindo como origem operacional para replicacao posterior em marketplaces e redes sociais.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** publicar o anuncio primeiro no site da loja,
+**para** manter o estoque publico centralizado e usar essa publicacao como base para os demais canais.
+
+## Contexto Operacional
+O cliente externo deve visualizar o anuncio apenas em canais publicos autorizados: site da loja e marketplaces/redes onde a loja decidiu publicar. Ele nao deve acessar dados internos do sistema. O modulo Administrativo controla quais anuncios estao publicados, pausados, vendidos ou removidos do site.
+
+A publicacao no site da loja e a publicacao principal. A partir dela, o sistema pode replicar o anuncio para os canais selecionados. Alteracoes relevantes, especialmente preco, devem atualizar o site e disparar sincronizacao/replicacao para marketplaces selecionados.
+
+## Regras de Publicacao
+- O anuncio deve estar vinculado a um veiculo.
+- O veiculo deve estar apto para anuncio.
+- Deve existir foto principal.
+- Deve existir preco anunciado.
+- Deve existir descricao publica minima.
+- O veiculo deve ter finalizado preparacao e estar liberado no kanban administrativo para publicacao.
+- Publicacao deve registrar usuario, data/hora e versao.\n- Somente Administrativo/Gestor pode publicar, atualizar, pausar ou remover publicacao.
+
+## Dados Registrados
+- `ad_id`.
+- `vehicle_id`.
+- `site_publication_status`.
+- `site_published_at`.
+- `site_published_by`.
+- `site_unpublished_at`.
+- `site_unpublished_by`.
+- `site_url`.
+- `publication_version`.
+- `publication_snapshot`.
+- `publication_notes`.
+
+## Acoes
+- Publicar no site.
+- Atualizar publicacao.
+- Pausar publicacao.
+- Remover publicacao.
+- Marcar como vendido.\n- Sincronizar alteracao de preco para site e marketplaces selecionados.
+- Visualizar URL publica.
+
+## Criterios de Aceite
+- Dado que um anuncio esta pronto, quando o Administrativo/Gestor publicar, entao o anuncio deve aparecer como publicado no site da loja.
+- Dado que a publicacao foi concluida, quando consultar o anuncio, entao o sistema deve mostrar URL publica e data/hora de publicacao.
+- Dado que o anuncio esta publicado, quando o Administrativo/Gestor alterar preco, descricao, fotos ou status, entao deve ser registrada nova versao e a alteracao deve ser enviada ao site e aos marketplaces/canais selecionados.
+- Dado que o veiculo foi vendido, quando marcar vendido, entao o anuncio deve sair do estoque ativo do site ou aparecer como vendido conforme configuracao.
+- Dado que falta foto principal ou preco, quando tentar publicar, entao o sistema deve bloquear e listar pendencias.
+
+## Decisoes Confirmadas na Revisao
+- Somente Administrativo/Gestor publica, atualiza, pausa ou remove anuncio no site da loja.
+- O anuncio vai ao ar quando o veiculo finalizou preparacao e foi liberado/acompanhado no kanban administrativo.
+- Alteracao de preco feita no sistema deve replicar para o site da loja e para marketplaces/canais selecionados de forma simultanea ou assistida, conforme integracao disponivel.
+- O sistema pode armazenar e usar URL publica do anuncio quando isso ajudar compartilhamento, auditoria e replicacao.
+- Cliente externo visualiza somente dados publicos do anuncio no site da loja e nos marketplaces/canais onde a loja publicou, nunca dados internos do sistema.
+- Quando o veiculo for vendido, o anuncio deve sair do estoque ativo publico ou ser marcado como vendido conforme configuracao, mantendo historico.
+## Fora de Escopo
+- SEO avancado.
+- Frontend publico completo do site.
+- Checkout ou reserva online.
+- Integracao com marketplaces.
+
+## Observacoes Tecnicas
+- Guardar snapshot do conteudo publicado para auditoria.
+- Evitar que alteracoes internas sensiveis vazem para o site.
+- Usar publicacao do site como estado base para replicacao externa.
+

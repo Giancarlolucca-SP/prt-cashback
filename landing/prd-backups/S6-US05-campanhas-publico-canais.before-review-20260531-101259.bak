@@ -1,0 +1,70 @@
+﻿# S6-US05: Cadastro e Controle de Campanhas
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Registrar campanhas associadas a anuncios, canais e publico, armazenando informacoes relevantes para analise de desempenho e tomada de decisao.
+
+## Historia de Usuario
+**Como** Gestor/Administrador,
+**quero** cadastrar campanhas com publico, canal e tipo,
+**para** entender quais acoes geram mais visualizacoes, leads e vendas.
+
+## Contexto Operacional
+A campanha deve guardar informacoes fundamentais: tipo de campanha, publico, canal, periodo, investimento, objetivo e observacoes. Essas informacoes devem alimentar os rankings e dashboards de anuncios.
+
+## Campos Minimos
+- `campaign_id`.
+- Nome da campanha.
+- Tipo de campanha.
+- Canal principal.
+- Canais relacionados.
+- Publico.
+- Objetivo.
+- Periodo inicial.
+- Periodo final.
+- Investimento previsto.
+- Investimento realizado.
+- Observacoes relevantes.
+- Responsavel.
+- Status.
+- Anuncios vinculados.
+
+## Tipos de Campanha
+- Organica.
+- Patrocinada.
+- Marketplace.
+- Redes sociais.
+- Reativacao de leads.
+- Promocional.
+- Institucional.
+- Outro.
+
+## Publico
+O publico deve ficar registrado nas campanhas. Exemplos:
+
+- Publico local/regional.
+- Interessados em SUV.
+- Interessados em hatch.
+- Clientes recorrentes.
+- Leads frios.
+- Faixa de preco.
+- Perfil definido manualmente.
+
+## Criterios de Aceite
+- Dado que o usuario cadastra campanha, quando salvar, entao publico, canal, periodo e tipo devem ficar registrados.
+- Dado que uma campanha tem anuncios vinculados, quando consultar campanha, entao deve mostrar anuncios e metricas agregadas.
+- Dado que uma campanha gerou leads, quando consultar metricas, entao deve exibir leads por campanha.
+- Dado que campanha teve investimento, quando consultar performance, entao deve exibir investimento previsto e realizado.
+- Dado que o usuario informa observacoes, quando consultar historico, entao as observacoes devem permanecer vinculadas a campanha.
+
+## Fora de Escopo
+- Otimizacao automatica de verba.
+- Integracao completa com gerenciadores de anuncio.
+- BI preditivo avancado.
+
+## Observacoes Tecnicas
+- Campanha pode ter varios anuncios.
+- Anuncio pode participar de mais de uma campanha, se necessario.
+- Manter dados estruturados para insights futuros de IA.

@@ -1,0 +1,61 @@
+﻿# S6-US06: Metricas e Rankings de Anuncios
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Apresentar metricas de anuncios e rankings para identificar quais veiculos, canais e campanhas geram mais leads e visualizacoes.
+
+## Historia de Usuario
+**Como** Administrador/Gestor,
+**quero** ver rankings de anuncios por leads e visualizacoes,
+**para** entender quais anuncios e campanhas estao performando melhor.
+
+## Contexto Operacional
+A aba de anuncios deve mostrar metricas de desempenho. Deve existir um ranking dos anuncios com mais leads e outro ranking dos anuncios com mais visualizacoes. Tambem devem aparecer informacoes relevantes de campanha, publico, canal e tipo de acao realizada.
+
+## Indicadores
+- Total de leads por anuncio.
+- Total de visualizacoes por anuncio.
+- Leads por canal.
+- Visualizacoes por canal.
+- Curtidas por post.
+- Quantidade de postagens por veiculo.
+- Campanhas vinculadas.
+- Publico da campanha.
+- Origem do lead.
+- Taxa de conversao quando disponivel.
+- Periodo analisado.
+
+## Rankings
+- Anuncios com mais leads.
+- Anuncios com mais visualizacoes.
+- Anuncios com mais curtidas/postagens em redes sociais.
+- Canais com melhor desempenho.
+- Campanhas com melhor desempenho.
+
+## Filtros
+- Periodo.
+- Canal.
+- Campanha.
+- Veiculo.
+- Tipo de estoque: proprio/consignado.
+- Status do anuncio.
+- Vendedor/Responsavel quando aplicavel.
+
+## Criterios de Aceite
+- Dado que existem anuncios com leads, quando abrir a aba de anuncios, entao deve haver ranking por quantidade de leads.
+- Dado que existem metricas de visualizacao, quando abrir a aba de anuncios, entao deve haver ranking por visualizacoes.
+- Dado que um anuncio pertence a campanha, quando consultar ranking, entao deve exibir campanha e publico vinculados.
+- Dado que o usuario filtra por periodo, quando aplicar filtro, entao metricas e rankings devem respeitar o periodo.
+- Dado que nao existe metrica automatica de um canal, quando houver lancamento manual, entao o sistema deve identificar origem manual da metrica.
+
+## Fora de Escopo
+- Modelo preditivo de performance.
+- Attribution marketing avancado.
+- Integracao automatica com todos canais.
+
+## Observacoes Tecnicas
+- Guardar metricas historicas por data de captura.
+- Diferenciar metrica automatica de metrica manual.
+- Preparar estrutura para IA consumir futuramente.

@@ -1,0 +1,190 @@
+# Sprint 02 Ready for Dev: Kanban Comercial, Agendamentos e Passagem para Venda
+
+## Status
+Ready for development.
+
+## Objetivo da Sprint
+Entregar a base operacional do fluxo comercial da loja: Kanban SDR, Kanban Vendas, agendamentos, registro de interacoes, alertas de leads esfriando, passagem controlada para Gestao/Documentacao, entrega tecnica inicial, notificacoes internas e metricas comerciais basicas.
+
+A sprint deve transformar a operacao comercial em uma fila viva de acao: cada lead, visita, negociacao e venda deve ter responsavel, proxima acao, status claro, historico e notificacao quando estiver parado.
+
+## Arquivos da Sprint
+- Plano da sprint: `sprint-02.md`
+- S2-US01: `stories/S2-US01-kanban-comercial-sdr-vendas.md`
+- S2-US02: `stories/S2-US02-agendamentos-comerciais.md`
+- S2-US03: `stories/S2-US03-registro-interacoes-follow-up.md`
+- S2-US04: `stories/S2-US04-transicao-sdr-vendas-gestao-documentacao.md`
+- S2-US05: `stories/S2-US05-alertas-leads-esfriando.md`
+- S2-US06: `stories/S2-US06-entrega-tecnica-inicial-checklist.md`
+- S2-US07: `stories/S2-US07-notificacoes-internas-comerciais.md`
+- S2-US08: `stories/S2-US08-metricas-comerciais-basicas.md`
+
+## Escopo Consolidado
+
+### 1. Kanban SDR e Kanban Vendas
+- Criar Kanban SDR para leads e agendamentos comerciais iniciais.
+- Criar Kanban Vendas para negociacoes conduzidas pelo vendedor.
+- SDR pode cadastrar leads e mover cards ate agendamento/visita ou negociacao direta com vendedor.
+- Vendedor pode assumir card, iniciar fluxo de vendas e mover todo o fluxo comercial sob sua responsabilidade.
+- Gestor/Administrador pode mover qualquer card.
+- Cada card deve ter cliente/lead, veiculo ou veiculo de interesse, responsavel, origem, data de criacao, etapa, proxima acao e historico.
+
+### 2. Agendamentos Comerciais
+- Agendamento sempre vinculado a card, cliente/lead e veiculo ou veiculo de interesse.
+- Para veiculo 0km ou sob encomenda, permitir registrar veiculo de interesse sem unidade fisica em estoque.
+- SDR ve sua propria agenda.
+- Vendedor ve sua propria agenda e agendamentos feitos para ele.
+- Administrativo, Gestor e Administrador veem agenda geral conforme permissao.
+- Agenda operacional de servicos deve ser separada em Kanban de Servicos futuro, fora do escopo principal desta sprint.
+
+### 3. Interacoes e Follow-up
+- Toda interacao relevante deve ser registrada no card.
+- Interacoes atualizam historico do cliente/lead e do processo comercial.
+- Proxima acao deve alimentar agenda, notificacoes e destaque do card.
+- Follow-up vencido ou lead sem continuidade deve gerar alerta/notificacao.
+
+### 4. Passagem SDR -> Vendas -> Gestao/Documentacao
+- SDR transfere ou encerra card quando cliente visita a loja, ve o carro ou entra em negociacao direta com vendedor.
+- Kanban Vendas inicia quando o vendedor assume o cliente, seja em visita, atendimento presencial, teste drive ou negociacao.
+- Vendedor recolhe documentacao inicial do comprador quando a negociacao evolui.
+- Quando vendedor confirma negocio fechado, o card sobe para Gestao/Documentacao.
+- Confirmacao comercial nao libera documento, entrega tecnica ou veiculo automaticamente.
+- Administrativo/Gestao assume conferencia documental, pagamento e preparacao para entrega.
+
+### 5. Alertas de Leads Esfriando
+- Alertas devem ser baseados em regra simples nesta sprint, sem IA.
+- 24h sem acao: atencao.
+- 48h sem acao: lead esfriando/pendente.
+- 72h sem acao: risco alto/resgate.
+- Follow-up vencido e lead sem aviso de continuidade devem gerar notificacao para responsavel e visao administrativa.
+- Alertas devem evitar duplicidade para a mesma pendencia ativa.
+
+### 6. Entrega Tecnica Inicial
+- Entrega tecnica somente depois de contrato assinado, documentos do comprador entregues/conferidos e pagamento confirmado.
+- Administrativo agenda entrega tecnica no Kanban de Gestao/Documentacao.
+- Vendedor acompanha data, horario e status da entrega tecnica de suas vendas.
+- Conferencia deve ser feita junto com o cliente no momento da entrega.
+- Documento deve ser preenchido automaticamente antes da impressao com dados da loja, cliente, veiculo, venda, vendedor, responsavel e checklist.
+- Documento impresso deve ter checklist item por item para marcacao manual com X junto com o cliente.
+- Cliente e responsavel da loja assinam a via impressa.
+- Via assinada deve ser anexada posteriormente na pasta digital do veiculo e vinculada a venda.
+- O nome formal e Entrega Tecnica; nao usar "Party Mode" nesta sprint.
+
+### 7. Notificacoes Internas
+- Vendedor recebe notificacoes apenas das suas vendas/leads assumidos e de agendamentos feitos pelo SDR para ele.
+- SDR recebe notificacoes apenas dos proprios leads/cards.
+- Administrativo, Dono e Gestor recebem visao geral conforme permissao.
+- Notificacoes aparecem na aba de Notificacoes e no card relacionado.
+- Sem badge no menu principal nesta sprint.
+- Acoes: marcar como vista, marcar como resolvida, abrir card relacionado e reatribuir responsavel quando usuario for Gestor/Administrador.
+
+### 8. Metricas Comerciais Basicas
+- Administrador acessa todos os Kanbans e escolhe qual modulo deseja visualizar.
+- Dono/Gestor acessa visao geral conforme permissao.
+- Dashboard geral da operacao comercial da Sprint 2.
+- Dashboard especifico do Kanban SDR.
+- Dashboard especifico do Kanban Vendas.
+- Metricas por etapa, responsavel, origem/canal, periodo e status.
+- Incluir notificacoes internas pendentes/resolvidas.
+- Incluir entregas tecnicas agendadas, pendentes de assinatura/anexo e realizadas.
+- Nao expor dados financeiros sensiveis sem permissao.
+
+## Perfis e Permissoes Iniciais
+
+| Papel | Kanban | Agenda | Notificacoes | Metricas |
+|---|---|---|---|---|
+| Administrador | Todos | Todos | Geral | Geral |
+| Dono/Gestor | Todos conforme permissao | Todos conforme permissao | Geral | Geral |
+| Administrativo | Gestao/Documentacao e consultas permitidas | Agenda geral/administrativa | Geral operacional | Operacional |
+| Vendedor | Seus cards e cards assumidos | Sua agenda e agendamentos feitos para ele | Suas vendas/leads | Proprias |
+| SDR | Seus leads/cards | Sua agenda | Seus leads/cards | Proprias/operacionais |
+| Cliente final | Nao acessa | Nao acessa | Nao acessa | Nao acessa |
+
+## Dados Minimos Recomendados
+- `pipeline_cards`
+- `pipeline_card_history`
+- `pipeline_type` ou `kanban_type`
+- `stage`
+- `stage_entered_at`
+- `responsible_user_id`
+- `customer_or_lead_id`
+- `vehicle_id`
+- `vehicle_interest_id`
+- `origin_channel`
+- `created_at`
+- `last_interaction_at`
+- `next_action_at`
+- `appointments`
+- `appointment_status`
+- `interactions`
+- `follow_ups`
+- `notifications`
+- `purchase_confirmations`
+- `document_process_status`
+- `delivery_technical_schedule`
+- `delivery_technical_status`
+- `audit_created_by`
+- `audit_created_at`
+- `audit_updated_by`
+- `audit_updated_at`
+
+## Criterios Gerais de Aceite
+- Kanban SDR e Kanban Vendas existem e sao navegaveis.
+- Cards podem ser criados, movidos e historizados.
+- Movimentacao de etapa registra usuario, data/hora e status anterior/novo.
+- SDR visualiza e opera apenas seus leads/cards, salvo permissao administrativa.
+- Vendedor visualiza e opera seus cards, leads assumidos e agendamentos feitos para ele.
+- Administrativo/Gestor/Administrador acessa visao geral conforme permissao.
+- Agendamento comercial fica vinculado a card, cliente/lead e veiculo/interesse.
+- Follow-up vencido, lead sem continuidade e lead esfriando geram notificacao/destaque.
+- Venda confirmada pelo vendedor gera passagem para Gestao/Documentacao.
+- Entrega tecnica so pode ser agendada apos contrato assinado, documentos do comprador entregues/conferidos e pagamento confirmado.
+- Documento de entrega tecnica pode ser gerado/preenchido automaticamente e impresso com checklist manual.
+- Notificacoes internas respeitam permissao e evitam duplicidade ativa.
+- Dashboard administrativo mostra indicadores basicos por Kanban, etapa, responsavel, origem/canal e periodo.
+- Metricas batem com os dados transacionais dos Kanbans, agendas, alertas e notificacoes.
+
+## Checklist Tecnico para Dev
+- Implementar permissoes no backend, nao apenas na interface.
+- Criar entidades/tabelas transacionais antes das metricas agregadas.
+- Criar historico de movimentacao de cards.
+- Criar vinculo obrigatorio entre card, cliente/lead e veiculo ou veiculo de interesse.
+- Criar validacoes de passagem entre SDR, Vendas e Gestao/Documentacao.
+- Criar rotina/regra para alertas de lead esfriando e follow-up vencido.
+- Criar central de notificacoes com status: nova, vista, resolvida, cancelada/ignorada.
+- Criar geracao de documento/PDF de entrega tecnica com checklist pre-preenchido.
+- Criar anexacao da via assinada da entrega tecnica na pasta digital do veiculo.
+- Criar consultas agregadas para dashboards sem contagem manual solta.
+- Criar testes de permissao, movimentacao, alertas, notificacoes, entrega tecnica e metricas.
+
+## Fora de Escopo da Sprint 2
+- WhatsApp automatico real.
+- Push mobile.
+- IA/Next Best Action real.
+- BI externo.
+- Dashboard financeiro, margem, DRE, comissao ou rentabilidade.
+- Integracao real com marketplaces.
+- Kanban de Servicos completo.
+- Kanban de Repasse.
+- Assinatura digital completa de entrega tecnica.
+- App mobile completo de entrega tecnica sem papel.
+
+## Riscos e Controles
+
+| Risco | Controle |
+|---|---|
+| Kanban virar complexo demais | Manter colunas e regras de passagem padronizadas. |
+| Usuario ver dados de outro responsavel | Aplicar permissao no backend e testar por perfil. |
+| Confirmacao comercial ser confundida com liberacao de entrega | Bloquear entrega sem contrato, documentos e pagamento confirmado. |
+| Lead parado sem acao | Alertas por SLA simples e notificacao ativa. |
+| Notificacao duplicada | Deduplicar por tipo, card, responsavel e status ativo. |
+| Metricas divergirem do Kanban | Usar as mesmas tabelas transacionais como fonte. |
+| WhatsApp entrar cedo demais | Manter WhatsApp automatico fora da sprint. |
+
+## Definicao de Pronto da Sprint
+- Todas as oito stories da Sprint 2 estao detalhadas.
+- Regras de permissao estao documentadas.
+- Fluxos SDR, Vendas e Gestao/Documentacao estao separados.
+- Alertas, notificacoes e metricas usam dados transacionais.
+- Entrega tecnica inicial tem pre-requisitos, documento impresso e armazenamento definido.
+- Arquivo consolidado pronto para orientar desenvolvimento.

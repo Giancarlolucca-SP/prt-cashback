@@ -1,0 +1,299 @@
+﻿# Protocolo Dev Story e Ambiente Docker
+
+## Objetivo
+Definir como o projeto deve sair do planejamento BMAD/BMAP para implementacao real, evitando que a IA desenvolvedora pule leitura de codigo, ignore arquitetura existente, teste sem ambiente isolado ou crie correcoes temporarias que quebrem o futuro.
+
+
+
+## Guia Operacional BMAP
+Para execucao tecnica detalhada de historias, status de pipeline, seeds, tratamento de erros de ambiente/dados e troca de modelos de IA, consultar `guia-operacional-bmap-execucao-historias.md`.
+## Diretrizes do Maestro BMAP
+Antes de qualquer Dev Story ou nova sessao de IA, o Maestro deve consultar `diretrizes-maestro-bmap.md`.
+
+O objetivo e evitar Vibe Code, manter a IA presa aos artefatos vivos, reduzir custo operacional de IA no produto, gerenciar saturacao da janela de contexto e coordenar paralelismo sem perda de rastreabilidade.
+## Pipeline de Status da Historia
+Fluxo operacional recomendado: [In Progress] -> [Manual QA / Seed] -> [In Review] -> [Done].
+
+O detalhe de cada estado fica no guia operacional BMAP.
+
+## Passo 1: Ready-for-Dev
+Antes de implementar, cada sprint ou story deve possuir:
+
+- escopo claro;
+- criterios de aceite;
+- permissoes/RBAC;
+- dados e entidades afetadas;
+- eventos de auditoria;
+- impactos em jobs/automacoes;
+- impactos em storage/anexos;
+- testes esperados;
+- fora de escopo;
+- riscos e dependencias.
+
+## Passo 2: BMAD Dev Story
+Nesta etapa, a IA assume papel de programadora pura.
+
+A IA desenvolvedora deve:
+
+1. Ler o codigo existente na maquina antes de propor implementacao.
+2. Identificar estrutura real de rotas, componentes, banco, migrations, helpers, services, middlewares, configuracoes e testes.
+3. Respeitar padroes ja existentes no repositorio.
+4. Implementar a menor mudanca suficiente para atender a story.
+5. Criar ou atualizar migrations quando houver mudanca de dados.
+6. Criar testes automatizados de backend para cobrir a nova funcionalidade.
+7. Criar testes de permissao/RBAC quando a funcionalidade envolver dados sensiveis.
+8. Criar testes de jobs/filas quando a funcionalidade disparar automacao.
+9. Registrar limitacoes quando algum teste nao puder ser executado localmente.
+
+A IA nao deve assumir arquitetura inexistente. Se o codigo real divergir do planejamento, deve apontar o conflito e propor ajuste seguro.
+
+## Passo 3: Preparacao do Ambiente e Resolucao de Conflitos
+Antes de testar interface ou fluxo completo, o ambiente local deve ser instanciado de forma reproduzivel.
+
+Diretriz:
+
+- Usar Docker/Docker Compose para isolar servicos locais quando aplicavel.
+- Incluir servicos necessarios como PostgreSQL, banco de testes, workers/jobs, provedores mockados e, no futuro, Redis se ele for adotado.
+- No MVP, Redis nao e obrigatorio porque jobs iniciam com pg-boss/PostgreSQL, mas o Docker deve ser preparado para permitir evolucao futura sem refatoracao dolorosa.
+- Variaveis de ambiente devem ficar em `.env` local nao versionado, com `.env.example` atualizado e sem segredos reais.
+
+Problemas de ambiente devem ser resolvidos na raiz, nao com remendos no codigo:
+
+- versao de Node;
+- gerenciador de pacotes;
+- versao de Python quando houver scripts auxiliares;
+- autenticacao de imagens Docker;
+- portas ocupadas;
+- URL do banco;
+- credenciais Supabase/Storage;
+- tokens de IA/OCR/Evolution/API;
+- permissao de filesystem;
+- diferenca entre Windows/PowerShell e ambiente Linux/container.
+
+## Regra contra Correcao Temporaria
+Nao corrigir problema de ambiente alterando regra de negocio, removendo teste, comentando validacao, hardcodando credencial ou mudando codigo produtivo sem necessidade.
+
+Se o problema for de ambiente, a correcao deve acontecer em:
+
+- Dockerfile;
+- docker-compose;
+- scripts de setup;
+- `.env.example`;
+- documentacao de instalacao;
+- versao declarada de Node/Python;
+- configuracao de CI/local;
+- variaveis de ambiente.
+
+## Checklist Antes de Testar UI
+Antes de abrir a interface:
+
+- Dependencias instaladas.
+- Docker ativo quando necessario.
+- PostgreSQL local/homologacao acessivel.
+- Migrations aplicadas.
+- Seeds ou dados minimos criados quando necessario.
+- Backend sobe sem erro.
+- Worker/jobs sobe sem erro quando aplicavel.
+- Frontend sobe sem erro.
+- `.env` local valido e `.env.example` atualizado.
+- Testes backend relevantes executados.
+- Permissoes/RBAC testadas quando aplicavel.
+
+## Checklist de Testes Automatizados
+Para cada Dev Story, avaliar:
+
+- teste de regra de negocio;
+- teste de permissao;
+- teste de validacao de entrada;
+- teste de erro esperado;
+- teste de auditoria/log quando sensivel;
+- teste de job/fila quando houver automacao;
+- teste de storage/anexo quando houver documento;
+- teste de integracao com adaptador mockado quando houver provedor externo.
+
+
+## Passo 4: Validacao Manual e QA
+Depois dos testes automatizados e da subida do ambiente local, a funcionalidade deve passar por validacao manual no navegador quando houver interface ou fluxo operacional.
+
+O QA deve validar:
+
+- caminho feliz principal;
+- fluxos de erro previstos;
+- permissao por perfil;
+- mensagens de bloqueio/pendencia;
+- comportamento de jobs e automacoes;
+- logs/auditoria quando aplicavel;
+- impacto visual no frontend;
+- responsividade em viewport estreito/mobile;
+- consistencia dos dados no banco apos a acao;
+- reprocessamento quando aplicavel;
+- idempotencia em webhooks e integracoes.
+
+## Ambiente Local para QA
+O ambiente local deve subir com servicos suficientes para simular a operacao real sem depender de producao.
+
+Quando aplicavel, incluir:
+
+- PostgreSQL local/teste;
+- backend;
+- frontend;
+- worker/jobs;
+- storage mockado ou ambiente controlado;
+- SMTP local para testar e-mails/notificacoes;
+- adaptadores mockados para IA, OCR, marketplaces, Evolution API e consultas externas;
+- endpoints ou scripts para simular webhooks.
+
+Exemplo: usar SMTP local para validar que e-mails/notificacoes foram disparados, sem enviar para clientes reais.
+
+## QA de Browser
+O teste no navegador deve simular usuarios reais por perfil:
+
+- Dono/Gestor;
+- Administrativo;
+- Vendedor;
+- SDR;
+- outros perfis quando existirem.
+
+Para cada perfil, validar:
+
+- o que aparece;
+- o que nao aparece;
+- o que pode executar;
+- o que e bloqueado;
+- se dados sensiveis ficam ocultos;
+- se a API tambem bloqueia acesso direto quando testado.
+
+## QA de Fluxos de Erro
+Todo fluxo critico deve ter pelo menos um teste manual de erro quando aplicavel.
+
+Exemplos:
+
+- webhook de marketplace envia dados duplicados;
+- job de OCR falha;
+- envio de WhatsApp falha;
+- usuario sem permissao tenta acessar documento;
+- anuncio vendido nao e removido em uma plataforma;
+- consulta externa retorna erro ou CAPTCHA;
+- storage falha ao salvar anexo;
+- backend recebe payload incompleto;
+- cliente/CPF/telefone duplicado;
+- venda tenta avancar sem pre-requisito.
+
+## Idempotencia em QA
+Webhooks e integracoes devem ser testados contra duplicidade quando aplicavel.
+
+Exemplo:
+
+- Se um marketplace enviar o mesmo webhook duas vezes, o sistema nao deve duplicar lead, anuncio, evento, venda, mensagem ou job.
+- O sistema deve reconhecer duplicidade por chave de idempotencia, identificador externo ou combinacao controlada.
+- A duplicidade deve ser ignorada ou consolidada, registrando log tecnico/auditoria conforme criticidade.
+
+
+## QA de Responsividade Mobile
+Como vendedores, SDRs, avaliadores e equipe operacional podem usar o sistema no patio da loja ou em campo, a interface deve ser validada em visualizacoes estreitas.
+
+Validar no minimo:
+
+- largura mobile estreita, como 360px a 390px;
+- largura mobile media, como 414px a 430px;
+- tablet ou viewport intermediario quando o fluxo for operacional;
+- rolagem vertical sem perda de acoes importantes;
+- botoes tocaveis sem ficarem pequenos demais;
+- tabelas transformadas em listas/cards quando necessario;
+- kanban utilizavel em tela estreita;
+- formularios sem campos cortados;
+- modais/drawers cabendo na tela;
+- textos sem sobreposicao;
+- acoes principais sempre acessiveis;
+- dados sensiveis continuando ocultos por perfil mesmo no mobile.
+
+Fluxos prioritarios para mobile:
+
+- vendedor acompanhando leads/card no patio;
+- vendedor consultando estoque permitido;
+- vendedor acompanhando status de preparacao/entrega de veiculo vinculado;
+- avaliador preenchendo avaliacao mobile;
+- anexar fotos/documentos quando aplicavel;
+- Administrativo/Gestor consultando alerta critico quando estiver fora do computador.
+
+Quando uma tela nao for mobile-first por natureza, ela ainda deve apresentar uma alternativa utilizavel ou bloquear com orientacao clara, sem quebrar layout.
+## Evidencia de QA
+Ao finalizar QA manual, registrar:
+
+- ambiente usado;
+- usuario/perfil testado;
+- fluxo testado;
+- dados de teste usados;
+- resultado esperado;
+- resultado obtido;
+- bugs encontrados;
+- screenshots ou logs quando necessario;
+- evidencia de teste mobile/responsivo quando houver interface operacional;
+- pendencias restantes.
+## Conflitos entre Planejamento e Codigo Real
+Se o planejamento pedir algo que o codigo atual nao suporta:
+
+1. Registrar divergencia.
+2. Identificar menor ajuste tecnico.
+3. Nao renomear ou refatorar grandes areas sem necessidade.
+4. Preservar dados, logs, permissoes e contratos existentes.
+5. Atualizar documentacao quando a decisao mudar.
+
+## Saida Esperada da Dev Story
+Ao finalizar implementacao, a IA deve informar:
+
+- arquivos alterados;
+- migrations criadas;
+- testes criados/alterados;
+- comandos executados;
+- resultado dos testes;
+- problemas de ambiente encontrados;
+- pendencias ou riscos restantes;
+- como validar manualmente se necessario;
+- resultado do QA manual/browser quando executado;
+- evidencias de fluxos de erro e idempotencia quando aplicavel.
+
+
+## Passo 5: BMAD Code Review
+Depois que o fluxo estiver funcionando na tela, os testes automatizados relevantes estiverem aprovados e o QA manual/browser tiver sido executado, a historia deve passar por revisao formal de codigo.
+
+A revisao deve verificar:
+
+- se a implementacao atende aos criterios de aceite;
+- se testes backend cobrem regra principal e erros relevantes;
+- se permissoes/RBAC foram aplicadas no backend e refletidas no frontend;
+- se logs/auditoria foram criados quando necessario;
+- se jobs/automacoes sao idempotentes quando aplicavel;
+- se webhooks tratam duplicidade quando aplicavel;
+- se dados sensiveis nao vazam no frontend, API, logs ou erros;
+- se migrations sao seguras e coerentes;
+- se `.env.example`, Docker e documentacao foram atualizados quando necessario;
+- se nao foram criadas correcoes temporarias ou hardcodes;
+- se o fluxo mobile/responsivo foi validado quando a tela for operacional.
+
+## Status Revisada
+A historia so pode ser movida para **Revisada** quando:
+
+1. Codigo implementado.
+2. Testes automatizados relevantes executados e aprovados, ou limitacao registrada.
+3. Ambiente local/Docker validado quando aplicavel.
+4. QA manual/browser realizado quando houver interface.
+5. Fluxos de erro relevantes testados.
+6. Responsividade mobile testada quando a tela for usada no patio/campo.
+7. Code review sem bloqueios criticos.
+8. Pendencias restantes registradas como follow-up, bug ou historia futura.
+
+Ao mover para **Revisada**, a proxima historia da sprint pode ser iniciada.
+
+## Saida Esperada do Code Review
+O fechamento deve registrar:
+
+- decisao: Revisada, Revisada com ressalvas ou Bloqueada;
+- principais arquivos revisados;
+- testes conferidos;
+- riscos restantes;
+- follow-ups criados;
+- pendencias de ambiente;
+- confirmacao de que a proxima historia pode iniciar.
+## Relacao com Sprint 11
+Este protocolo complementa a S11-US07. A Sprint 11 define a base tecnica; este protocolo define como cada story deve ser implementada com leitura real do codigo, testes automatizados, ambiente Docker reproduzivel, QA manual/browser e code review antes de ser movida para Revisada.

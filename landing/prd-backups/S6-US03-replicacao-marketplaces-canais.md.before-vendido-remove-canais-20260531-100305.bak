@@ -1,0 +1,78 @@
+﻿# S6-US03: Replicacao para Marketplaces e Canais Selecionados
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Permitir que o usuario selecione em quais plataformas o anuncio publicado no site da loja deve ser replicado, controlando status, logs, evidencias e falhas por canal.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** selecionar os canais onde o anuncio sera publicado,
+**para** ampliar a divulgacao do veiculo mantendo controle de status e auditoria.
+
+## Contexto Operacional
+A publicacao principal acontece no site da loja. Depois disso, o usuario escolhe canais externos, como Webmotors, OLX, Mercado Livre, Instagram, Facebook e outros canais configuraveis.
+
+A replicacao pode ser automatizada quando houver API/fornecedor autorizado, ou assistida/manual quando o canal nao permitir integracao direta. O sistema nao deve contornar captcha, mecanismos de protecao ou termos de uso.
+
+## Canais Iniciais
+- Site da loja como origem principal.
+- Webmotors.
+- OLX.
+- Mercado Livre.
+- Instagram.
+- Facebook.
+- Outros canais configuraveis.
+
+## Status por Canal
+- Nao selecionado.
+- Selecionado.
+- Pendente.
+- Em publicacao.
+- Publicado.
+- Ativo.
+- Pausado.
+- Removido.
+- Erro.
+- Requer acao manual.
+
+## Dados Minimos
+- `ad_id`.
+- `channel_id`.
+- `channel_name`.
+- `selected_for_publication`.
+- `channel_publication_status`.
+- `external_ad_id`.
+- `external_url`.
+- `published_at`.
+- `published_by`.
+- `automation_id`.
+- `last_sync_at`.
+- `last_error_message`.
+- `evidence_url_or_file_id`.
+
+## Regras de Compliance
+- Usar API oficial, fornecedor licenciado, integracao autorizada ou fluxo manual/assistido validado.
+- Nao burlar captcha, bloqueios, limites ou validacoes humanas.
+- Quando houver validacao humana, pausar e solicitar acao de usuario autorizado.
+- Registrar evidencia e responsavel.
+
+## Criterios de Aceite
+- Dado que o anuncio esta publicado no site, quando o usuario selecionar canais externos, entao o sistema deve criar registros de publicacao por canal.
+- Dado que um canal foi selecionado, quando a replicacao iniciar, entao o status deve mudar para pendente/em publicacao.
+- Dado que a publicacao externa foi concluida, quando houver URL ou ID externo, entao o sistema deve registrar esse dado.
+- Dado que ocorrer erro, quando consultar o canal, entao o sistema deve exibir erro e permitir nova tentativa ou acao manual.
+- Dado que houver captcha ou validacao humana, quando detectado, entao o sistema deve pausar e registrar que requer acao manual.
+
+## Fora de Escopo
+- Contratacao real de APIs/fornecedores.
+- Automacao anti-captcha.
+- Publicacao paga automatica.
+- Sincronizacao bidirecional completa de todos marketplaces.
+
+## Observacoes Tecnicas
+- Modelar canais como configuraveis.
+- Manter logs por tentativa.
+- Preparar arquitetura para workers assincronos.
+- Permitir anexar evidencia manual em MVP.

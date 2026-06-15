@@ -1,0 +1,65 @@
+﻿# S6-US02: Publicacao Principal no Site da Loja
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Definir o site da loja como canal principal de publicacao do anuncio, servindo como origem operacional para replicacao posterior em marketplaces e redes sociais.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** publicar o anuncio primeiro no site da loja,
+**para** manter o estoque publico centralizado e usar essa publicacao como base para os demais canais.
+
+## Contexto Operacional
+O cliente externo deve visualizar o estoque somente pelo site da loja. O modulo Administrativo controla quais anuncios estao publicados, pausados, vendidos ou removidos do site.
+
+A publicacao no site da loja e a publicacao principal. A partir dela, o sistema pode replicar o anuncio para os canais selecionados.
+
+## Regras de Publicacao
+- O anuncio deve estar vinculado a um veiculo.
+- O veiculo deve estar apto para anuncio.
+- Deve existir foto principal.
+- Deve existir preco anunciado.
+- Deve existir descricao publica minima.
+- O status do veiculo deve permitir publicacao.
+- Publicacao deve registrar usuario, data/hora e versao.
+
+## Dados Registrados
+- `ad_id`.
+- `vehicle_id`.
+- `site_publication_status`.
+- `site_published_at`.
+- `site_published_by`.
+- `site_unpublished_at`.
+- `site_unpublished_by`.
+- `site_url`.
+- `publication_version`.
+- `publication_snapshot`.
+- `publication_notes`.
+
+## Acoes
+- Publicar no site.
+- Atualizar publicacao.
+- Pausar publicacao.
+- Remover publicacao.
+- Marcar como vendido.
+- Visualizar URL publica.
+
+## Criterios de Aceite
+- Dado que um anuncio esta pronto, quando o Administrativo/Gestor publicar, entao o anuncio deve aparecer como publicado no site da loja.
+- Dado que a publicacao foi concluida, quando consultar o anuncio, entao o sistema deve mostrar URL publica e data/hora de publicacao.
+- Dado que o anuncio esta publicado, quando o usuario alterar preco ou descricao, entao deve ser registrada nova versao de publicacao.
+- Dado que o veiculo foi vendido, quando marcar vendido, entao o anuncio deve sair do estoque ativo do site ou aparecer como vendido conforme configuracao.
+- Dado que falta foto principal ou preco, quando tentar publicar, entao o sistema deve bloquear e listar pendencias.
+
+## Fora de Escopo
+- SEO avancado.
+- Frontend publico completo do site.
+- Checkout ou reserva online.
+- Integracao com marketplaces.
+
+## Observacoes Tecnicas
+- Guardar snapshot do conteudo publicado para auditoria.
+- Evitar que alteracoes internas sensiveis vazem para o site.
+- Usar publicacao do site como estado base para replicacao externa.

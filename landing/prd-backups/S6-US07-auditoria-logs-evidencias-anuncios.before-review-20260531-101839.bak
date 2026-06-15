@@ -1,0 +1,76 @@
+﻿# S6-US07: Auditoria, Logs e Evidencias de Publicacao
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Registrar auditoria completa das acoes de anuncio, publicacao, replicacao, postagem, campanha e metricas, permitindo rastreabilidade operacional e compliance.
+
+## Historia de Usuario
+**Como** Administrador/Gestor,
+**quero** auditar quem publicou, alterou, replicou e mediu anuncios,
+**para** ter controle sobre operacao, evidencias e eventuais falhas por canal.
+
+## Contexto Operacional
+O modulo de anuncios envolve publicacao em site, canais externos, redes sociais, campanhas e metricas. Cada acao relevante deve gerar log com responsavel, data/hora, canal, origem, resultado e evidencia quando aplicavel.
+
+## Eventos Auditaveis
+- Criacao de anuncio.
+- Edicao de anuncio.
+- Alteracao de preco.
+- Alteracao de fotos/videos/thumbnail.
+- Publicacao no site.
+- Remocao/pausa do site.
+- Selecao de canal externo.
+- Replicacao para marketplace.
+- Postagem em Instagram/Facebook.
+- Captura de metricas.
+- Lancamento manual de metricas.
+- Cadastro/alteracao de campanha.
+- Erro de publicacao ou sincronizacao.
+- Acao manual por validacao humana.
+
+## Campos Minimos de Auditoria
+- `audit_id`.
+- `entity_type`.
+- `entity_id`.
+- `event_type`.
+- `performed_by_user_id`.
+- `performed_by_role`.
+- `automation_id`.
+- `channel`.
+- `source`.
+- `occurred_at`.
+- `before_snapshot`.
+- `after_snapshot`.
+- `result_status`.
+- `evidence_url_or_file_id`.
+- `external_reference`.
+- `error_message`.
+
+## Evidencias
+Quando aplicavel, guardar:
+
+- URL do anuncio publicado.
+- ID externo do anuncio.
+- Print ou arquivo de evidencia.
+- Resposta de API/fornecedor.
+- Registro de acao manual.
+- Mensagem de erro.
+
+## Criterios de Aceite
+- Dado que um usuario publica anuncio, quando a publicacao finalizar, entao deve existir log com usuario, data/hora, canal e resultado.
+- Dado que uma replicacao falha, quando consultar logs, entao deve aparecer erro e canal afetado.
+- Dado que metricas forem lancadas manualmente, quando auditar, entao deve constar responsavel e origem manual.
+- Dado que automacao executar acao, quando auditar, entao deve constar identificacao da automacao.
+- Dado que houver acao manual por validacao humana, quando auditar, entao deve constar responsavel e evidencia.
+
+## Fora de Escopo
+- SIEM corporativo.
+- Trilha imutavel blockchain.
+- Auditoria fiscal externa.
+
+## Observacoes Tecnicas
+- Logs devem ser append-only ou protegidos contra alteracao indevida.
+- Dados sensiveis nao devem aparecer em evidencias publicas.
+- Usar snapshots quando houver alteracao relevante de conteudo publicado.

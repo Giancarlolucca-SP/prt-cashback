@@ -1,0 +1,338 @@
+---
+title: 'S1-US01: Cadastro Base de Clientes'
+status: draft
+created: 2026-05-29
+sprint: 'Sprint 1: Cadastros Base, Clientes, Veiculos e Estoque Minimo'
+source_sprint: '../sprint-01.md'
+source_prd: '../../prds/prd-projeto-2-2026-05-25/prd.md'
+related_frs:
+  - FR-022D
+  - FR-022E
+  - FR-022F
+  - FR-022G
+  - FR-022GA
+  - FR-022H
+---
+
+# S1-US01: Cadastro Base de Clientes
+
+## Historia
+
+**Como** Administrador ou Vendedor autorizado,  
+**quero** cadastrar, consultar, editar e inativar clientes na base interna,  
+**para** manter uma base unica de pessoas que compraram, visitaram, demonstraram interesse ou viraram lead.
+
+## Objetivo da Entrega
+
+Criar a primeira versao funcional da pagina/base de clientes, com cadastro simples, listagem, busca, filtros, permissao por papel e auditoria minima.
+
+Esta historia deve entregar a base comum de clientes finais e leads da loja. Compradores de repasse ficam fora desta base e devem ser tratados em pagina/cadastro exclusivo de repasse.
+
+## Requisitos Cobertos
+
+| FR | Aplicacao nesta historia |
+|---|---|
+| FR-022D | Criar pagina/base interna de clientes. |
+| FR-022E | Permitir registrar pessoas que ja compraram, demonstraram interesse, viraram lead ou visitaram a loja. |
+| FR-022F | Centralizar informacoes iniciais do cliente e preparar vinculos futuros com historico, compras, interesses, visitas, leads, conversas, propostas e follow-ups. |
+| FR-022G | Permitir busca/filtros por nome, telefone, origem, status, interesse, vendedor, compra realizada, visita realizada e periodo, em versao inicial. |
+| FR-022GA | Cliente final nao acessa a pagina/base interna de clientes. |
+| FR-022H | Preparar o cadastro para vinculos futuros com veiculos de interesse, negociacoes, vendas, visitas, test drives e recontatos. |
+
+## Fora de Escopo
+
+- Cadastro de compradores de repasse.
+- Cadastro de fornecedores de repasse.
+- Kanban completo de CRM.
+- Lead scoring, IA ou Next Best Action.
+- Envio automatico de mensagens.
+- Integracao WhatsApp.
+- Pos-venda de 2 anos.
+- Aniversariantes e automacao de parabens.
+- Vinculo completo com vendas, contratos e documentos.
+- Importacao de contatos externos.
+
+## Distincao Importante de Cadastro
+
+Nesta historia, "cliente" significa cliente final ou lead da loja:
+
+- pessoa que quer comprar;
+- pessoa que visitou a loja;
+- pessoa que demonstrou interesse;
+- pessoa que ja comprou;
+- pessoa que entrou como lead.
+
+Nao entram nesta base comum:
+
+- compradores de repasse;
+- fornecedores de repasse;
+- fornecedores/origens de veiculos;
+- prestadores de servico;
+- despachantes.
+
+Esses cadastros terao paginas e fluxos proprios para evitar mistura operacional.
+
+## Tela Principal: Base de Clientes
+
+### Funcao
+
+Listar clientes cadastrados e permitir busca, filtros e acesso ao detalhe.
+
+### Colunas Minimas
+
+- Nome
+- Telefone/WhatsApp
+- Origem
+- Status
+- Interesse principal
+- Vendedor/responsavel
+- Compra realizada: sim/nao
+- Visita realizada: sim/nao
+- Ultima atualizacao
+- Acoes: ver/editar/inativar conforme permissao
+
+### Busca
+
+A busca deve aceitar:
+
+- nome completo ou parcial;
+- telefone/WhatsApp;
+- email quando cadastrado.
+
+### Filtros Iniciais
+
+- Origem
+- Status
+- Interesse principal
+- Vendedor/responsavel
+- Compra realizada: sim/nao
+- Visita realizada: sim/nao
+- Periodo de cadastro/atualizacao
+
+### Estados de Interface
+
+- Carregando
+- Lista vazia
+- Sem resultado para filtros
+- Erro ao carregar
+- Sem permissao
+
+## Tela/Formulario: Criar ou Editar Cliente
+
+### Campos Obrigatorios
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| Nome | texto | obrigatorio, minimo 2 caracteres |
+| Telefone/WhatsApp | texto | obrigatorio se email nao informado; aceitar mascara BR |
+| Email | texto | obrigatorio se telefone nao informado; validar formato quando preenchido |
+| Status | select | obrigatorio |
+| Origem | select | obrigatorio |
+
+### Campos Opcionais
+
+| Campo | Tipo | Observacao |
+|---|---|---|
+| CPF/CNPJ | texto | opcional nesta sprint; validar formato se preenchido |
+| Data de nascimento | data | opcional; usado futuramente para aniversarios |
+| Interesse principal | select/texto | comprar, vender, trocar, consignar, financiar, avaliar, outro |
+| Vendedor/responsavel | usuario | opcional no cadastro inicial |
+| Observacoes | texto longo | livre, com limite configuravel |
+| Compra realizada | booleano | default nao |
+| Visita realizada | booleano | default nao |
+
+### Status Inicial de Cliente
+
+- lead
+- interessado
+- visitante
+- cliente comprador
+- inativo
+
+### Origem Inicial
+
+- loja
+- site
+- WhatsApp
+- marketplace
+- indicacao
+- telefone
+- manual
+- outro
+
+## Regras de Negocio
+
+1. Cliente deve possuir identificador unico interno.
+2. Nome e pelo menos um meio de contato devem ser obrigatorios.
+3. Telefone e email nao precisam ser ambos obrigatorios, mas pelo menos um deles deve existir.
+4. O sistema deve evitar duplicidade obvia por telefone/WhatsApp ou email.
+5. Quando possivel duplicidade for detectada, o sistema deve avisar antes de salvar, sem bloquear obrigatoriamente nesta primeira versao.
+6. Cliente inativado nao deve ser excluido fisicamente.
+7. Inativar cliente nao remove historico, vinculos ou auditoria.
+8. Vendedor/responsavel pode ser alterado por usuario autorizado.
+9. Cliente final nao pode acessar essa base interna.
+10. Comprador de repasse nao deve ser cadastrado aqui como cliente comum apenas por receber oferta de repasse.
+
+## Permissoes
+
+| Papel | Criar | Listar | Ver detalhe | Editar | Inativar | Exportar |
+|---|---|---|---|---|---|---|
+| Administrador | sim | sim | sim | sim | sim | futuro |
+| Dono/Gestor | opcional | sim | sim | opcional | opcional | futuro |
+| Vendedor | sim | sim, conforme regra | sim, conforme regra | sim, conforme regra | nao | nao |
+| SDR | sim | sim, conforme regra | sim, conforme regra | sim, conforme regra | nao | nao |
+| Cliente final | nao | nao | nao | nao | nao | nao |
+
+## Modelo de Dados Sugerido
+
+### Tabela/Entidade `customers`
+
+| Campo | Tipo sugerido | Obrigatorio | Observacao |
+|---|---|---|---|
+| id | uuid | sim | identificador interno |
+| name | string | sim | nome do cliente |
+| phone | string | condicional | telefone/WhatsApp |
+| email | string | condicional | email |
+| document | string | nao | CPF/CNPJ opcional |
+| birth_date | date | nao | aniversario futuro |
+| origin | enum/string | sim | origem inicial |
+| status | enum/string | sim | lead/interessado/visitante/comprador/inativo |
+| main_interest | enum/string | nao | comprar/vender/trocar/etc. |
+| assigned_user_id | uuid | nao | vendedor/SDR responsavel |
+| purchase_done | boolean | sim | default false |
+| visit_done | boolean | sim | default false |
+| notes | text | nao | observacoes livres |
+| created_by | uuid | sim | usuario criador |
+| updated_by | uuid | nao | ultimo usuario editor |
+| created_at | datetime | sim | criacao |
+| updated_at | datetime | sim | ultima atualizacao |
+| inactive_at | datetime | nao | inativacao logica |
+| inactive_by | uuid | nao | responsavel por inativar |
+
+### Indices Sugeridos
+
+- `customers.phone`
+- `customers.email`
+- `customers.name`
+- `customers.status`
+- `customers.origin`
+- `customers.assigned_user_id`
+- `customers.created_at`
+
+## Acoes/Endpoints Sugeridos
+
+A nomenclatura final pode variar conforme arquitetura, mas a historia precisa suportar:
+
+| Acao | Descricao |
+|---|---|
+| `createCustomer` | criar cliente |
+| `listCustomers` | listar com filtros e busca |
+| `getCustomerById` | detalhe do cliente |
+| `updateCustomer` | editar cliente |
+| `deactivateCustomer` | inativar cliente |
+| `checkCustomerDuplicate` | verificar possivel duplicidade por telefone/email |
+
+## Auditoria
+
+Devem gerar log:
+
+- criacao de cliente;
+- edicao de dados principais;
+- alteracao de status;
+- alteracao de responsavel;
+- inativacao;
+- tentativa negada por falta de permissao, se a arquitetura ja suportar.
+
+### Campos Minimos do Log
+
+- usuario
+- data/hora
+- entidade: customer
+- id do cliente
+- acao
+- resumo da alteracao
+- origem da acao: web/app/admin
+
+## Criterios de Aceite Funcional
+
+1. Administrador consegue criar cliente com nome e telefone.
+2. Administrador consegue criar cliente com nome e email quando telefone nao for informado.
+3. Sistema bloqueia cadastro sem nome.
+4. Sistema bloqueia cadastro sem telefone e sem email.
+5. Sistema lista clientes cadastrados.
+6. Busca por nome retorna cliente esperado.
+7. Busca por telefone retorna cliente esperado.
+8. Filtro por status funciona.
+9. Filtro por origem funciona.
+10. Filtro por responsavel funciona quando houver responsavel.
+11. Usuario autorizado consegue editar cliente.
+12. Inativar cliente remove da lista padrao, mas nao apaga registro.
+13. Cliente inativado pode ser consultado por filtro/status quando permitido.
+14. Vendedor sem permissao nao consegue inativar cliente.
+15. Cliente final nao consegue acessar a base interna.
+16. Comprador de repasse nao aparece automaticamente nesta base comum apenas por estar cadastrado no modulo de repasse.
+17. Criacao, edicao e inativacao geram auditoria.
+
+## Criterios de Aceite Tecnico
+
+1. Tabela/entidade de clientes criada por migration ou mecanismo equivalente.
+2. Validacoes obrigatorias existem no frontend e no backend.
+3. Permissoes sao aplicadas no backend.
+4. Listagem suporta paginacao ou limite seguro de registros.
+5. Busca/filtros nao quebram com campos vazios.
+6. Dados sensiveis nao aparecem para papel sem permissao.
+7. Logs de auditoria sao gravados em transacoes principais.
+8. Estados de carregamento, vazio, erro e sem permissao existem na interface.
+9. Erros de validacao aparecem de forma clara para o usuario.
+10. O codigo diferencia `customers` de futuros cadastros de `repasse_buyers` e `suppliers`.
+
+## Testes Minimos
+
+### Testes de Unidade/Validador
+
+- Nome obrigatorio.
+- Telefone ou email obrigatorio.
+- Email invalido retorna erro.
+- Status invalido retorna erro.
+- Origem invalida retorna erro.
+
+### Testes de Permissao
+
+- Administrador cria/edita/inativa.
+- Vendedor cria/edita conforme regra, mas nao inativa.
+- Usuario sem permissao nao lista base.
+- Cliente final nao acessa endpoint/tela interna.
+
+### Testes de Integracao
+
+- Criar cliente e listar.
+- Criar cliente e buscar por nome.
+- Criar cliente e filtrar por status.
+- Editar cliente e verificar auditoria.
+- Inativar cliente e garantir que nao foi excluido fisicamente.
+
+## Dados Seed/Demo
+
+Criar pelo menos:
+
+- 1 cliente lead vindo do site.
+- 1 cliente interessado vindo da loja.
+- 1 cliente comprador.
+- 1 cliente visitante.
+- 1 cliente inativo.
+
+Nao criar comprador de repasse neste seed de clientes comuns.
+
+## Observacoes para UX
+
+A tela deve ser simples e operacional. Evitar transformar esta primeira entrega em CRM completo.
+
+A base de clientes deve preparar terreno para o futuro Sales Launchpad, mas nesta historia o foco e cadastro, busca, filtro e detalhe simples.
+
+## Pronto Para Desenvolvimento Quando
+
+- Esta historia estiver aprovada pelo gestor.
+- Campos obrigatorios estiverem confirmados.
+- Papeis/permissoes iniciais estiverem aceitos.
+- Decisao de separar compradores de repasse em pagina propria estiver mantida.
+- O desenvolvedor tiver acesso ao padrao de banco/migration/autenticacao do projeto.

@@ -1,0 +1,240 @@
+﻿# Diretrizes de Ouro para o Maestro do Processo BMAP
+
+## Objetivo
+Definir a postura de governanca do Maestro BMAP durante planejamento, arquitetura, implementacao, QA e code review.
+
+O Maestro nao atua como digitador de codigo. Ele conduz o processo, controla o ritmo, protege a coerencia do produto e impede que a IA avance em modo freestyle sem lastro nos documentos vivos.
+
+## 1. Manter as Redeas da IA
+A IA nao deve trabalhar em modo livre sem curadoria.
+
+Antes de autorizar qualquer novo passo, o Maestro deve garantir que o agente leu:
+
+- arquivo Kickoff/Handoff do projeto;
+- PRD vigente;
+- epicos;
+- sprint atual;
+- story alvo;
+- mapas transversais relevantes;
+- protocolo de Dev Story;
+- diretrizes de seguranca;
+- mapa de automacoes quando houver IA/jobs/integracoes.
+
+Regra:
+
+- Nenhuma implementacao deve comecar apenas com conversa de chat.
+- A fonte de verdade e a documentacao viva no repositorio.
+- Se a IA sugerir algo sem lastro em PRD, story, decisao registrada ou aprovacao do gestor, tratar como proposta, nao como requisito.
+
+## 2. Vibe Code vs BMAP
+Vibe Code e quando a IA sai gerando codigo, telas ou arquitetura sem passar pelas fases de validacao.
+
+BMAP exige:
+
+1. Descoberta e documentacao.
+2. Historias claras.
+3. CritÃ©rios de aceite.
+4. Arquitetura e dados.
+5. Permissoes e seguranca.
+6. Implementacao orientada por story.
+7. Testes automatizados.
+8. QA manual/browser.
+9. Code review.
+10. Status Revisada.
+
+O Maestro deve interromper qualquer agente que:
+
+- ignore documentacao;
+- invente regra de negocio;
+- crie tecnologia desnecessaria;
+- pule testes;
+- altere escopo sem registrar;
+- resolva problema de ambiente mexendo em regra produtiva;
+- implemente fluxo sensivel sem permissao/auditoria.
+
+## 3. Economia de Tokens e Pragmatismo
+O sistema nao deve depender de IA cara em toda interacao diaria do usuario.
+
+Regra de produto e arquitetura:
+
+- Preferir dados estruturados no banco.
+- Preferir calculos deterministicos quando possivel.
+- Preferir metadados pre-calculados para leitura rapida.
+- Rodar IA apenas quando houver ganho claro.
+- Rodar analises em delta: recalcular apenas o que mudou.
+- Evitar reanalisar cliente, venda, documento ou lead a cada clique.
+- Salvar resultado, origem, data/hora, versao da regra/modelo e status de revisao quando aplicavel.
+
+Exemplos:
+
+- Ranking de lead deve usar score armazenado/atualizado por evento, nao prompt novo a cada abertura da tela.
+- Next Best Action pode ser calculado por pesos configuraveis e receber apoio de IA apenas em casos especificos.
+- OCR deve salvar extracao e status, nao reler o mesmo arquivo sem motivo.
+- IA de resumo deve atualizar por nova interacao relevante, nao por toda visualizacao.
+
+## 4. Gerenciamento de Janela de Contexto
+O volume de PRD, arquitetura, epicos, sprints e stories e grande. A janela do chat pode saturar.
+
+Sinais de saturacao:
+
+- respostas imprecisas;
+- confusao entre sprints;
+- perda de decisoes recentes;
+- repeticao de perguntas ja respondidas;
+- sugestoes fora do padrao aprovado;
+- mistura entre produto, UX e implementacao.
+
+Quando isso acontecer:
+
+1. Abrir nova sessao de chat limpa.
+2. Pedir para a IA ler o indice atualizado do projeto.
+3. Indicar sprint/story atual.
+4. Indicar mapas transversais relevantes.
+5. Indicar protocolo de Dev Story.
+6. Continuar a partir dos arquivos Markdown, nao da memoria do chat antigo.
+
+Principio:
+
+- Os arquivos Markdown sao a memoria compactada de alta qualidade do projeto.
+- O chat e temporario; os artefatos vivos sao permanentes.
+
+## 5. Aproveitamento Multitask
+O processo BMAP permite paralelismo com controle.
+
+Enquanto uma IA executa uma Dev Story em um terminal, o Maestro pode:
+
+- revisar outra story;
+- validar UX;
+- preparar dados de teste;
+- revisar logs ou criterios de aceite;
+- analisar riscos;
+- preparar proxima pergunta de refinamento;
+- acompanhar ambiente Docker/QA em outra frente.
+
+Regras de paralelismo:
+
+- Nao executar duas mudancas conflitantes nos mesmos arquivos sem controle.
+- Nao misturar implementacoes de stories diferentes sem branch/contexto claro.
+- Sempre registrar qual story esta em execucao, em QA, em review ou revisada.
+- Evitar que agentes paralelos criem decisoes divergentes.
+
+## 6. Ordem de Comando para Novos Agentes
+Todo novo agente/sessao deve receber orientacao inicial:
+
+1. Leia o Kickoff/Handoff.
+2. Leia a sprint atual.
+3. Leia a story alvo.
+4. Leia os mapas transversais relevantes.
+5. Leia o protocolo de Dev Story e QA.
+6. Leia o codigo real antes de implementar.
+7. Nao avance para codigo sem confirmar entendimento.
+
+## 7. Frontend Surface e Filtro de Qualidade
+O Maestro deve impedir que historias de produto sejam entregues apenas como backend abstrato.
+
+Regra:
+
+- Se a historia envolve acao, decisao, acompanhamento, revisao, alerta, cadastro, aprovacao ou consulta por usuario, deve existir uma superficie visual correspondente.
+- A IA nao pode encerrar a tarefa apenas com endpoints, controllers ou services quando o fluxo exige uso humano.
+- Se a historia for backend-only, essa natureza deve estar declarada antes do desenvolvimento.
+- A interface deve respeitar RBAC: quem nao tem acesso nao deve ver nem a possibilidade visual de acessar.
+
+O Maestro deve perguntar em toda historia operacional:
+
+- Onde o usuario ve isso?
+- Onde ele clica?
+- Como ele sabe que deu certo?
+- Como ele sabe que falhou?
+- Quem nao pode ver ficou realmente sem acesso visual?
+- Funciona em mobile quando o uso acontece no patio/campo?
+## 8. Versionamento Seguro e Postura de Negocios
+O Maestro deve proteger o ecossistema do projeto tambem no nivel de repositorio.
+
+Forks Clean:
+
+- Bases open source, templates e brownfield devem ter os remotos revisados antes de desenvolvimento real.
+- A origem herdada deve ser removida quando nao pertencer ao projeto.
+- O `origin` deve apontar para o repositorio privado definitivo.
+- O Maestro deve evitar que agentes de IA leiam branches externas como se fossem parte do produto.
+- O Maestro deve impedir push acidental para repositorio publico, template original ou fornecedor externo.
+
+Checklist:
+
+- `git remote -v` conferido;
+- `git remote remove origin` usado apenas quando a origem for externa/herdada;
+- novo `origin` privado configurado;
+- protecao de branch principal avaliada;
+- segredos e `.env` fora do Git;
+- documentacao viva mantida no repositorio correto.
+
+Postura de negocios:
+
+- Codigo, PRD, arquitetura, prompts, regras comerciais, automacoes e dados do CRM fazem parte do ativo estrategico do projeto.
+- A praticidade de usar um fork nao pode expor propriedade intelectual ou regras internas da loja.
+## 9. Commits Baseados em Seguranca
+O Maestro deve tratar commit/push como protecao operacional, nao como burocracia.
+
+Regra:
+
+- Toda micro-historia validada deve ser commitada antes da proxima mudanca.
+- Push para repositorio privado deve acontecer assim que o checkpoint estiver aprovado e o remoto estiver correto.
+- A IA nao deve ser usada como mecanismo principal de rollback.
+- O Maestro deve bloquear comandos destrutivos ou sincronizacao forçada sem aprovacao explicita.
+- Mudancas grandes devem ser quebradas em commits menores e rastreaveis.
+
+Risco evitado:
+
+- Amnesia estatistica da IA ao tentar reverter codigo complexo.
+- Perda de refatoracoes locais por `reset`, pull/rebase mal feito, sync forçado ou sobrescrita de arquivos.
+- Dificuldade de revisar regressao quando varias historias ficam misturadas em um unico bloco.
+
+Perguntas do Maestro antes de seguir:
+
+- A micro-historia foi validada?
+- Existe commit local?
+- O push foi feito para o remoto privado correto?
+- O `git status` esta limpo ou as pendencias estao conscientemente registradas?
+- Existe risco de sobrescrever trabalho local de outra frente?
+## 10. Checkpoint Antes de Codar
+Antes de permitir codigo, confirmar:
+
+- story esta ready-for-dev;
+- remotos Git foram revisados quando a base vier de fork/template/brownfield;
+- criterios de aceite existem;
+- dados e entidades estao claros;
+- permissoes/RBAC estao claros;
+- logs/auditoria estao definidos;
+- automacoes/jobs estao definidos quando aplicavel;
+- ambiente Docker/.env esta previsto;
+- testes backend esperados estao claros;
+- QA manual/browser esta previsto quando houver interface.
+- Frontend Surface esta definida ou a historia foi declarada backend-only.
+
+## 11. Checkpoint Antes de Aprovar
+Antes de mover historia para Revisada:
+
+- codigo implementado;
+- testes automatizados relevantes aprovados;
+- ambiente validado;
+- QA manual/browser executado quando aplicavel;
+- Frontend Surface entregue e revisada quando houver uso operacional;
+- mobile/responsivo validado quando operacional;
+- code review concluido;
+- riscos/follow-ups registrados;
+- documentacao atualizada se houve mudanca.
+- commit/push realizado para a micro-historia validada, ou motivo registrado quando nao for possivel.
+
+## 12. Decisao Transversal
+O Maestro BMAP e responsavel por manter ritmo, coerencia e lastro documental.
+
+A IA pode acelerar escrita, implementacao, testes e revisao, mas o Maestro preserva:
+
+- escopo;
+- sequencia metodologica;
+- economia de custo;
+- seguranca;
+- qualidade;
+- continuidade entre sessoes;
+- rastreabilidade das decisoes.
+
+

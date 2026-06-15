@@ -1,0 +1,128 @@
+﻿# Sprint 04: Pos-venda, Relacionamento, Aniversarios e Recompra
+
+## Status
+Em definicao.
+
+## Objetivo da Sprint
+Construir a base de relacionamento apos a venda: lembretes de contato com clientes, registro de feedback, aniversarios, mensagens de parabens, acompanhamento administrativo e metricas de recompra/retencao.
+
+A Sprint 4 transforma o historico de clientes em uma rotina ativa de relacionamento. O sistema deve lembrar a equipe de contatos importantes, registrar o que aconteceu e alimentar metricas para a loja entender retorno, recompra e qualidade do pos-venda.
+
+## Ponto de Entrada
+A Sprint 4 usa dados consolidados das sprints anteriores:
+
+- Cliente cadastrado e vinculado a compras/vendas.
+- Venda concluida ou em status final relevante.
+- Data da compra registrada no modulo de vendas.
+- Vendedor responsavel registrado.
+- Historico da venda e do veiculo disponivel no dossie/base de dados.
+
+## Ponto de Saida
+A Sprint 4 termina quando:
+
+- Sistema gera notificacao de contato pos-venda apos 2 anos da compra.
+- Vendedor/administrativo registra feedback do contato.
+- Administrativo/Gestor acompanha notificacoes pendentes e preenchidas.
+- Aniversariantes do mes ficam visiveis em dashboard.
+- Mensagens de parabens por WhatsApp ficam registradas como automaticas ou assistidas, conforme integracao.
+- Dashboard mostra clientes cadastrados, clientes compradores e clientes que retornaram a comprar.
+- Historico de relacionamento fica gravado para metricas e insights futuros.
+
+## Stories Macro Propostas
+
+### S4-US01: Alerta Pos-venda de 2 Anos
+Gerar notificacao para contato com cliente 2 anos apos a compra do veiculo.
+
+Arquivo detalhado: `stories/S4-US01-alerta-pos-venda-2-anos.md`.
+
+Escopo inicial:
+- Usar data da compra registrada no modulo de vendas.
+- Gerar alerta quando completar 2 anos da compra.
+- Objetivo do alerta: lembrar vendedor/loja de ligar para saber como esta o carro, se precisa de outro veiculo ou se esta buscando troca.
+- Vendedor original recebe o alerta quando ainda estiver ativo e tiver permissao.
+- Administrativo/Gestor acompanha todos os alertas sempre e pode escolher outro vendedor quando o vendedor original nao estiver mais ativo.
+- Registrar status: pendente, em contato, concluido, reagendado, sem contato, reatribuido. Feedback deve ser preenchido em ate 7 dias; atraso gera notificacao com nome do vendedor e nome do cliente.
+
+### S4-US02: Registro de Feedback da Ligacao Pos-venda
+Permitir registrar o resultado do contato pos-venda, manter historico do cliente e criar oportunidade ou pendencia interna quando aplicavel.
+
+Arquivo detalhado: `stories/S4-US02-feedback-ligacao-pos-venda.md`.
+
+Escopo inicial:
+- Vendedor ou responsavel registra feedback do cliente.
+- Campos: data do contato, canal, resultado, interesse em troca, observacao e proxima acao.
+- Administrativo acompanha quais notificacoes foram preenchidas.
+- Feedback alimenta historico do cliente e metricas; canal e feedback ficam no historico do cliente para consultas futuras.
+
+### S4-US03: Aniversariantes e Parabens por WhatsApp
+Exibir aniversariantes, extrair data de nascimento de documentos quando disponivel e registrar envio/resposta de parabens por WhatsApp/e-mail ou fluxo assistido.
+
+Arquivo detalhado: `stories/S4-US03-aniversariantes-parabens-whatsapp.md`.
+
+Escopo inicial:
+- Dashboard de aniversariantes do dia, do mes e dos proximos 7 dias.
+- Data de aniversario nao e obrigatoria nem solicitada no cadastro; quando disponivel, deve ser extraida de documento do comprador por OCR/agente advanced com validacao humana quando necessario.
+- Mensagem de parabens pode ser automatica ou assistida, conforme integracao aprovada.
+- Registrar mensagem enviada, data/hora, canal, status, resposta do cliente quando houver, opt-out e origem da data de aniversario.
+- Administrativo/Gestor pode visualizar mensagens enviadas e respostas.
+
+### S4-US04: Dashboard de Relacionamento com Clientes
+Criar metricas administrativas sobre base de clientes, aniversarios, pos-venda, feedbacks, oportunidades e recompra.
+
+Arquivo detalhado: `stories/S4-US04-dashboard-relacionamento-clientes.md`.
+
+Escopo inicial:
+- Total de clientes cadastrados.
+- Clientes que compraram.
+- Clientes que retornaram a comprar.
+- Aniversariantes do mes.
+- Alertas pos-venda pendentes/concluidos.
+- Feedbacks preenchidos e pendentes.
+
+### S4-US05: Clientes que Retornaram a Comprar
+Identificar clientes que compraram novamente, classificar recorrencia em intervalo de ate 2 anos e gerar ranking historico de clientes que mais compraram.
+
+Arquivo detalhado: `stories/S4-US05-clientes-retornaram-comprar.md`.
+
+Escopo inicial:
+- Relacionar cliente com multiplas compras pelo mesmo CPF/CNPJ, sem permitir duplicidade de cadastro sem revisao.
+- Exibir quantidade de compras por cliente e ranking dos clientes que mais compraram desde a abertura da loja.
+- Data da ultima compra e vendedor responsavel.
+- Indicar se recompra veio de contato pos-venda, aniversario, campanha, indicacao, demanda espontanea ou acao do vendedor quando informado.
+- Classificar como cliente recorrente quando a nova compra ocorrer em ate 2 anos da compra anterior; fora desse intervalo, manter no historico/ranking, mas nao marcar como recorrente de 2 anos.
+- Permitir anotar em top clientes ultima interacao, ultimos feedbacks e proxima acao.
+
+### S4-US06: Historico de Relacionamento do Cliente
+Centralizar em linha do tempo unica as interacoes de pos-venda, aniversarios, recompra, feedbacks, vendas, pendencias e proximas acoes.
+
+Arquivo detalhado: `stories/S4-US06-historico-relacionamento-cliente.md`.
+
+Escopo inicial:
+- Linha do tempo unica do cliente, baseada em eventos estruturados.
+- Contatos realizados e tentativas.
+- Mensagens de aniversario.
+- Feedbacks pos-venda.
+- Recompras e oportunidades futuras.
+- Dados estruturados para metricas e IA futura, com tipo, origem, canal, responsavel, data/hora e vinculos com venda/card/mensagem/pendencia.
+
+## Decisoes Ja Confirmadas do Produto
+- No modulo de vendas/cadastro de cliente, deve ficar registrada a data da compra.
+- Apos 2 anos, sistema deve gerar notificacao no dashboard para lembrar contato com cliente.
+- Vendedor deve anotar qual foi o feedback.
+- Administrativo podera acompanhar se as notificacoes foram preenchidas.
+- Modulo administrativo deve mostrar metricas de clientes cadastrados e clientes que compraram e retornaram a comprar.
+- Dashboard deve mostrar quantidade de aniversariantes do mes.
+- Administrador pode observar como a automacao enviou parabens por WhatsApp e ver resposta dos clientes.
+- Armazenar dados de forma estruturada para consumo futuro por IA e extracao de insights.
+
+## Fora de Escopo Inicial da Sprint 4
+- Motor de IA/Next Best Action real.
+- Campanhas complexas de marketing.
+- Automacao real de WhatsApp sem provedor aprovado.
+- CRM externo completo.
+- Segmentacao avancada por comportamento.
+- Programa de fidelidade com regras financeiras.
+
+## Proximo Passo
+Gerar sprint-04-ready-for-dev.md consolidando as 6 stories, dependencias, permissoes, criterios gerais de aceite, LGPD/opt-out e checklist tecnico para desenvolvimento.
+

@@ -1,0 +1,47 @@
+﻿# S8-US03: Kanban de Servicos e Oficina
+
+## Epic
+Servicos, Oficina, Prestadores e Notas Fiscais
+
+## Objetivo
+Criar uma pagina/kanban operacional para acompanhar veiculos em oficina, servicos em andamento, data de entrada, prestador, previsao de entrega e atrasos.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** visualizar carros na oficina e seus servicos em andamento,
+**para** controlar preparacao, prazos e pendencias de cada veiculo.
+
+## Colunas Sugeridas
+- Aguardando envio.
+- Na oficina/prestador.
+- Aguardando peca.
+- Em execucao.
+- Aguardando retorno/orcamento.
+- Concluido.
+- Atrasado.
+- Cancelado.
+
+## Dados no Card
+- Veiculo.
+- Placa/codigo interno quando permitido.
+- Data de entrada.
+- Oficina/prestador.
+- O que esta sendo feito.
+- Status.
+- Previsao de entrega.
+- Responsavel interno.
+- Alertas de atraso.
+
+## Criterios de Aceite
+- Dado que uma OS e enviada ao prestador, quando abrir kanban, entao o veiculo/OS deve aparecer na etapa correta.
+- Dado que o prazo venceu, quando abrir kanban, entao deve aparecer alerta de atraso.
+- Dado que OS e concluida, quando finalizar, entao card deve sair da visao ativa ou ir para concluido.
+- Dado que usuario abre card, entao deve ver historico, prestador, evidencias e custos conforme permissao.
+
+## Fora de Escopo
+- Agenda externa completa do prestador.
+- Roteirizacao/logistica.
+
+## Observacoes Tecnicas
+- Pode reutilizar padrao de kanban das sprints anteriores.
+- Deve alimentar metricas de tempo em oficina.

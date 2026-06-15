@@ -1,0 +1,94 @@
+﻿# S6-US01: Cadastro Operacional de Anuncio do Veiculo
+
+## Epic
+Anuncios, Marketplaces e Campanhas
+
+## Objetivo
+Criar o cadastro operacional de anuncio vinculado a um veiculo, reunindo fotos, videos, descricao, preco, opcionais relevantes, status e dados necessarios para publicacao no site da loja e replicacao para canais selecionados.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** criar e manter um anuncio a partir do cadastro do veiculo,
+**para** publicar o veiculo no site da loja e preparar a replicacao para marketplaces e redes sociais.
+
+## Contexto Operacional
+O anuncio nasce a partir de um veiculo cadastrado. O modulo de anuncio deve reaproveitar dados do veiculo, mas permitir ajustes comerciais especificos de anuncio, como descricao, fotos, videos, preco anunciado, destaque de opcionais e observacoes internas.
+
+O calculo de margem e precificacao ja foi definido na Sprint 5. Nesta story, o foco e o cadastro operacional do anuncio, sem expor margem ao vendedor.
+
+## Campos Minimos
+- `ad_id`.
+- `vehicle_id`.
+- Codigo interno do veiculo.
+- Titulo do anuncio.
+- Marca, modelo, versao, ano/modelo, cor, cambio, combustivel, quilometragem.
+- Placa/chassi somente para uso interno conforme permissao.
+- Preco anunciado.
+- Tipo de negocio: proprio ou consignado.
+- Opcionais relevantes em campo editavel/input.
+- Descricao publica.
+- Observacoes internas.
+- Fotos do veiculo.
+- Videos do veiculo.
+- Thumbnail principal.
+- Status do anuncio.
+- Status do veiculo no estoque.
+- Data de criacao.
+- Criado por.
+- Ultima alteracao.
+- Alterado por.
+
+## Status do Anuncio
+Status iniciais:
+
+- Rascunho.
+- Pronto para publicar.
+- Publicado no site.
+- Replicacao pendente.
+- Ativo em canais externos.
+- Pausado.
+- Vendido.
+- Removido.
+- Erro de publicacao.
+
+## Midias
+O anuncio deve permitir anexar:
+
+- Fotos do veiculo.
+- Videos do veiculo.
+- Thumbnail principal.
+- Arquivos ou links de midia, conforme arquitetura definida.
+
+Regras iniciais:
+
+- Deve existir uma foto principal obrigatoria para publicacao.
+- Videos sao permitidos, mas podem ser opcionais.
+- Thumbnail pode ser manual ou automatizada em story especifica de redes sociais.
+- A ordem das fotos deve ser controlavel.
+
+## Permissoes
+- Administrativo/Gestor cria, edita, publica e remove anuncios.
+- Vendedor pode visualizar anuncios conforme permissao definida.
+- Vendedor nao visualiza margem, custos, simulador de preco ou imposto.
+- Cliente externo visualiza apenas anuncios publicados no site da loja.
+- Permissoes financeiras devem ser aplicadas no backend.
+
+## Criterios de Aceite
+- Dado que existe um veiculo cadastrado, quando o Administrativo/Gestor criar anuncio, entao o sistema deve vincular o anuncio ao veiculo.
+- Dado que o anuncio e criado, quando abrir a tela, entao dados principais do veiculo devem ser carregados automaticamente.
+- Dado que o usuario inserir fotos, quando salvar o anuncio, entao as fotos devem permanecer vinculadas e ordenadas.
+- Dado que o usuario anexar video, quando salvar, entao o video deve ficar disponivel no cadastro do anuncio.
+- Dado que o vendedor acessa o anuncio, quando nao tiver permissao financeira, entao nao deve visualizar margem, custo ou simulador.
+- Dado que o anuncio esta sem foto principal, quando tentar publicar, entao o sistema deve bloquear a publicacao e informar pendencia.
+
+## Fora de Escopo
+- Publicacao no site.
+- Replicacao para marketplaces.
+- Captura automatica de metricas.
+- Geracao automatica de descricao por IA.
+
+## Observacoes Tecnicas
+- Usar `vehicle_id` como vinculo obrigatorio.
+- Manter historico de alteracoes relevantes.
+- Separar campos publicos de campos internos.
+- Reaproveitar dados do cadastro de veiculo e do modulo financeiro sem duplicar regras de margem.

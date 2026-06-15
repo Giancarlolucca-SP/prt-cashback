@@ -1,0 +1,50 @@
+﻿# S7-US02: Consultas Automaticas na Avaliacao
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Apoiar a avaliacao com consultas externas de FIPE, anuncios comparaveis e dados de mercado por API oficial/fornecedor autorizado ou RPA em VM quando nao houver integracao viavel.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** que o sistema realize consultas de apoio na avaliacao,
+**para** comparar preco, mercado e referencias antes de fazer proposta de compra.
+
+## Fontes Iniciais
+- FIPE por fonte oficial, autorizacao ou fornecedor licenciado.
+- Marketplaces/sites informados pela loja.
+- Historico interno de compras/vendas quando existir.
+
+## Regras de Automacao
+- Priorizar API oficial ou fornecedor licenciado/autorizado.
+- Usar RPA em VM/computador remoto quando nao houver integracao viavel e houver validacao juridica/compliance.
+- Nao contornar captcha, validacao humana, bloqueios ou termos de uso.
+- Quando houver captcha/validacao humana, pausar e solicitar usuario autorizado.
+- Registrar logs, evidencias e responsavel/automacao.
+
+## Dados Minimos
+- `evaluation_id`.
+- Fonte consultada.
+- Tipo de consulta.
+- Parametros usados.
+- Resultado estruturado.
+- URL/evidencia.
+- Data/hora.
+- Usuario/automacao responsavel.
+- Status: pendente, concluida, erro, requer validacao humana.
+
+## Criterios de Aceite
+- Dado que uma avaliacao existe, quando solicitar consulta FIPE, entao o sistema deve registrar fonte, resultado e data/hora.
+- Dado que houver consulta por RPA, quando concluir, entao logs e evidencias devem ficar vinculados a avaliacao.
+- Dado que houver captcha, quando detectado, entao o fluxo deve pausar para usuario autorizado.
+- Dado que a consulta falhar, quando consultar avaliacao, entao erro e origem devem aparecer.
+
+## Fora de Escopo
+- Automacao anti-captcha.
+- Uso de fonte nao autorizada.
+- Precificacao automatica final sem validacao humana.
+
+## Observacoes Tecnicas
+- Executar consultas assincronamente.
+- Guardar snapshot dos resultados usados na avaliacao.

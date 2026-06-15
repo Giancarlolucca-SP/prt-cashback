@@ -1,0 +1,53 @@
+﻿# S7-US06: Fornecedores de Compra de Veiculos
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Cadastrar fornecedores de veiculos para compra, como locadoras, leiloes, frotistas, portais e outros, incluindo links de acesso e credenciais protegidas.
+
+## Historia de Usuario
+**Como** Administrador,
+**quero** cadastrar fornecedores de compra de veiculos,
+**para** organizar fontes de aquisicao e acessar seus portais com seguranca.
+
+## Tipos de Fornecedor
+- Frota de locadoras.
+- Sites de leilao.
+- Frotistas.
+- Portais de venda de veiculos.
+- Parceiros comerciais.
+- Outros.
+
+## Campos Minimos
+- `supplier_id`.
+- Nome.
+- Tipo/categoria.
+- Contato.
+- Telefone/WhatsApp.
+- Email.
+- Site/portal.
+- Link direto.
+- Observacoes.
+- Status.
+- Credenciais/acessos protegidos quando necessario.
+
+## Credenciais
+- Campos de acesso/senha devem ser protegidos por permissao.
+- Preferir cofre/criptografia.
+- Registrar quem visualizou/alterou credenciais.
+- Nao exibir senha em texto aberto para perfis sem permissao.
+
+## Criterios de Aceite
+- Dado que Administrador cadastra fornecedor, quando salvar, entao fornecedor deve ficar disponivel para propostas/compras.
+- Dado que fornecedor possui portal, quando acessar cadastro, entao deve haver link direto.
+- Dado que houver credenciais, quando usuario sem permissao acessar, entao senha nao deve ser exibida.
+
+## Fora de Escopo
+- Cofre corporativo definitivo sem arquitetura definida.
+- Login automatico em todos portais.
+- Compra automatica em leilao.
+
+## Observacoes Tecnicas
+- Modelar categorias configuraveis.
+- Auditar acesso a credenciais.

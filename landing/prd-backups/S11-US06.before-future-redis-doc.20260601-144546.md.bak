@@ -1,0 +1,263 @@
+# S11-US06: Jobs, Filas, Automacoes e Webhooks
+
+## Epic
+Arquitetura Tecnica, Banco de Dados e Base do MVP
+
+## Objetivo
+Definir o motor tecnico para executar tarefas demoradas, automacoes, mensagens, OCR, IA, consultas externas, sincronizacoes, webhooks e reprocessamentos sem travar a experiencia do usuario e mantendo auditoria operacional.
+
+## Historia de Usuario
+**Como** equipe de desenvolvimento,
+**quero** uma arquitetura clara para jobs, filas, automacoes e webhooks,
+**para** que o sistema processe tarefas em segundo plano com seguranca, rastreabilidade, reprocessamento e possibilidade de evolucao futura.
+
+## Principios
+- Tarefas demoradas nao devem bloquear a resposta principal da API.
+- Jobs devem ter status acompanhavel pelo sistema.
+- Toda automacao relevante deve ter origem, contexto, responsavel tecnico e logs.
+- Automacoes nao devem tomar decisoes sensiveis sem aprovacao humana quando a regra exigir.
+- Falhas devem ser registradas e, quando seguro, permitir reprocessamento.
+- Integracoes externas devem passar por adaptadores internos.
+- Permissoes, RBAC, escopo e regras de privacidade continuam valendo para jobs e automacoes.
+
+## Motor de Jobs do MVP
+O MVP deve iniciar com pg-boss/PostgreSQL ou solucao equivalente baseada no PostgreSQL.
+
+Motivo:
+
+- Reduz infraestrutura inicial.
+- Evita Redis no MVP.
+- Mantem fila, status e tentativas proximos ao banco principal.
+- Atende volume inicial esperado de uma loja/operacao em validacao.
+- Permite evoluir depois para Redis/BullMQ se houver alto volume ou necessidade de filas mais complexas.
+
+## Tipos de Jobs
+Jobs previstos no MVP:
+
+- Envio de WhatsApp via Evolution API.
+- Envio de e-mail operacional.
+- OCR/leitura assistida de documentos.
+- IA para apoio, sugestoes, classificacoes e resumos.
+- Consultas externas autorizadas em orgaos, fontes publicas/contratadas e tribunais quando configurado.
+- Sincronizacao de anuncios com site da loja e marketplaces.
+- Atualizacao/remocao de anuncios apos venda.
+- Coleta/leitura de metricas de campanhas e anuncios quando houver integracao ou automacao permitida.
+- Webhooks recebidos de provedores externos.
+- Webhooks enviados para integracoes futuras.
+- Reprocessamento de falhas.
+- Relatorios pesados quando aplicavel.
+- Alertas internos e notificacoes.
+
+## Status Padrao de Job
+Todo job deve ter ciclo de vida claro.
+
+Status sugeridos:
+
+- `queued`: criado e aguardando processamento.
+- `processing`: em execucao.
+- `completed`: concluido com sucesso.
+- `failed`: falhou apos tentativa.
+- `retrying`: aguardando nova tentativa.
+- `cancelled`: cancelado por regra ou usuario autorizado.
+- `blocked`: bloqueado por permissao, configuracao ausente ou regra de negocio.
+
+## Metadados de Job
+Tabela conceitual: `background_jobs` ou uso das tabelas da ferramenta escolhida com tabela auxiliar de negocio quando necessario.
+
+Campos conceituais:
+
+- `id` UUID.
+- `store_id`.
+- `job_type`.
+- `status`.
+- `priority`.
+- `payload` controlado.
+- `entity_type`.
+- `entity_id`.
+- `requested_by_user_id` quando houver usuario.
+- `triggered_by` usuario, sistema, webhook, agenda ou automacao.
+- `scheduled_for` quando aplicavel.
+- `attempts`.
+- `max_attempts`.
+- `last_error_code`.
+- `last_error_message`.
+- `started_at`.
+- `finished_at`.
+- `created_at`.
+- `updated_at`.
+
+## Prioridades
+Prioridades sugeridas:
+
+- Alta: mensagens operacionais criticas, remocao de anuncio vendido, consulta necessaria antes de proposta, falha que bloqueia venda/compra.
+- Media: OCR, IA de apoio, sincronizacao de anuncios, e-mails operacionais.
+- Baixa: metricas, relatorios pesados, reprocessamentos nao urgentes, rotinas de limpeza.
+
+## Automacoes
+Automacoes devem nascer de regras configuradas no sistema.
+
+Exemplos:
+
+- Lead sem interacao por tempo definido.
+- Cliente fazendo aniversario.
+- Cliente com recompra prevista.
+- Veiculo sem atualizacao de preparacao.
+- Anuncio publicado, alterado ou removido.
+- Venda finalizada.
+- Documento anexado.
+- Proposta aguardando aprovacao.
+- OS atrasada.
+- Consulta externa concluida.
+
+Cada automacao deve registrar:
+
+- Regra que disparou.
+- Entidade afetada.
+- Usuario responsavel quando houver.
+- Acao criada.
+- Resultado.
+- Erro quando houver.
+
+## Webhooks Recebidos
+Webhooks recebidos devem:
+
+- Validar origem e assinatura/token quando o provedor permitir.
+- Registrar payload bruto controlado quando seguro.
+- Normalizar dados para evento interno.
+- Ser idempotentes para evitar duplicidade.
+- Criar job quando exigirem processamento demorado.
+- Registrar falha sem quebrar o sistema principal.
+
+Exemplos:
+
+- Retorno de WhatsApp/Evolution API.
+- Retorno de e-mail.
+- Retorno de marketplace.
+- Retorno de consulta externa.
+- Retorno de provedor de OCR/IA quando assicrono.
+
+## Webhooks Enviados
+Webhooks enviados ficam previstos para evolucao e integracoes futuras.
+
+Quando existirem:
+
+- Devem respeitar permissao e configuracao da loja.
+- Devem ter segredo/token.
+- Devem registrar tentativas e respostas.
+- Devem permitir reprocessamento.
+- Nao devem expor dados sensiveis sem configuracao explicita.
+
+## Consultas Externas Automatizadas
+Consultas externas por IA/automacao devem seguir regras:
+
+- Usar apenas fontes permitidas, contratadas ou tecnicamente autorizadas.
+- Nao burlar captcha, termos de uso, bloqueios ou controles de acesso.
+- Registrar fonte, data, termo consultado, resultado e usuario/processo que solicitou.
+- Permitir revisao humana quando o resultado impactar decisao sensivel.
+- Bloquear proposta/etapa quando a consulta obrigatoria ainda nao foi concluida.
+
+## IA em Jobs
+Jobs de IA podem:
+
+- Classificar mensagem.
+- Sugerir resposta.
+- Resumir historico.
+- Ler documento ou extrair campos.
+- Apoiar consulta externa.
+- Sugerir proxima acao.
+- Criar alerta interno.
+
+Regras:
+
+- IA nao aprova venda, compra, pagamento, margem, comissao, documento critico ou exclusao sozinha.
+- Sugestoes relevantes devem deixar rastro do prompt/contexto minimo, resultado e aceite/rejeicao humana quando aplicavel.
+- Dados enviados para IA devem respeitar permissao, minimizacao e necessidade operacional.
+
+## Reprocessamento
+Jobs com falha devem permitir reprocessamento quando seguro.
+
+Regras:
+
+- Definir maximo de tentativas por tipo de job.
+- Usar backoff quando aplicavel.
+- Evitar duplicar mensagens, pagamentos, contratos, anuncios ou acoes sensiveis.
+- Reprocessamento manual deve exigir permissao.
+- Reprocessamento deve gerar log tecnico e, quando sensivel, audit log.
+
+## Idempotencia
+Jobs que podem ser chamados mais de uma vez devem usar chave de idempotencia.
+
+Exemplos:
+
+- Publicar anuncio em marketplace.
+- Remover anuncio vendido.
+- Enviar mensagem automatica.
+- Processar webhook.
+- Gerar documento.
+- Sincronizar status externo.
+
+## Observabilidade dos Jobs
+O sistema deve permitir acompanhar:
+
+- Jobs por status.
+- Jobs por tipo.
+- Jobs com falha.
+- Tempo medio de processamento.
+- Ultimo erro.
+- Tentativas.
+- Provedor externo envolvido.
+- Entidade/processo vinculado.
+
+Visibilidade deve seguir permissao:
+
+- Dono/Gestor ve painel geral.
+- Administrativo pode ver jobs operacionais e financeiros autorizados.
+- Vendedor/SDR nao ve logs tecnicos globais; no maximo ve status operacional de um processo proprio quando permitido.
+
+## Auditoria
+Devem gerar audit log quando aplicavel:
+
+- Automacao criada, alterada, ativada ou inativada.
+- Job sensivel disparado manualmente.
+- Reprocessamento manual.
+- Consulta externa sensivel.
+- Mensagem automatica enviada para cliente.
+- Falha critica que impacta venda, compra, pagamento, contrato ou anuncio.
+- Alteracao de regra de automacao.
+
+## Evolucao Futura
+Possibilidades documentadas:
+
+- Migrar de pg-boss/PostgreSQL para Redis/BullMQ quando houver alto volume, necessidade de filas mais especializadas ou workers separados.
+- Separar workers em processos/servicos independentes quando automacoes crescerem.
+- Adicionar dashboard tecnico avancado de filas.
+- Adicionar dead-letter queue formal.
+- Adicionar mensageria externa para eventos entre servicos, se algum modulo for extraido.
+- Adicionar rate limit por provedor, loja e tipo de tarefa.
+- Adicionar janelas de envio para mensagens automaticas.
+
+## Decisoes a Confirmar
+1. Confirmamos pg-boss/PostgreSQL ou equivalente como motor inicial de jobs/filas do MVP, sem Redis no inicio?
+2. Confirmamos que WhatsApp, e-mail, OCR, IA, consultas externas, marketplaces, webhooks e relatorios pesados devem rodar como jobs quando demorados?
+3. Confirmamos que jobs devem ter status acompanhavel, tentativas, erro, entidade vinculada e possibilidade de reprocessamento seguro?
+4. Confirmamos que automacoes devem nascer de regras configuraveis e registrar origem, contexto, resultado e erro?
+5. Confirmamos que consultas externas automatizadas devem respeitar fontes permitidas/contratadas, sem burlar captcha/termos/bloqueios, e deixar historico da consulta?
+6. Confirmamos que IA pode sugerir/classificar/resumir/ler, mas nao aprova decisoes sensiveis sozinha?
+7. Confirmamos que vendedor/SDR nao ve logs tecnicos globais, apenas status operacional permitido de processos proprios?
+
+## Criterios de Aceite
+- Dado que tarefa demorada e solicitada, quando backend receber, entao deve criar job e retornar status inicial sem travar a API.
+- Dado que job falha, quando falha for registrada, entao deve guardar erro, tentativas e permitir reprocessamento quando seguro.
+- Dado que automacao dispara, quando executar, entao deve registrar regra, entidade, resultado e logs.
+- Dado que webhook externo chega, quando processar, entao deve validar origem quando possivel e evitar duplicidade.
+- Dado que consulta externa sensivel e feita, quando concluir, entao deve registrar fonte, data, termo consultado e resultado.
+- Dado que IA gera sugestao, quando impactar decisao sensivel, entao deve exigir aceite humano conforme regra.
+- Dado que usuario sem permissao tenta ver logs tecnicos, quando acessar, entao frontend nao deve exibir possibilidade e backend deve bloquear.
+
+## Fora de Escopo
+- Redis/BullMQ obrigatorio no MVP.
+- Microservicos de workers separados no MVP.
+- Mensageria externa obrigatoria no MVP.
+- Bypass de captcha, termos de uso, bloqueios ou controles de acesso.
+- Automacoes decidindo aprovacoes sensiveis sem humano.
+- Dashboard tecnico avancado de observabilidade no MVP.

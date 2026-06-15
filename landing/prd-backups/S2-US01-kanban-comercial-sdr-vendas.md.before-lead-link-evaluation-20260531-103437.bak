@@ -1,0 +1,355 @@
+---
+title: 'S2-US01: Kanban Comercial SDR/Vendas'
+status: draft
+created: 2026-05-29
+sprint: 'Sprint 2: Kanban Comercial, Agendamentos e Passagem para Venda'
+source_sprint: '../sprint-02.md'
+source_prd: '../../prds/prd-projeto-2-2026-05-25/prd.md'
+related_frs:
+  - FR-009
+  - FR-010
+  - FR-011
+  - FR-012
+  - FR-013
+  - FR-014
+  - FR-015
+  - FR-015A
+  - FR-015B
+  - FR-015C
+  - FR-015D
+  - FR-015K
+  - FR-015L
+  - FR-032
+  - FR-033
+  - FR-035
+  - FR-036
+  - NFR-002
+  - NFR-003
+  - NFR-005
+---
+
+# S2-US01: Kanban Comercial SDR/Vendas
+
+## Historia
+
+**Como** SDR, Vendedor ou Gestor,  
+**quero** visualizar, filtrar e mover oportunidades em um Kanban comercial,  
+**para** acompanhar cada lead desde a entrada ate a confirmacao de compra, priorizando o que precisa de acao agora.
+
+## Objetivo da Entrega
+
+Criar a primeira versao completa do Kanban comercial SDR/Vendas, conectado aos cards cliente/lead x veiculo criados na Sprint 1. A tela deve funcionar como uma central operacional de tracao comercial: mostrar oportunidades por etapa, destacar leads parados ou esfriando, registrar movimentacoes no historico e respeitar permissoes por papel.
+
+Esta story nao implementa IA/Next Best Action avancado, mas prepara uma fila visual de prioridade baseada em regras simples: follow-up vencido, tempo parado na etapa, agendamento proximo e lead sem interacao recente.
+
+## Requisitos Cobertos
+
+| FR/NFR | Aplicacao nesta historia |
+|---|---|
+| FR-009 | Cards/leads com origem, canal, intencao, veiculo de interesse e responsavel. |
+| FR-010 | Intencao do lead como campo/filtro quando disponivel. |
+| FR-011 | Historico unificado por lead/cliente. |
+| FR-012 | Historico com acoes, follow-ups, mudancas de etapa e observacoes. |
+| FR-013 | Kanban de atendimento e negociacao. |
+| FR-014 | Movimento entre etapas por drag and drop ou acao equivalente. |
+| FR-015 | Card exibe status, vendedor, proximo follow-up, ultima interacao e veiculo de interesse. |
+| FR-015A | Passo a passo do atendimento ate confirmacao de compra, perda ou resgate. |
+| FR-015B | Origem/campanha/anuncio/veiculo de interesse quando disponivel. |
+| FR-015C | Canal de comunicacao registrado em nivel operacional. |
+| FR-015D | Midia, canal, responsavel, data/hora, etapa, proxima acao e observacoes. |
+| FR-015K | Alertas de esfriamento para leads sem resposta/follow-up/agendamento. |
+| FR-015L | Base para fila priorizada de leads quentes, esfriando e visitas proximas. |
+| FR-032 | Base futura para filas de atendimento. |
+| FR-033 | Filtros por origem do lead. |
+| FR-035 | Base para SLA simples de resposta. |
+| FR-036 | Registro de alteracao de responsavel e motivo. |
+| NFR-002 | Dados consistentes. |
+| NFR-003 | Auditoria de mudancas de etapa/responsavel. |
+| NFR-005 | Permissoes por papel. |
+
+## Fora de Escopo
+
+- Integracao real com WhatsApp, Instagram ou marketplaces.
+- IA/Next Best Action avancado.
+- Distribuicao automatica completa de leads.
+- Redistribuicao automatica por SLA.
+- Propostas comerciais completas.
+- Confirmacao de compra completa, que fica na S2-US04.
+- Kanban documental/entrega tecnica completo.
+- Dashboard executivo completo.
+
+## Decisoes Confirmadas
+
+1. O Kanban comercial usa as colunas: Novo lead, Em contato, Agendado, Visitou loja, Test drive realizado, Em negociacao, Aguardando retorno, Aguardando confirmacao de compra, Perdido/sem interesse.
+2. O card deve exibir data de criacao.
+3. SDR pode mover cards ate agendamento/visita ou ate encaminhar para negociacao direta com vendedor.
+4. Vendedor pode mover todo o fluxo comercial conforme permissao.
+5. Gestor/Administrador pode mover qualquer card.
+6. Compra confirmada nao e resolvida nesta story; ela sera tratada na S2-US04.
+7. Card perdido/sem interesse deve sair da visualizacao ativa padrao, mantendo historico.
+8. Card em `Aguardando confirmacao de compra` permanece visivel e pronto para passagem de compra.
+
+## Colunas do Kanban
+
+| Ordem | Coluna | Uso |
+|---:|---|---|
+| 1 | Novo lead | Lead/card recem-criado, ainda sem atendimento efetivo. |
+| 2 | Em contato | Primeiro contato em andamento. |
+| 3 | Agendado | Visita, test drive, retorno ou atendimento marcado. |
+| 4 | Visitou loja | Cliente compareceu presencialmente. |
+| 5 | Test drive realizado | Cliente realizou test drive. |
+| 6 | Em negociacao | Vendedor conduzindo proposta/condicao/combinados. |
+| 7 | Aguardando retorno | Loja aguarda resposta do cliente ou retorno prometido. |
+| 8 | Aguardando confirmacao de compra | Negociacao avancada aguardando confirmacao final. |
+| 9 | Perdido/sem interesse | Oportunidade encerrada sem venda, arquivada da visao ativa padrao. |
+
+## Dados Exibidos no Card
+
+Obrigatorios:
+
+- nome do lead/cliente;
+- veiculo de interesse principal;
+- origem do lead;
+- responsavel atual;
+- status/coluna atual;
+- data de criacao;
+- data do contato inicial;
+- ultima interacao;
+- proxima acao;
+- tempo parado na etapa atual;
+- alerta de esfriamento quando aplicavel.
+
+Opcionais quando disponiveis:
+
+- canal de comunicacao;
+- campanha/anuncio de origem;
+- telefone/WhatsApp mascarado conforme permissao;
+- intencao do lead;
+- observacao curta;
+- agendamento mais proximo;
+- badge de marketplace/origem especial.
+
+## Regras de Movimentacao
+
+### SDR
+
+- Pode criar e mover cards permitidos nas etapas iniciais.
+- Pode mover ate `Agendado` e `Visitou loja`.
+- Pode encaminhar para `Em negociacao` quando houver negociacao direta com vendedor.
+- Nao deve confirmar compra, salvo permissao excepcional.
+- Nao deve mover card para etapas finais administrativas.
+
+### Vendedor
+
+- Pode mover todo o fluxo comercial dos cards sob sua responsabilidade/permissao.
+- Pode mover para `Em negociacao`, `Aguardando retorno`, `Aguardando confirmacao de compra` e `Perdido/sem interesse`.
+- Pode assumir card encaminhado pelo SDR quando permitido.
+- Nao deve liberar documentacao/entrega apenas por mover card.
+
+### Gestor/Administrador
+
+- Pode visualizar e mover todos os cards.
+- Pode alterar responsavel, exigindo motivo quando trocar carteira/responsavel de oportunidade ativa.
+- Pode corrigir etapa com justificativa quando necessario.
+
+## Lead Esfriando / Prioridade Simples
+
+A primeira regra sera operacional e configuravel depois:
+
+- Sem interacao ha 24h: `Atencao`.
+- Sem interacao ha 48h: `Esfriando`.
+- Sem interacao ha 72h: `Risco alto`.
+
+Excecoes:
+
+- Card com agendamento futuro confirmado pode ter alerta reduzido, mas ainda deve mostrar proxima acao.
+- Card em `Perdido/sem interesse` nao gera alerta ativo.
+- Card em `Aguardando confirmacao de compra` pode ter alerta proprio de negociacao parada.
+
+## Filtros e Ordenacoes
+
+### Filtros
+
+- Responsavel.
+- Status/coluna.
+- Origem.
+- Canal.
+- Veiculo de interesse.
+- Data de criacao.
+- Data da ultima interacao.
+- Proxima acao.
+- Lead atrasado/esfriando.
+- Agendamento proximo.
+- Marketplace/campanha quando disponivel.
+
+### Ordenacoes
+
+- Mais tempo parado na etapa.
+- Proxima acao mais antiga/vencida.
+- Data de criacao mais recente.
+- Ultima interacao mais antiga.
+- Origem/canal.
+
+## Historico e Auditoria
+
+Toda movimentacao de card deve registrar:
+
+- card/oportunidade;
+- lead/cliente;
+- veiculo de interesse;
+- etapa anterior;
+- etapa nova;
+- usuario responsavel pela mudanca;
+- data/hora;
+- motivo quando obrigatorio;
+- observacao quando informada.
+
+Tambem deve atualizar o historico do cliente/lead com evento operacional legivel para Vendedor/SDR.
+
+## Modelo de Dados / Campos Necessarios
+
+A story deve evoluir a entidade criada na S1-US05 ou usar entidade equivalente, com campos:
+
+- `id`
+- `lead_id` ou `customer_id`
+- `vehicle_id`
+- `current_stage`
+- `responsavel_id`
+- `origem_interesse`
+- `canal_comunicacao`
+- `campanha_origem`
+- `data_criacao`
+- `data_contato`
+- `last_interaction_at`
+- `next_action_at`
+- `stage_entered_at`
+- `temperature_status`
+- `status_active`
+- `lost_reason`
+- `created_by`
+- `updated_by`
+- `created_at`
+- `updated_at`
+- `archived_at`
+
+Tabela/evento de historico de etapa, se separado:
+
+- `id`
+- `card_id`
+- `from_stage`
+- `to_stage`
+- `changed_by`
+- `changed_at`
+- `reason`
+- `notes`
+
+## Permissoes
+
+| Papel | Ver cards | Mover cards | Alterar responsavel | Confirmar compra |
+|---|---|---|---|---|
+| Administrador | Todos | Todos | Sim | Conforme S2-US04 |
+| Dono/Gestor | Todos | Todos | Sim, com motivo | Conforme S2-US04 |
+| Administrativo | Conforme permissao | Conforme fluxo permitido | Conforme permissao | Conforme S2-US04 |
+| Vendedor | Sua base/permissao | Todo fluxo comercial permitido | Nao, salvo permissao | Conforme S2-US04 |
+| SDR | Leads/cards permitidos | Ate agendamento/visita ou encaminhamento para negociacao | Nao, salvo permissao | Nao |
+| Cliente final | Nao | Nao | Nao | Nao |
+
+## Criterios de Aceite Funcional
+
+1. Usuario autorizado acessa o Kanban comercial.
+2. Usuario sem permissao nao acessa o Kanban.
+3. Kanban exibe as colunas definidas em ordem.
+4. Card exibe nome, veiculo, origem, responsavel, status, data de criacao, ultima interacao, proxima acao e alerta quando houver.
+5. SDR move card ate `Agendado` e `Visitou loja`.
+6. SDR pode encaminhar card para `Em negociacao` quando houver negociacao direta com vendedor.
+7. SDR nao confirma compra nesta story.
+8. Vendedor move todo o fluxo comercial permitido.
+9. Gestor/Administrador move qualquer card.
+10. Mudanca de etapa registra historico do cliente/lead.
+11. Mudanca de etapa gera auditoria.
+12. Card sem interacao ha 24h exibe atencao.
+13. Card sem interacao ha 48h exibe esfriando.
+14. Card sem interacao ha 72h exibe risco alto.
+15. Card perdido/sem interesse sai da visao ativa padrao e fica consultavel por filtro/historico.
+16. Card em `Aguardando confirmacao de compra` permanece visivel e pronto para S2-US04.
+17. Filtros por responsavel, status, origem, veiculo, data e lead atrasado funcionam.
+
+## Checklist Tecnico de Aceite
+
+1. Criar/ajustar modelo de card comercial com etapa atual, data de criacao, ultima interacao e proxima acao.
+2. Criar lista controlada de etapas do Kanban.
+3. Criar endpoint/acao para listar cards por permissao.
+4. Criar endpoint/acao para mover card entre etapas.
+5. Validar regras de movimentacao por papel.
+6. Calcular tempo parado na etapa.
+7. Calcular status de esfriamento por regra simples.
+8. Registrar historico operacional em toda mudanca de etapa.
+9. Registrar auditoria em toda mudanca de etapa/responsavel.
+10. Criar filtros e ordenacoes iniciais.
+11. Criar estados de carregamento, vazio, erro e sem permissao.
+12. Criar testes de permissao, movimentacao, filtros e alertas.
+
+## Testes Minimos
+
+### Testes de Unidade/Regra
+
+- Calculo de tempo parado na etapa.
+- Calculo de alerta 24h/48h/72h.
+- Etapa invalida e rejeitada.
+- SDR nao consegue confirmar compra.
+- SDR consegue encaminhar para negociacao quando regra permitir.
+- Vendedor consegue mover fluxo comercial permitido.
+- Gestor consegue mover qualquer card.
+
+### Testes de Integracao
+
+- Criar card e visualizar no Kanban.
+- Mover card de Novo lead para Em contato.
+- Mover card para Agendado.
+- Mover card para Visitou loja.
+- Encaminhar card para Em negociacao.
+- Mover card para Aguardando confirmacao de compra.
+- Mover card para Perdido/sem interesse e confirmar saida da visao ativa.
+- Ver historico do cliente/lead apos mudanca.
+- Ver auditoria apos mudanca.
+
+### Testes de Permissao
+
+- SDR ve apenas cards permitidos.
+- Vendedor ve sua base/permissao.
+- Gestor ve todos.
+- Usuario sem permissao nao acessa.
+- Cliente final nao acessa rota/tela interna.
+
+## Dados Seed/Demo
+
+Criar pelo menos:
+
+- 1 card novo lead.
+- 1 card em contato.
+- 1 card agendado.
+- 1 card visitou loja.
+- 1 card test drive realizado.
+- 1 card em negociacao.
+- 1 card aguardando retorno.
+- 1 card aguardando confirmacao de compra.
+- 1 card perdido/sem interesse.
+- 1 card sem interacao ha 24h.
+- 1 card sem interacao ha 48h.
+- 1 card sem interacao ha 72h.
+
+## Observacoes para UX
+
+O Kanban deve ser uma tela de trabalho, nao um relatorio. O card precisa ser rapido de ler: quem e o cliente, qual carro interessa, o que falta fazer e ha quanto tempo esta parado.
+
+A tela deve evitar excesso visual. Alertas de esfriamento precisam ser claros, mas nao podem transformar todos os cards em urgencia permanente.
+
+A acao principal do card deve apontar para a proxima movimentacao ou proxima acao registrada.
+
+## Pronto Para Desenvolvimento Quando
+
+- S1-US05 estiver implementada como base de card/vinculo cliente x veiculo.
+- Regras de movimentacao por papel estiverem aceitas.
+- Colunas do Kanban estiverem confirmadas.
+- Regra inicial de lead esfriando 24h/48h/72h estiver aceita.
+- S2-US02 e S2-US03 estiverem alinhadas para agendamento/interacoes, mesmo que implementadas depois.

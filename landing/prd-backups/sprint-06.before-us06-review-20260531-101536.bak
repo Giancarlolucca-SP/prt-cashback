@@ -1,0 +1,161 @@
+﻿# Sprint 06: Anuncios, Marketplaces e Campanhas
+
+## Status
+Em definicao.
+
+## Objetivo da Sprint
+Construir o modulo de anuncios como central operacional de publicacao dos veiculos, usando o site da loja como publicacao principal e permitindo replicacao controlada para marketplaces, redes sociais e campanhas selecionadas.
+
+A Sprint 6 conecta cadastro de veiculos, precificacao/margem, estoque operacional e funil comercial. O objetivo e permitir que o Administrativo/Gestor publique um veiculo no site da loja, selecione onde deseja replicar o anuncio, acompanhe metricas de desempenho e registre evidencias/auditoria de cada canal.
+
+## Ponto de Entrada
+A Sprint 6 usa dados consolidados das sprints anteriores:
+
+- Veiculo cadastrado e classificado como proprio ou consignado.
+- Fotos, videos, opcionais relevantes e dados comerciais do veiculo.
+- Preco de venda e simulador de margem da Sprint 5.
+- Estoque operacional e status do veiculo.
+- Leads recebidos e vinculados ao kanban SDR/Vendas.
+
+## Ponto de Saida
+A Sprint 6 termina quando:
+
+- O anuncio pode ser criado a partir do veiculo.
+- A publicacao principal no site da loja pode ser ativada/inativada.
+- O usuario pode selecionar canais de replicacao: marketplaces, Instagram, Facebook e outros canais configuraveis.
+- O sistema registra onde o anuncio esta ativo.
+- Metricas por anuncio, campanha e canal podem ser registradas e consultadas.
+- Rankings de anuncios por leads e visualizacoes estao definidos.
+- Campanhas armazenam publico, tipo, periodo, investimento e observacoes relevantes.
+- Logs/auditoria registram publicacao, alteracao, replicacao e erro.
+
+## Stories Macro Propostas
+
+### S6-US01: Cadastro Operacional de Anuncio do Veiculo
+Criar cadastro do anuncio a partir do veiculo, com fotos, videos, descricao, preco, opcionais, status e dados principais de publicacao.
+
+Arquivo detalhado: `stories/S6-US01-cadastro-operacional-anuncio-veiculo.md`.
+
+Escopo inicial:
+- Criar anuncio vinculado obrigatoriamente a um veiculo.
+- Usar dados do cadastro do veiculo como base.
+- Permitir fotos, videos, descricao, opcionais relevantes, preco, observacoes internas e status.
+- Exibir status de estoque e status de anuncio.
+- Vendedor pode visualizar anuncio conforme permissao; Administrativo/Gestor opera publicacao.
+
+### S6-US02: Publicacao Principal no Site da Loja
+Definir o site da loja como publicacao principal do anuncio.
+
+Arquivo detalhado: `stories/S6-US02-publicacao-site-loja.md`.
+
+Escopo inicial:
+- Publicar o anuncio no site da loja a partir do modulo Administrativo.
+- Inativar/remover anuncio do site quando necessario.
+- Registrar data/hora, usuario, veiculo e versao publicada.
+- O cliente externo ve estoque apenas pelo site da loja.
+- O site da loja funciona como origem operacional para replicacao para outros canais.
+
+### S6-US03: Replicacao para Marketplaces e Canais Selecionados
+Permitir selecionar onde o anuncio sera replicado apos a publicacao principal.
+
+Arquivo detalhado: `stories/S6-US03-replicacao-marketplaces-canais.md`.
+
+Escopo inicial:
+- Selecionar canais como Webmotors, OLX, Mercado Livre, Instagram, Facebook e outros configuraveis.
+- Registrar status por canal: pendente, publicado, ativo, pausado, erro, removido.
+- Permitir fluxo manual/assistido ou integracao futura por API/RPA autorizada.
+- Guardar evidencias e logs da replicacao.
+- Nao contornar mecanismos de protecao ou termos dos canais.
+
+### S6-US04: Postagens Instagram/Facebook e Thumbnails
+Controlar postagens em redes sociais, thumbnails e metricas de visualizacao/curtidas.
+
+Arquivo detalhado: `stories/S6-US04-postagens-redes-sociais-thumbnails.md`.
+
+Escopo inicial:
+- Registrar postagens feitas no Instagram e Facebook.
+- Permitir modo manual ou automatizado conforme decisao do Gestor Administrativo.
+- Controlar thumbnail automatica ou manual.
+- Registrar quantidade de vezes que o veiculo foi postado.
+- Trazer metricas de visualizacoes, curtidas, comentarios e leads quando disponivel.
+
+### S6-US05: Cadastro e Controle de Campanhas
+Registrar campanhas vinculadas a anuncios, canais e publico.
+
+Arquivo detalhado: `stories/S6-US05-campanhas-publico-canais.md`.
+
+Escopo inicial:
+- Registrar tipo de campanha, canal, publico, periodo, investimento, objetivo e observacoes.
+- Publico deve ficar registrado nas campanhas.
+- Permitir vincular campanha a um ou mais anuncios.
+- Registrar informacoes especificas importantes da campanha.
+- Alimentar metricas de leads, visualizacoes e conversao.
+
+### S6-US06: Metricas e Rankings de Anuncios
+Criar ranking de anuncios com mais leads e ranking de anuncios com mais visualizacoes.
+
+Arquivo detalhado: `stories/S6-US06-metricas-rankings-anuncios.md`.
+
+Escopo inicial:
+- Ranking por quantidade de leads.
+- Ranking por visualizacoes.
+- Indicadores por canal, campanha, periodo, veiculo e origem.
+- Visualizar quais anuncios performaram melhor.
+- Preparar dados para insights futuros de IA.
+
+### S6-US07: Auditoria, Logs e Evidencias de Publicacao
+Registrar auditoria completa do ciclo de anuncio, publicacao, replicacao e alteracoes.
+
+Arquivo detalhado: `stories/S6-US07-auditoria-logs-evidencias-anuncios.md`.
+
+Escopo inicial:
+- Registrar quem criou, editou, publicou, pausou, removeu ou replicou anuncio.
+- Registrar data/hora, canal, origem, responsavel, automacao e resultado.
+- Guardar evidencias quando aplicavel: URL, print, ID externo, mensagem de retorno, erro.
+- Manter historico por anuncio e por veiculo.
+- Apoiar compliance e rastreabilidade operacional.
+
+## Decisoes Ja Confirmadas do Produto
+- S6-US05 revisada: campanha pode ter varios anuncios e anuncio pode participar de mais de uma campanha.
+- Publico e preenchido quando aplicavel; nao e obrigatorio em toda campanha.
+- Tipo `Outro` permite descricao manual.
+- Campanhas consolidam leads, visualizacoes, curtidas, cliques quando houver, investimento e anuncios vinculados.
+- Administrativo/Gestor cria e edita campanhas; vendedor apenas visualiza conforme permissao.- S6-US04 revisada: postagem e thumbnail podem ser manuais ou automatizados; Gestor Administrativo decide.
+- Automacao deve ler metricas de Instagram/Facebook e preencher o sistema quando houver integracao/autorizacao; caso contrario, registro manual/assistido.
+- Metricas por post incluem visualizacoes, curtidas, comentarios, compartilhamentos, leads, data da captura e canal.
+- Vendedor apenas visualiza postagens/metricas se permitido; Administrativo/Gestor controla publicacao.- S6-US03 revisada: canais iniciais incluem Webmotors, OLX, Mercado Livre, iCarros, Instagram, Facebook e outros configuraveis.
+- Replicacao deve priorizar API oficial/fornecedor licenciado; RPA em VM pode ser usado quando nao houver integracao oficial viavel, com compliance e sem contornar protecoes.
+- Captcha/validacao humana pausa o fluxo e exige usuario autorizado.
+- Publicacao, alteracao de preco e venda devem sincronizar status por canal com logs obrigatorios.- Ao vender o veiculo, o anuncio deve sair de todas as plataformas/canais ativos, preservando historico no sistema.
+- S6-US02 revisada: somente Administrativo/Gestor publica, atualiza, pausa ou remove anuncio no site da loja.
+- Anuncio so vai ao ar quando o veiculo finalizou preparacao e foi liberado/acompanhado no kanban administrativo.
+- Alteracao de preco no sistema deve replicar para site da loja e marketplaces/canais selecionados de forma simultanea ou assistida.
+- URL publica pode ser armazenada e usada para compartilhamento, auditoria e replicacao.
+- Cliente externo visualiza somente dados publicos do anuncio no site da loja e canais publicados, nunca dados internos.- S6-US01 revisada: somente Administrativo/Gestor cria, edita e publica anuncios.
+- Vendedor apenas visualiza anuncios conforme permissao; nao sugere ajustes e nao publica.
+- Para publicar anuncio, campos minimos: veiculo vinculado, preco, foto principal, descricao, quilometragem, opcionais relevantes e status apto.
+- Video e opcional por carro.
+- Descricao do anuncio e manual pelo Administrativo/Gestor.- A publicacao principal deve ser no site da loja.
+- A partir dessa publicacao, o sistema deve replicar automaticamente ou assistidamente para outras plataformas selecionadas.
+- O usuario deve selecionar onde publicar.
+- O modulo deve trazer metricas sobre postagens, visualizacoes, curtidas e quantidade de vezes postado.
+- O modulo deve ranquear anuncios com mais leads e anuncios com mais visualizacoes.
+- Campanhas devem registrar publico, tipo de campanha, canal e informacoes especificas relevantes.
+- Logs, evidencias e auditoria sao obrigatorios.
+
+## Fora de Escopo Inicial da Sprint 6
+- Integracao real definitiva com todos marketplaces sem fornecedor/API definida.
+- Compra de midia automatica completa.
+- Otimizacao por IA de criativos e textos.
+- Edicao avancada de video.
+- Gestao financeira completa de campanhas alem dos campos definidos.
+- Captura automatica de metricas quando o canal nao permitir API/autorizacao.
+
+## Proximo Passo
+Revisar a S6-US01 e confirmar os campos obrigatorios do cadastro operacional do anuncio.
+
+
+
+
+
+

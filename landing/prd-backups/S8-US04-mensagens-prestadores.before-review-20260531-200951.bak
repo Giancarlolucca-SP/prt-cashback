@@ -1,0 +1,43 @@
+﻿# S8-US04: Mensagens para Prestadores
+
+## Epic
+Servicos, Oficina, Prestadores e Notas Fiscais
+
+## Objetivo
+Permitir envio e registro de mensagens para prestadores pelo sistema, vinculando comunicacao a veiculo, OS e prestador.
+
+## Historia de Usuario
+**Como** Administrativo/Gestor,
+**quero** enviar mensagens para prestadores pelo sistema,
+**para** solicitar orcamento, enviar evidencias, cobrar retorno e manter historico centralizado.
+
+## Canais
+- WhatsApp quando integracao estiver configurada.
+- E-mail quando configurado.
+- Registro manual/assistido quando envio ocorrer fora do sistema.
+
+## Campos Minimos
+- `provider_message_id`.
+- Prestador.
+- Veiculo.
+- OS.
+- Canal.
+- Mensagem.
+- Anexos/evidencias.
+- Enviado por.
+- Data/hora.
+- Status de envio.
+- Resposta quando registrada.
+
+## Criterios de Aceite
+- Dado que usuario envia mensagem a prestador, quando concluir, entao historico deve ficar vinculado ao prestador, veiculo e OS.
+- Dado que envio falha, quando consultar mensagem, entao deve exibir erro e permitir nova tentativa/registro manual.
+- Dado que mensagem tem anexo, quando consultar OS, entao anexo deve aparecer no historico.
+
+## Fora de Escopo
+- Chat completo bidirecional em tempo real.
+- Envio sem integracao autorizada.
+
+## Observacoes Tecnicas
+- Preparar integracao futura com Evolution API e e-mail.
+- Registrar logs por envio.

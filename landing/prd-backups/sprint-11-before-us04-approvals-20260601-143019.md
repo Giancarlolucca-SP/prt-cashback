@@ -1,0 +1,85 @@
+﻿# Sprint 11: Arquitetura Tecnica, Banco de Dados e Base do MVP
+
+## Status
+Em definicao.
+
+## Objetivo da Sprint
+Definir a base tecnica do MVP, incluindo arquitetura geral, stack, banco de dados, autenticacao, RBAC, estrutura modular, armazenamento de anexos, filas/jobs, integracoes externas, ambientes, backup e deploy.
+
+A Sprint 11 transforma as regras de produto das sprints 1 a 10 em uma base implementavel, com limites claros entre frontend, backend, banco de dados, arquivos, automacoes, IA e integracoes.
+
+## Ponto de Entrada
+A Sprint 11 usa decisoes anteriores:
+
+- Fluxos de clientes, veiculos, estoque, leads, vendas, documentacao, entrega, pos-venda, financeiro, anuncios, compra, repasse, prestadores, IA, automacoes e configuracoes.
+- Perfis e permissoes definidos na Sprint 10.
+- Necessidade de anexos, logs imutaveis, auditoria, LGPD operacional, automacoes, Evolution API, e-mail e OCR/leitura assistida.
+- Necessidade de um MVP economico, viavel, escalavel e facil de evoluir.
+
+## Ponto de Saida
+A Sprint 11 termina quando:
+
+- Arquitetura geral e stack tecnica ficam definidas.
+- Banco de dados e entidades principais ficam mapeados.
+- Autenticacao, sessoes, RBAC e escopos ficam projetados.
+- Estrutura de modulos/telas e APIs fica organizada.
+- Storage de anexos e documentos fica definido.
+- Jobs, filas, automacoes e integracoes ficam estruturados.
+- Ambientes, backup, deploy e observabilidade inicial ficam definidos.
+
+## Stories Macro Propostas
+
+### S11-US01: Arquitetura Geral do Sistema e Stack Tecnica
+Definir arquitetura do MVP, separacao de responsabilidades, stack recomendada, padroes de integracao e principios tecnicos.
+
+Arquivo detalhado: `stories/S11-US01-arquitetura-geral-stack-tecnica.md`.
+
+Escopo inicial:
+- Arquitetura web do MVP.
+- Frontend, backend, banco, storage e jobs.
+- Stack tecnica sugerida.
+- Separacao de modulos.
+- Principios de seguranca, auditoria e evolucao.
+
+### S11-US02: Modelo de Dados Principal e Entidades do MVP
+Definir entidades, relacionamentos, chaves, snapshots historicos e tabelas principais.
+
+Arquivo detalhado: `stories/S11-US02-modelo-dados-principal-entidades-mvp.md`.
+
+### S11-US03: Autenticacao, RBAC e Escopos de Permissao
+Definir login, sessoes, perfis, permissoes, escopos e enforcement no backend.
+
+Arquivo detalhado: `stories/S11-US03-autenticacao-rbac-escopos-permissao.md`.
+
+### S11-US04: API Backend e Contratos entre Modulos
+Definir padrao de endpoints, validacoes, erros, paginacao, filtros, transacoes e eventos.
+
+Arquivo detalhado: `stories/S11-US04-api-backend-contratos-modulos.md`.
+
+### S11-US05: Storage de Anexos e Documentos
+Definir armazenamento, metadados, vinculos, permissoes, exclusao de documentos de cliente e retencao.
+
+### S11-US06: Jobs, Filas, Automacoes e Webhooks
+Definir motor tecnico para alertas, mensagens, OCR, IA, consultas externas, sincronizacoes e reprocessamento.
+
+### S11-US07: Ambientes, Deploy, Backup e Observabilidade
+Definir ambientes, variaveis, backup, logs tecnicos, monitoramento inicial, erros criticos e deploy.
+
+## Decisoes Ja Confirmadas do Produto
+- S11-US04 criada para revisar: padrao REST/JSON, contratos internos entre modulos, validacoes, erros padronizados, paginacao/filtros, transacoes, eventos internos, jobs assicronos, adaptadores de integracao e auditoria da API.
+- S11-US03 revisada: aprovado login proprio com e-mail/senha sem SSO no MVP; sessao sem expirar por inatividade; backend sempre prevalece sobre UI; Dono/Gestor pode forcar troca de senha e inativar usuario imediatamente; RBAC por modulo/acao/escopo/area sensivel; frontend totalmente adaptado por perfil, ocultando qualquer possibilidade visual de dados sem permissao; tentativas diretas por URL/API seguem bloqueadas e auditadas quando aplicavel.
+- S11-US02 revisada: aprovado usar `store_id` desde o MVP, UUID como padrao de ID, soft delete/inativacao para cadastros principais, anexos com `file_attachments` + `file_attachment_links`, audit logs com `entity_type` + `entity_id`, snapshots obrigatorios em venda/financeiro/comissao/impostos/contratos/templates/regras e audit logs append-only.
+- S11-US01 item 6 aprovado: stack final prioriza TypeScript ponta a ponta, com Next.js/React no frontend, Node.js no backend, PostgreSQL, Prisma, Supabase Storage e pg-boss/PostgreSQL. NestJS ou Fastify sera definido na implementacao conforme organizacao desejada do backend.
+- Padrao tecnico aprovado: toda decisao que puder mudar futuramente deve documentar alternativa futura, gatilhos para mudanca, caminho de migracao, dados/logs/permissoes a preservar e riscos/cuidados.
+- S11-US01 item 5 aprovado: MVP sera monolito modular; microservicos ficam fora do inicio. Modulos devem ser separados internamente por dominio e a extracao futura deve seguir roteiro documentado, preservando contratos, dados, RBAC, logs, auditoria e historico.
+- S11-US01 item 4 aprovado: jobs/filas do MVP devem iniciar com pg-boss/PostgreSQL ou solucao equivalente, evitando Redis no inicio. Redis/BullMQ fica como evolucao futura se houver alto volume ou necessidade de filas mais complexas.
+- S11-US01 item 3 aprovado: usar Supabase Storage para anexos/documentos no MVP. PostgreSQL guarda metadados e vinculos; arquivos ficam em buckets privados com acesso controlado pelo backend. S3 compativel/Cloudflare R2 fica como alternativa futura.
+- S11-US01 item 2 aprovado: MVP deve priorizar infraestrutura gerenciada e economica, reduzindo manutencao de servidor. VPS propria fica como opcao futura se houver necessidade de custo/controle apos validacao.
+- S11-US01 item 1 aprovado: arquitetura web com frontend separado, backend API central e PostgreSQL como banco principal. IA, chatbots, OCR, WhatsApp/e-mail, consultas externas, sincronizacoes e webhooks devem rodar por filas/jobs; arquivos ficam em storage externo; pgvector/banco vetorial fica como evolucao futura se houver necessidade real.
+- Sprint 11 iniciada para definir a base tecnica do MVP.
+- Arquitetura deve respeitar permissoes, logs, auditoria e LGPD definidos na Sprint 10.
+- MVP deve priorizar solucao economica, viavel e facil de manter.
+- Stack e infraestrutura devem suportar Evolution API, e-mail, anexos, OCR/leitura assistida, IA, automacoes e marketplaces.
+
+## Proximo Passo
+Revisar a S11-US04 e confirmar API backend e contratos entre modulos.

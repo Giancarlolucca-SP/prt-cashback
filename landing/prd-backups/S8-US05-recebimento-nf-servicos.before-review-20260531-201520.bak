@@ -1,0 +1,56 @@
+﻿# S8-US05: Recebimento de NF e Lancamento Financeiro
+
+## Epic
+Servicos, Oficina, Prestadores e Notas Fiscais
+
+## Objetivo
+Receber NF/recibos de servicos por e-mail, WhatsApp ou upload manual, vincular a veiculo/OS/prestador e lancar custo no DRE da loja e DRE do carro.
+
+## Historia de Usuario
+**Como** Administrativo,
+**quero** receber e classificar NFs de servicos,
+**para** alimentar automaticamente ou de forma assistida o financeiro, a contabilidade e a pasta do veiculo.
+
+## Entradas
+- E-mail recebido.
+- WhatsApp recebido.
+- Upload manual.
+- Anexo em OS.
+
+## Regras
+- NF deve ser vinculada a veiculo, OS, prestador e categoria quando possivel.
+- Valor deve alimentar DRE da loja e DRE do veiculo.
+- Uma via/arquivo deve ser separado para contabilidade.
+- Arquivo deve ser armazenado na pasta do veiculo.
+- Quando OCR/leitura automatica falhar, deve abrir pendencia para revisao manual.
+
+## Campos Minimos
+- `service_invoice_id`.
+- Veiculo.
+- OS.
+- Prestador.
+- Categoria.
+- Numero/documento.
+- Valor.
+- Data de emissao.
+- Data de recebimento.
+- Canal de recebimento.
+- Arquivo.
+- Status de leitura/classificacao.
+- Lancamento financeiro vinculado.
+- Contabilidade: enviado/pendente.
+
+## Criterios de Aceite
+- Dado que NF e recebida, quando classificada, entao deve ficar vinculada a veiculo/OS/prestador.
+- Dado que valor e confirmado, quando salvar, entao deve alimentar DRE da loja e DRE do carro.
+- Dado que NF precisa ir para contabilidade, quando classificada, entao deve ficar disponivel em fila/pasta de contabilidade.
+- Dado que leitura automatica falha, quando consultar pendencias, entao Administrativo deve conseguir revisar manualmente.
+
+## Fora de Escopo
+- Emissao de NF.
+- Escrituracao contabil completa.
+- OCR perfeito sem revisao humana.
+
+## Observacoes Tecnicas
+- Guardar arquivo original.
+- Registrar origem e responsavel pela classificacao.

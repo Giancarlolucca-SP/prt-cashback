@@ -1,0 +1,179 @@
+﻿# S7-US01: Avaliacao Mobile do Veiculo
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Permitir que a loja registre uma avaliacao mobile do veiculo com dados do proprietario/fornecedor, dados completos do carro, fotos, checklist detalhado, opcionais relevantes, preparacao necessaria e observacoes comerciais para apoiar decisao de compra.
+
+## Historia de Usuario
+**Como** avaliador/vendedor autorizado,
+**quero** registrar a avaliacao do veiculo pelo mobile,
+**para** documentar o estado do carro, opcionais e informacoes iniciais antes de fazer proposta de compra, entrada no estoque, consignacao ou repasse.
+
+## Contexto Operacional
+O processo de compra comeca na avaliacao. A avaliacao deve ser simples para uso mobile, mas estruturada o suficiente para gerar proposta, consulta externa, historico e possivel entrada no estoque ou modulo de repasse.
+
+Quando o sistema ja possuir informacoes do cliente, fornecedor, lead, veiculo, consulta previa ou oportunidade de compra, esses campos devem vir pre-preenchidos para conferencia/complemento do avaliador.
+
+## Permissoes Iniciais
+- Vendedor/avaliador autorizado pode iniciar e preencher avaliacao mobile.
+- Administrativo/Gestor visualiza todas as avaliacoes.
+- Administrativo/Gestor pode complementar, corrigir ou assumir fluxo apos avaliacao conforme permissao.
+- Acesso a dados sensiveis, consultas externas e documentos deve respeitar perfil e auditoria.
+
+## Campos Obrigatorios e Preenchimento Assistido
+Campos obrigatorios devem seguir o checklist de avaliacao previsto no PRD, especialmente FR-056, FR-057, FR-058 e derivados.
+
+Quando qualquer informacao ja existir no sistema, ela deve ser carregada automaticamente no formulario para conferencia:
+
+- Dados vindos do lead/cliente/proprietario.
+- Dados vindos de cadastro anterior do veiculo.
+- Dados vindos de proposta/oportunidade de compra.
+- Dados vindos de fornecedor.
+- Dados vindos de consultas automatizadas/assistidas quando ja executadas.
+
+O avaliador deve conseguir confirmar, corrigir ou completar os campos conforme permissao.
+
+## Campos Minimos da Avaliacao
+- `evaluation_id`.
+- Data/hora da avaliacao.
+- Avaliador responsavel.
+- Origem da avaliacao.
+- Nome/contato do proprietario ou fornecedor.
+- Motivo da venda.
+- Se a pessoa pretende buscar outro veiculo na loja.
+- Marca, modelo, versao, ano/modelo, cor, combustivel, cambio, quilometragem.
+- Placa, RENAVAM e chassi quando disponiveis.
+- Indicacao se o veiculo esta no nome da pessoa que esta apresentando/mostrando o carro.
+- Indicacao se o documento apresentado corresponde ao proprietario retornado na consulta, quando houver consulta.
+- Campo/check de veiculo de leilao: sim, nao ou a confirmar.
+- Indicacao se o veiculo e PCD ou possui enquadramento que altere calculo/isencao de IPVA.
+- Opcionais relevantes em campo de input.
+- Acessorios, opcionais e itens agregados relevantes.
+- Fotos externas, internas, detalhes/avarias, hodometro e pontos especificos exigidos.
+- Observacoes comerciais.
+- Melhorias/servicos necessarios.
+- Previsao de gastos por item quando aplicavel.
+- Status da avaliacao.
+- Resultado preliminar: apto para comercializacao imediata, apto com ressalvas ou nao apto ate concluir melhorias obrigatorias.
+
+## Checklist Inicial
+Todos os itens que exigirem nota devem usar escala de 0 a 10, onde 0 representa condicao pessima/inaceitavel e 10 representa condicao excelente.
+
+### Estrutura, Lataria e Pintura
+- Lataria.
+- Pintura.
+- Repintura: indicar se existe, se aparenta estar bem feita ou se tem problema visivel, com nota de 0 a 10.
+- Funilaria: risco, marca de fita, diferenca de textura/granulado, diferenca de cor, tinta em borrachas/canaletas, falta de verniz, escorrido de verniz e sinais visiveis.
+- Alinhamento de capo, porta-malas, lanternas, portas e demais vaos visiveis.
+- Longarinas e painel do capo: originalidade, reparo, troca ou desalinhamento.
+- Plaquetas/etiquetas da montadora: cor, presenca, estado, posicao, sinais de adulteracao, remocao ou substituicao.
+- Parafusos do capo, porta-malas e portas: fotos e observacoes sobre marca de chave, desmontagem, ajuste, troca de peca ou indicio relevante.
+- Parafusos do porta-malas integros e sem marcas anormais de ferramenta/remocao/ajuste.
+- Calafetacao no fundo do porta-malas, paineis laterais e regioes internas acessiveis.
+- Vestigios de cola, massa, selante, solda, pintura irregular ou acabamento divergente em regioes estruturais.
+- Colunas e regioes proximas as travas das portas, quando operacionalmente permitido.
+- Frisos, molduras e acabamentos externos com nota de 0 a 10.
+
+### Mecanica, Motor e Cambio
+- Motor.
+- Cambio.
+- Teste visual de motor ligado: elevar aproximadamente a 3.000 giros, soltar acelerador e observar/anotar cor da fumaca. Procedimento final e seguranca operacional: a validar.
+- Novo acionamento apos cerca de 20 minutos de conversa/aquecimento para observar comportamento do motor. Procedimento final: a validar.
+- Veiculo manual: altura/percepcao da embreagem parado, baixa, normal ou alta.
+- Veiculo automatico: tranco ao mudar posicoes/marchas, delay para engatar ou comportamento anormal parado/em movimento.
+- Teste de rodagem: trancos, atrasos ou falhas nas trocas de marcha.
+- Vazamentos na parte inferior.
+- Liquido de arrefecimento: nivelado, abaixo do nivel ou aspecto anormal.
+- Direcao: folga, comportamento em rua irregular/esburacada, volante mexendo ou comportamento anormal.
+- Suspensao: ruidos, batidas, instabilidade ou comportamento anormal.
+- Alinhamento do veiculo com nota de 0 a 10 e observacoes.
+
+### Rodas, Pneus e Itens Agregados
+- Pneus com nota de 0 a 10, observacao e necessidade de troca quando aplicavel.
+- Rodas.
+- Estepe: presenca, condicao com nota de 0 a 10, calibragem aparente, desgaste e necessidade de troca.
+- Manual do proprietario: ausencia, estado, fotos/anexos e observacoes.
+- Revisoes no manual quando houver: quilometragem, data, carimbo/registro, consistencia aparente e observacoes.
+- Nota fiscal ou documento fiscal de origem quando apresentado, com evidencia/foto quando possivel.
+
+### Interior e Eletrica
+- Interior.
+- Bancos com nota de 0 a 10: desgaste, rasgos, manchas, costuras, espuma, regulagens, trilhos e necessidade de reparo/higienizacao.
+- Painel.
+- Parte eletrica.
+- Desgaste dos pedais de freio, acelerador e embreagem quando aplicavel, com foto e coerencia aparente com quilometragem.
+- Quilometragem atual com foto do hodometro e observacao quando houver divergencia, suspeita ou incoerencia.
+
+### Documentacao e Consultas Basicas
+- Documentacao aparente.
+- Conferencia simples do numero do chassi: OK ou observacao.
+- Placa e RENAVAM quando disponiveis para consultas internas e externas.
+- Resultado de consulta veicular pela Informcar quando realizada.
+- Resultado de Renainf completa quando disponivel.
+- Resultado de DETRAN/SP: multas, valor total de multas, licenciamento, valor de licenciamento e restricoes financeiras/tributarias.
+- Resultado de IPVA/Fazenda SP: valor devido, status e observacoes.
+- Divida ativa pelo RENAVAM quando consultada.
+- Multas PRF e DCC Transito quando consultadas.
+
+### Preparacao Necessaria
+- Pintura de roda.
+- Polimento.
+- Higienizacao.
+- Polimento de farois.
+- Necessidade de mecanico: motivo, prioridade e observacoes.
+- Necessidade de encomendar pecas: peca, quantidade estimada, urgencia, fornecedor sugerido e status quando aplicavel.
+- Melhorias necessarias: area do veiculo, descricao do problema, melhoria recomendada, prioridade, custo estimado, responsavel sugerido e evidencia/foto.
+
+### Opcionais, Acessorios e Itens Premium
+- Performance/mecanica premium: freios carbono-ceramica, escapamento esportivo de fabrica, eixo traseiro estercante, elevacao do eixo dianteiro e pacotes como Porsche Chrono, McLaren Track Pack, Weissach Package.
+- Acabamento externo/fibra de carbono: pacote carbono externo, capo/teto em fibra de carbono, rodas especiais/forjadas, center lock, pintura especial de fabrica como Porsche PTS, Ferrari Historical Colors, foscos/Magno.
+- Interior/tecnologia/conforto: bancos de confeccao especial, som premium/high-end, carbono interno, volante esportivo com seletores, teto solar/teto de vidro, teto estrelado e telas traseiras.
+- Itens agregados/protecao: PPF completo/frente total, blindagem com empresa, nivel e delaminacao, wallbox para hibridos plug-in, carregador portatil de fabrica, capa protetora original e rastreador/telemetria ativo.
+
+## Fotos Minimas Orientadas
+- Frente.
+- Traseira.
+- Laterais.
+- Rodas.
+- Painel.
+- Hodometro/quilometragem.
+- Bancos/interior.
+- Porta-malas.
+- Motor.
+- Documento/etiquetas quando aplicavel.
+- Parafusos e pontos internos do capo, porta-malas e portas.
+- Detalhes de avarias.
+
+## Aviso Comercial
+O modulo mobile deve mostrar uma pequena observacao durante a avaliacao:
+
+`Atencao: veiculos sem opcionais relevantes podem valer cerca de 10% menos que o mesmo modelo em versao completa. Avaliar conforme mercado, estado e configuracao.`
+
+## Decisoes Confirmadas na Revisao
+- Vendedor/avaliador autorizado pode iniciar avaliacao; Administrativo/Gestor visualiza todas.
+- Campos obrigatorios devem seguir o checklist de avaliacao ja previsto no PRD.
+- Quando o sistema ja possuir informacoes do cliente, fornecedor, lead, veiculo, consulta ou oportunidade, deve pre-preencher os campos para conferencia do avaliador.
+- O avaliador pode confirmar, corrigir ou completar informacoes conforme permissao.
+
+## Criterios de Aceite
+- Dado que o avaliador inicia avaliacao, quando salvar, entao o sistema deve registrar data/hora, responsavel, origem e veiculo avaliado.
+- Dado que o avaliador preenche opcionais, quando salvar, entao os opcionais devem ficar no historico da avaliacao.
+- Dado que fotos foram anexadas, quando consultar avaliacao, entao as fotos devem aparecer vinculadas.
+- Dado que o avaliador usa mobile, quando abrir checklist, entao deve conseguir marcar itens principais de forma simples, com nota 0 a 10 quando o item exigir nota.
+- Dado que ja existam dados do cliente, veiculo ou fornecedor, quando abrir a avaliacao, entao o sistema deve pre-preencher os campos conhecidos para conferencia.
+- Dado que a avaliacao e concluida, quando gerar proposta, entao a proposta deve carregar dados da avaliacao.
+
+## Fora de Escopo
+- Precificacao automatica final.
+- Consulta FIPE/marketplaces.
+- Analise juridica do proprietario.
+- Compra final do veiculo.
+
+## Observacoes Tecnicas
+- Otimizar tela para mobile.
+- Permitir salvar rascunho.
+- Registrar alteracoes relevantes em log.
+- Separar campos manuais, campos pre-preenchidos e campos retornados por consulta/automacao.
+- Manter contexto suficiente para analytics e IA futura.

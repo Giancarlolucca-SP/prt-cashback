@@ -1,0 +1,70 @@
+﻿# S7-US01: Avaliacao Mobile do Veiculo
+
+## Epic
+Avaliacao, Compra de Veiculos e Repasse
+
+## Objetivo
+Permitir que a loja registre uma avaliacao mobile do veiculo com dados basicos, fotos, checklist, opcionais relevantes e observacoes comerciais para apoiar decisao de compra.
+
+## Historia de Usuario
+**Como** avaliador/vendedor autorizado,
+**quero** registrar a avaliacao do veiculo pelo mobile,
+**para** documentar o estado do carro, opcionais e informacoes iniciais antes de fazer proposta de compra.
+
+## Contexto Operacional
+O processo de compra comeca na avaliacao. A avaliacao deve ser simples para uso mobile, mas estruturada o suficiente para gerar proposta, consulta externa, historico e possivel entrada no estoque ou modulo de repasse.
+
+## Campos Iniciais
+- `evaluation_id`.
+- Data/hora da avaliacao.
+- Avaliador responsavel.
+- Origem da avaliacao.
+- Nome/contato do proprietario ou fornecedor.
+- Marca, modelo, versao, ano/modelo, cor, combustivel, cambio, quilometragem.
+- Placa/chassi quando aplicavel e conforme permissao.
+- Opcionais relevantes em campo de input.
+- Fotos externas.
+- Fotos internas.
+- Fotos de detalhes/avarias.
+- Observacoes comerciais.
+- Status da avaliacao.
+
+## Checklist Inicial
+- Lataria.
+- Pintura.
+- Pneus.
+- Rodas.
+- Vidros.
+- Interior.
+- Bancos.
+- Painel.
+- Parte eletrica.
+- Motor.
+- Cambio.
+- Suspensao.
+- Documentacao aparente.
+- Manual/chave reserva quando informado.
+- Observacoes de avarias.
+
+## Aviso Comercial
+O modulo mobile deve mostrar uma pequena observacao durante a avaliacao:
+
+`Atencao: veiculos sem opcionais relevantes podem valer cerca de 10% menos que o mesmo modelo em versao completa. Avaliar conforme mercado, estado e configuracao.`
+
+## Criterios de Aceite
+- Dado que o avaliador inicia avaliacao, quando salvar, entao o sistema deve registrar data/hora, responsavel e veiculo avaliado.
+- Dado que o avaliador preenche opcionais, quando salvar, entao os opcionais devem ficar no historico da avaliacao.
+- Dado que fotos foram anexadas, quando consultar avaliacao, entao as fotos devem aparecer vinculadas.
+- Dado que o avaliador usa mobile, quando abrir checklist, entao deve conseguir marcar itens principais de forma simples.
+- Dado que a avaliacao e concluida, quando gerar proposta, entao a proposta deve carregar dados da avaliacao.
+
+## Fora de Escopo
+- Precificacao automatica final.
+- Consulta FIPE/marketplaces.
+- Analise juridica do proprietario.
+- Compra final do veiculo.
+
+## Observacoes Tecnicas
+- Otimizar tela para mobile.
+- Permitir salvar rascunho.
+- Registrar alteracoes relevantes em log.
