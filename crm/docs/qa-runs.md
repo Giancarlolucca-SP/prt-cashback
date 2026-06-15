@@ -1676,3 +1676,54 @@ Observacoes:
 
 - O custo do seed base isolado e material para um smoke frequente, mesmo sem massa demo operacional.
 - Proxima melhoria recomendada: investigar um modo seguro para reutilizar hashes de senha dos usuarios dev quando eles ja existem, evitando rehash Argon2 desnecessario em seeds repetidos.
+
+## 2026-06-14 - Reutilizacao segura de hash dev no seed repetido
+
+Contexto:
+
+- Etapa BMAP: otimizacao de feedback loop dos smokes sem alterar comportamento padrao de seguranca.
+- Foco: evitar recalculo Argon2 dos usuarios dev quando o seed e repetido em ambiente local/smoke e os usuarios ja existem.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check packages/db/prisma/seed.mjs` | Passou |
+| `node --check scripts/measure-base-seed.mjs` | Passou |
+| `node --check scripts/measure-auth-smoke-bootstrap.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run db:seed:base:measure` | Passou: media ~1,0s |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+| `npm run test:smoke:auth:bootstrap` | Passou: total ~3,0s |
+| `npm run test:smoke:auth:timed` | Passou: total ~11,7s |
+
+Resultado:
+
+- Criada flag `SEED_REUSE_DEV_PASSWORD_HASH=true` para seed repetido de desenvolvimento/smoke.
+- Quando a flag esta ativa e o usuario dev ja existe, o seed reutiliza `passwordHash` salvo; quando nao existe, calcula Argon2 normalmente.
+- O auth smoke e os medidores de seed/bootstrap passaram a ativar a flag junto de `SEED_SKIP_DEMO_DATA=true`.
+- README documenta a flag como otimizacao de desenvolvimento/smoke.
+
+Medicoes:
+
+- Seed base isolado antes: media ~14.265ms.
+- Seed base isolado depois: media ~1.041ms.
+- Bootstrap auth smoke depois:
+  - `import-app`: ~930ms.
+  - `import-db`: ~20ms.
+  - `db:seed-base`: ~1.661ms.
+  - `build-app`: ~263ms.
+  - `shutdown`: ~96ms.
+  - total: ~2.969ms.
+- Auth smoke completo depois:
+  - `module-load`: ~3.971ms.
+  - `db:seed`: ~1.993ms.
+  - `app-bootstrap`: ~261ms.
+  - total: ~11.714ms.
+
+Observacoes:
+
+- O comportamento padrao do seed continua recalculando hash; a reutilizacao exige flag explicita.
+- Proxima melhoria recomendada: revisar o custo de `module-load` do auth smoke, que agora e maior que o seed base no fluxo completo.

@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 
 const DEV_PASSWORD = "Gt3@2026dev";
 const skipDemoData = process.env.SEED_SKIP_DEMO_DATA === "true";
+const reuseDevPasswordHash = process.env.SEED_REUSE_DEV_PASSWORD_HASH === "true";
 
 async function hashPassword(password) {
   return argon2.hash(password, {
@@ -13,6 +14,21 @@ async function hashPassword(password) {
     timeCost: 2,
     type: argon2.argon2id,
   });
+}
+
+async function resolveDevPasswordHash(email) {
+  if (reuseDevPasswordHash) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { passwordHash: true },
+    });
+
+    if (existingUser?.passwordHash) {
+      return existingUser.passwordHash;
+    }
+  }
+
+  return hashPassword(DEV_PASSWORD);
 }
 
 const roles = [
@@ -515,7 +531,7 @@ async function main() {
 
   const userByRole = new Map();
   for (const [name, email, role] of users) {
-    const passwordHash = await hashPassword(DEV_PASSWORD);
+    const passwordHash = await resolveDevPasswordHash(email);
     const user = await prisma.user.upsert({
       where: { email },
       update: {

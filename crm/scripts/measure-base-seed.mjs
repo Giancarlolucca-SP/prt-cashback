@@ -24,6 +24,7 @@ for (let index = 0; index < runs; index += 1) {
     env: {
       ...process.env,
       SEED_SKIP_DEMO_DATA: "true",
+      SEED_REUSE_DEV_PASSWORD_HASH: "true",
     },
     stdio: "ignore",
   });

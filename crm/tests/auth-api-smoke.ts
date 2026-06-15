@@ -54,6 +54,7 @@ execSync("npm run db:seed", {
   env: {
     ...process.env,
     SEED_SKIP_DEMO_DATA: "true",
+    SEED_REUSE_DEV_PASSWORD_HASH: "true",
   },
 });
 checkpoint("db:seed");
