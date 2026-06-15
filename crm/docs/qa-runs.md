@@ -1896,3 +1896,40 @@ Observacoes:
 - A primeira tentativa revelou que checar apenas `127.0.0.1` nao detectava conflito em `::3000`; a checagem foi corrigida para testar a porta sem fixar host.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: centralizar helpers comuns de `qa-core-auto-local` e `qa-daily-auto-local` quando houver nova duplicacao real.
+
+## 2026-06-15 - Helper compartilhado para runners automaticos de QA
+
+Contexto:
+
+- Etapa BMAP: reduzir duplicacao tecnica entre runners automaticos de QA local.
+- Foco: centralizar utilitarios ja repetidos de npm, porta livre, espera por URL, binarios locais e encerramento de processos.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/helpers/qa-runner.mjs` | Passou |
+| `node --check scripts/qa-core-auto-local.mjs` | Passou |
+| `node --check scripts/qa-daily-auto-local.mjs` | Passou |
+| `rg -n "function npmCli|function npmRunArgs|function localBin|findFreePort|waitForUrl|stopService" scripts/qa-core-auto-local.mjs scripts/qa-daily-auto-local.mjs scripts/helpers/qa-runner.mjs` | Passou |
+| `rg -n "127\\.0\\.0\\.1|server\\.listen\\(port" scripts/qa-core-auto-local.mjs scripts/qa-daily-auto-local.mjs scripts/helpers/qa-runner.mjs` | Passou |
+| `node --test tests/qa-daily-auto-local.test.mjs` | Passou |
+| `node --test tests/qa-runner.test.mjs` | Passou |
+| `npm run test:unit` | Passou: 13 testes |
+| `npm run qa:core:auto:local` | Passou |
+| `npm run typecheck` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+
+Resultado:
+
+- Criado `scripts/helpers/qa-runner.mjs`.
+- `qa-core-auto-local` e `qa-daily-auto-local` passaram a reutilizar `findFreePort`, `waitForUrl`, `stopService`, `localBin` e helpers de npm.
+- A checagem de porta compartilhada testa a porta sem fixar `127.0.0.1`, preservando a correcao para conflitos em IPv6.
+- Criado `tests/qa-runner.test.mjs` para proteger a deteccao de porta ocupada por listener sem host explicito.
+
+Observacoes:
+
+- A logica especifica de cada runner permaneceu no proprio script para evitar abstracao prematura.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: manter `qa:core:auto:local` como comando padrao de verificacao central antes de novas historias funcionais.
