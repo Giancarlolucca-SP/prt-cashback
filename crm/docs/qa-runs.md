@@ -1451,3 +1451,35 @@ Observacoes:
 
 - A rodada foi bem mais rapida que a anterior, indicando variacao relevante do ambiente Windows/banco local.
 - Proxima melhoria recomendada: salvar historico dos timings em arquivo opcional para comparar varias rodadas antes de otimizar seed ou particionar o auth smoke.
+
+## 2026-06-14 - Historico local de timings do auth smoke
+
+Contexto:
+
+- Etapa BMAP: diagnostico comparavel da regressao pesada.
+- Foco: guardar medicoes locais do auth smoke para comparar varias rodadas antes de otimizar.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check tests/auth-api-smoke.ts` | Passou |
+| `node --check scripts/run-auth-smoke-timed.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run test:smoke:auth:timed` | Passou: runner ~20,2s |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- `npm run test:smoke:auth:timed` passou a gravar `.dev-logs/auth-smoke-timings.jsonl`.
+- Cada linha contem `finishedAt`, `success`, `totalMs` e os checkpoints com duracao incremental e acumulada.
+- `.dev-logs/` segue ignorado pelo Git, mantendo o historico como diagnostico local.
+- Medicao desta rodada: total ~20,4s; `module-load` ~6,5s, `db:seed` ~3,9s, `app-bootstrap` ~0,7s.
+
+Observacoes:
+
+- A variacao entre rodadas segue alta, entao a decisao de otimizar seed ou particionar o smoke deve considerar uma serie de medicoes.
+- Proxima melhoria recomendada: criar um resumidor simples para ler `.dev-logs/auth-smoke-timings.jsonl` e mostrar medias/min/max por checkpoint.

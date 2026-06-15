@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { buildApp } from "../apps/api/src/app.js";
 import { prisma } from "../apps/api/src/lib/db.js";
 
 const timingEnabled = process.env.AUTH_SMOKE_TIMING === "true";
+const timingLogPath = process.env.AUTH_SMOKE_TIMING_LOG;
 const processStartedAt = Number(process.env.AUTH_SMOKE_PROCESS_STARTED_AT);
 const scriptStartedAt = Date.now();
 const timingStartedAt = Number.isFinite(processStartedAt) && processStartedAt > 0 ? processStartedAt : scriptStartedAt;
 let checkpointStartedAt = timingStartedAt;
+const checkpoints: Array<{ label: string; durationMs: number; totalMs: number }> = [];
+let smokeSucceeded = false;
 
 function checkpoint(label: string) {
   if (!timingEnabled) {
@@ -15,8 +20,30 @@ function checkpoint(label: string) {
   }
 
   const now = Date.now();
-  console.log(`[auth-smoke] ${label}: +${now - checkpointStartedAt}ms (${now - timingStartedAt}ms total)`);
+  const durationMs = now - checkpointStartedAt;
+  const totalMs = now - timingStartedAt;
+  checkpoints.push({ label, durationMs, totalMs });
+  console.log(`[auth-smoke] ${label}: +${durationMs}ms (${totalMs}ms total)`);
   checkpointStartedAt = now;
+}
+
+function writeTimingHistory(success: boolean) {
+  if (!timingEnabled || !timingLogPath) {
+    return;
+  }
+
+  const finishedAt = Date.now();
+  mkdirSync(dirname(timingLogPath), { recursive: true });
+  appendFileSync(
+    timingLogPath,
+    `${JSON.stringify({
+      finishedAt: new Date(finishedAt).toISOString(),
+      success,
+      totalMs: finishedAt - timingStartedAt,
+      checkpoints,
+    })}\n`,
+    "utf8",
+  );
 }
 
 checkpoint("module-load");
@@ -4068,7 +4095,9 @@ try {
   });
   assert.equal(deletedCustomer.statusCode, 404);
   checkpoint("analytics/compliance/audit/webhooks");
+  smokeSucceeded = true;
 } finally {
+  writeTimingHistory(smokeSucceeded);
   await app.close();
   await prisma.$disconnect();
 }

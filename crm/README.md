@@ -122,6 +122,8 @@ Para diagnosticar quais blocos do auth smoke estao mais lentos:
 npm run test:smoke:auth:timed
 ```
 
+O comando tambem registra o historico local em `.dev-logs/auth-smoke-timings.jsonl`.
+
 Atalho equivalente:
 
 ```bash
