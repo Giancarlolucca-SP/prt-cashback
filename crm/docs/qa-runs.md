@@ -1998,3 +1998,32 @@ Observacoes:
 
 - A UI ainda nao exibe esse historico; a API ficou pronta e protegida para a proxima etapa de frontend.
 - Proxima melhoria recomendada: adicionar painel/modal de historico do lead na tela `/leads`, reaproveitando o padrao visual do historico do cliente.
+
+## 2026-06-15 - Modal de historico do lead na UI
+
+Contexto:
+
+- Etapa BMAP: expor na UI a rota de historico operacional do lead.
+- Foco: permitir ao vendedor revisar etapas, follow-ups, agenda e eventos recentes sem sair da tela `/leads`.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run qa:pre-story:local` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- A fila priorizada de `/leads` ganhou acao `Historico`.
+- A acao abre modal com contadores de etapas, follow-ups, agenda e eventos.
+- O modal consome `GET /leads/:id/history` e reaproveita o padrao visual de historico do cliente.
+- Estados de carregamento, erro e vazio foram tratados no proprio modal.
+
+Observacoes:
+
+- O gate confirmou que `/leads` continua renderizando dentro de `qa:functional:local` e `qa:commercial:local`.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: adicionar QA funcional de UI que clique em `Historico` na tela `/leads` e confirme o modal carregado.

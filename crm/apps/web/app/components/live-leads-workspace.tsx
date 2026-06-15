@@ -55,6 +55,39 @@ type LeadFollowUp = {
   } | null;
 };
 
+type LeadHistoryStage = {
+  id: string;
+  fromStage: LeadStatus | null;
+  toStage: LeadStatus;
+  reason: string | null;
+  createdAt: string;
+};
+
+type LeadHistoryAppointment = {
+  id: string;
+  type: string;
+  title: string;
+  startsAt: string;
+  endsAt: string | null;
+  status: string;
+  notes: string | null;
+};
+
+type LeadHistoryEvent = {
+  id: string;
+  action: string;
+  module: string | null;
+  createdAt: string;
+};
+
+type LeadHistoryResponse = {
+  lead: Lead;
+  stageHistory: LeadHistoryStage[];
+  followUps: LeadFollowUp[];
+  appointments: LeadHistoryAppointment[];
+  events: LeadHistoryEvent[];
+};
+
 type LeadFormState = {
   title: string;
   source: string;
@@ -291,7 +324,10 @@ export function LiveLeadsWorkspace() {
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
   const [followUpPeriod, setFollowUpPeriod] = useState<FollowUpPeriod>("today");
   const [followUps, setFollowUps] = useState(fallbackFollowUps);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<LeadHistoryResponse | null>(null);
   const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -537,6 +573,37 @@ export function LiveLeadsWorkspace() {
     }
   }
 
+  async function openLeadHistory(lead: Lead) {
+    if (!token || !canReadLeads) {
+      return;
+    }
+
+    setHistoryError(null);
+    setHistoryStatus("loading");
+    setSelectedHistory({
+      appointments: [],
+      events: [],
+      followUps: [],
+      lead,
+      stageHistory: [],
+    });
+
+    try {
+      const response = await apiGet<LeadHistoryResponse>(`/leads/${lead.id}/history`, token);
+      setSelectedHistory(response);
+      setHistoryStatus("ready");
+    } catch {
+      setHistoryError("Nao foi possivel carregar o historico do lead.");
+      setHistoryStatus("error");
+    }
+  }
+
+  function closeLeadHistory() {
+    setHistoryError(null);
+    setHistoryStatus("idle");
+    setSelectedHistory(null);
+  }
+
   const view = useMemo(() => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -579,6 +646,34 @@ export function LiveLeadsWorkspace() {
     locked: "Sem permissao",
   }[status];
   const followUpPeriodDetails = dateRangeForFollowUpPeriod(followUpPeriod);
+  const leadHistoryItems = selectedHistory
+    ? [
+        ...selectedHistory.stageHistory.slice(0, 8).map((item) => ({
+          detail: item.reason ?? "Sem motivo registrado",
+          id: `stage-${item.id}`,
+          meta: new Date(item.createdAt).toLocaleString("pt-BR", { day: "2-digit", hour: "2-digit", minute: "2-digit", month: "2-digit" }),
+          title: `${item.fromStage ? statusLabels[item.fromStage] : "Entrada"} -> ${statusLabels[item.toStage]}`,
+        })),
+        ...selectedHistory.followUps.slice(0, 8).map((item) => ({
+          detail: item.notes ?? (item.completedAt ? "Follow-up concluido" : "Follow-up pendente"),
+          id: `follow-up-${item.id}`,
+          meta: new Date(item.dueAt).toLocaleString("pt-BR", { day: "2-digit", hour: "2-digit", minute: "2-digit", month: "2-digit" }),
+          title: item.type,
+        })),
+        ...selectedHistory.appointments.slice(0, 8).map((item) => ({
+          detail: item.notes ?? item.status,
+          id: `appointment-${item.id}`,
+          meta: new Date(item.startsAt).toLocaleString("pt-BR", { day: "2-digit", hour: "2-digit", minute: "2-digit", month: "2-digit" }),
+          title: item.title || item.type,
+        })),
+        ...selectedHistory.events.slice(0, 8).map((item) => ({
+          detail: item.module ?? "evento operacional",
+          id: `event-${item.id}`,
+          meta: new Date(item.createdAt).toLocaleString("pt-BR", { day: "2-digit", hour: "2-digit", minute: "2-digit", month: "2-digit" }),
+          title: item.action.replaceAll("_", " "),
+        })),
+      ].slice(0, 16)
+    : [];
 
   return (
     <>
@@ -798,6 +893,54 @@ export function LiveLeadsWorkspace() {
         </div>
       ) : null}
 
+      {selectedHistory ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Historico do lead">
+          <section className="dre-modal customer-history-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Historico do lead</p>
+                <h3>{selectedHistory.lead.title}</h3>
+              </div>
+              <button aria-label="Fechar historico do lead" className="icon-button" onClick={closeLeadHistory} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="customer-history-modal-body">
+              <div className="customer-history-summary">
+                <span>Etapas<strong>{selectedHistory.stageHistory.length}</strong></span>
+                <span>Follow-ups<strong>{selectedHistory.followUps.length}</strong></span>
+                <span>Agenda<strong>{selectedHistory.appointments.length}</strong></span>
+                <span>Eventos<strong>{selectedHistory.events.length}</strong></span>
+              </div>
+              {historyStatus === "loading" ? (
+                <article className="customer-history-entry">
+                  <strong>Carregando historico</strong>
+                  <span>Buscando etapas, follow-ups, agenda e eventos do lead.</span>
+                </article>
+              ) : null}
+              {historyError ? <p className="lead-modal-error">{historyError}</p> : null}
+              <div className="customer-history-modal-list">
+                {leadHistoryItems.map((item) => (
+                  <article className="customer-history-entry" key={item.id}>
+                    <div className="customer-history-entry-heading">
+                      <strong>{item.title}</strong>
+                      <span>{item.meta}</span>
+                    </div>
+                    <span>{item.detail}</span>
+                  </article>
+                ))}
+                {historyStatus === "ready" && leadHistoryItems.length === 0 ? (
+                  <article className="customer-history-entry">
+                    <strong>Sem historico operacional</strong>
+                    <span>Este lead ainda nao possui etapas, follow-ups, agenda ou eventos registrados.</span>
+                  </article>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <section className="panel module-kanban-panel" aria-label="Kanban individual de leads">
         <div className="section-heading">
           <div>
@@ -939,6 +1082,7 @@ export function LiveLeadsWorkspace() {
                 <div className="lead-score">
                   <span>{relativeTime(lead.createdAt)}</span>
                   <strong>{lead.temperature ?? "--"}</strong>
+                  <button className="text-button" disabled={!canReadLeads} onClick={() => void openLeadHistory(lead)} type="button">Historico</button>
                   <button className="text-button" disabled={!canUpdateLeads} onClick={() => openFollowUpModal(lead)} type="button">Follow-up</button>
                 </div>
               </article>
