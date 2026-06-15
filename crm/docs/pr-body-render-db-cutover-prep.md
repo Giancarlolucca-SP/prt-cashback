@@ -21,6 +21,8 @@
 - `crm/`
   - Adds negative anti-tracker tests for leads, inventory, services, document/message templates, and accountant notes.
   - Updates QA evidence in `crm/docs/qa-runs.md`.
+  - Adds the operational runbook in `crm/docs/render-db-cutover-runbook.md`.
+  - Adds the pre-merge audit in `crm/docs/pre-merge-audit-render-db-cutover-prep.md`.
 
 ## Validation
 
@@ -36,6 +38,7 @@
 ## Rollout Notes
 
 - This PR does not execute the database cutover.
+- The cutover steps and rollback are documented in `crm/docs/render-db-cutover-runbook.md`.
 - Before deployment, configure Render secrets manually:
   - `DATABASE_URL`
   - `DIRECT_URL`

@@ -173,4 +173,6 @@ Para confirmar que o Render esta apontando para o banco esperado, execute localm
 CHECK_EMAIL=<email-de-teste> CHECK_PASSWORD=<senha-de-teste> CHECK_ATTENDANT=<nome-atendente> npm run verify:render-db
 ```
 
+Para cutover de banco, siga tambem o runbook operacional em `crm/docs/render-db-cutover-runbook.md`.
+
 Acesse o admin em `https://postocash-admin.vercel.app` e faça login com as credenciais do operador cadastrado no banco.
