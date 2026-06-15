@@ -77,12 +77,22 @@ const moveLeadStageSchema = z
 
 const scheduleLeadFollowUpSchema = z.object({
   dueAt: z.coerce.date(),
-  notes: z.string().trim().max(1000).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do follow-up") })
+    .optional(),
   type: z.string().trim().min(2).max(80).default("Contato comercial"),
 });
 
 const completeLeadFollowUpSchema = z.object({
-  notes: z.string().trim().max(1000).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do follow-up") })
+    .optional(),
 });
 
 const convertLeadFollowUpToAppointmentSchema = z

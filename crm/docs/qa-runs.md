@@ -2211,3 +2211,34 @@ Observacoes:
 
 - O smoke de API ja bloqueava pixel remoto em mensagens; esta rodada protege o detector central em nivel unitario.
 - Proxima melhoria recomendada: adicionar varredura estatica para campos textuais sensiveis que ainda nao usam `containsRemoteLoadVector`.
+
+## 2026-06-15 - Varredura de schemas para conteudo remoto
+
+Contexto:
+
+- Etapa BMAP: garantir que campos textuais livres de rotas sensiveis usem a barreira contra recursos remotos carregaveis.
+- Foco: `body`, `content`, `notes` e `description` em schemas de API.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --test tests/remote-content-schema-coverage.test.mjs` | Passou |
+| `npm run test:unit` | Passou: 21 testes no total |
+| `npm run typecheck` | Passou |
+| `npm run test:smoke:auth` | Passou |
+| `npm run build:api` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+
+Resultado:
+
+- Criado `tests/remote-content-schema-coverage.test.mjs`.
+- `test:unit` passou a executar a varredura estatica de schemas.
+- Adicionado guard remoto em observacoes de contador, follow-ups, estoque, descricoes financeiras e descricoes de servicos/custos.
+- A varredura diferencia campos `z.record(...)` de texto livre para evitar falso positivo em payload estruturado.
+
+Observacoes:
+
+- O smoke de auth/API passou apos as mudancas nos schemas.
+- Proxima melhoria recomendada: adicionar casos negativos de API para pelo menos um endpoint novo protegido fora de mensagens, por exemplo follow-up ou estoque.

@@ -6,6 +6,7 @@ import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const transactionTypeSchema = z.enum(["INCOME", "EXPENSE", "TRANSFER"]);
 const transactionStatusSchema = z.enum(["PENDING", "SCHEDULED", "PAID", "CANCELLED", "OVERDUE"]);
@@ -26,7 +27,12 @@ const createTransactionSchema = z.object({
   categoryId: z.string().uuid().optional(),
   type: transactionTypeSchema,
   status: transactionStatusSchema.default("PENDING"),
-  description: z.string().trim().min(2).max(180),
+  description: z
+    .string()
+    .trim()
+    .min(2)
+    .max(180)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Descricao financeira") }),
   amount: z.number().positive(),
   dueAt: z.coerce.date().optional(),
   paidAt: z.coerce.date().optional(),

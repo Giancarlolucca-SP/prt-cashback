@@ -5,6 +5,7 @@ import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const ownershipTypeSchema = z.enum(["OWN", "CONSIGNED", "REPASSE", "TRADE_IN"]);
 const inventoryStatusSchema = z.enum(["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REPASSE", "REMOVED"]);
@@ -38,7 +39,12 @@ const createInventorySchema = z.object({
   purchaseCost: z.number().nonnegative().optional(),
   askingPrice: z.number().nonnegative().optional(),
   entryDate: z.coerce.date().optional(),
-  notes: z.string().trim().max(1000).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do estoque") })
+    .optional(),
 });
 
 const updateInventorySchema = z
@@ -51,7 +57,13 @@ const updateInventorySchema = z
     askingPrice: z.number().nonnegative().nullable().optional(),
     entryDate: z.coerce.date().optional(),
     exitDate: z.coerce.date().nullable().optional(),
-    notes: z.string().trim().max(1000).nullable().optional(),
+    notes: z
+      .string()
+      .trim()
+      .max(1000)
+      .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do estoque") })
+      .nullable()
+      .optional(),
   })
   .refine((input) => Object.keys(input).length > 0, {
     message: "Informe ao menos um campo para atualizar.",
@@ -63,7 +75,12 @@ const inventoryParamsSchema = z.object({
 
 const addVehicleCostSchema = z.object({
   category: z.string().trim().min(2).max(80),
-  description: z.string().trim().min(2).max(180),
+  description: z
+    .string()
+    .trim()
+    .min(2)
+    .max(180)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Descricao do custo do veiculo") }),
   amount: z.number().positive(),
   occurredAt: z.coerce.date().optional(),
   capitalized: z.boolean().default(true),

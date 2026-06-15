@@ -28,7 +28,12 @@ const accountantSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().trim().max(40).optional(),
   document: z.string().trim().max(40).optional(),
-  notes: z.string().trim().max(1000).optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do contador") })
+    .optional(),
 });
 
 const businessHourSchema = z.object({

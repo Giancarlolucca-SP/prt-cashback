@@ -6,6 +6,7 @@ import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const serviceOrderStatusSchema = z.enum(["OPEN", "SCHEDULED", "RUNNING", "WAITING_PROVIDER", "WAITING_INVOICE", "DONE", "CANCELLED"]);
 
@@ -90,7 +91,12 @@ const serviceOrderStatusUpdateSchema = z.object({
 
 const serviceOrderItemSchema = z.object({
   catalogItemId: z.string().uuid().optional(),
-  description: z.string().trim().min(2).max(180),
+  description: z
+    .string()
+    .trim()
+    .min(2)
+    .max(180)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Descricao do item de servico") }),
   quantity: z.number().positive().default(1),
   unitPrice: z.number().nonnegative().optional(),
   costAmount: z.number().nonnegative().optional(),
@@ -98,7 +104,12 @@ const serviceOrderItemSchema = z.object({
 
 const serviceCostSchema = z.object({
   providerId: z.string().uuid().optional(),
-  description: z.string().trim().min(2).max(180),
+  description: z
+    .string()
+    .trim()
+    .min(2)
+    .max(180)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Descricao do custo de servico") }),
   amount: z.number().positive(),
   occurredAt: z.coerce.date().optional(),
 });
