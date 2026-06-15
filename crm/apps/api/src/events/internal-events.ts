@@ -26,6 +26,7 @@ export type InternalEventName =
   | "lead.follow_up_scheduled"
   | "lead.stage_changed"
   | "appointment.created"
+  | "appointment.updated"
   | "appointment.status_changed"
   | "inventory.created"
   | "sale.created"

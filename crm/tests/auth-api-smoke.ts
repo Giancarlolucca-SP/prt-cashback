@@ -2328,6 +2328,30 @@ try {
   assert.ok(customerHistory.json().appointments.some((appointment: { id: string }) => appointment.id === createdAppointmentId));
   assert.ok(customerHistory.json().timeline.some((item: { kind: string; entityId: string }) => item.kind === "appointment" && item.entityId === createdAppointmentId));
   assert.ok(
+    customerHistory.json().events.some(
+      (event: { metadata: { appointmentId?: string; status?: string } | null; type: string }) =>
+        event.type === "customer.appointment_created" && event.metadata?.appointmentId === createdAppointmentId && event.metadata?.status === "SCHEDULED",
+    ),
+  );
+  assert.ok(
+    customerHistory.json().events.some(
+      (event: { metadata: { appointmentId?: string; changedFields?: string[]; toStartsAt?: string } | null; type: string }) =>
+        event.type === "customer.appointment_updated" &&
+        event.metadata?.appointmentId === createdAppointmentId &&
+        event.metadata.changedFields?.includes("startsAt") &&
+        event.metadata.toStartsAt === "2026-06-08T16:00:00.000Z",
+    ),
+  );
+  assert.ok(
+    customerHistory.json().events.some(
+      (event: { metadata: { appointmentId?: string; fromStatus?: string; toStatus?: string } | null; type: string }) =>
+        event.type === "customer.appointment_status_changed" &&
+        event.metadata?.appointmentId === createdAppointmentId &&
+        event.metadata.fromStatus === "CONFIRMED" &&
+        event.metadata.toStatus === "DONE",
+    ),
+  );
+  assert.ok(
     customerHistory
       .json()
       .events.some(

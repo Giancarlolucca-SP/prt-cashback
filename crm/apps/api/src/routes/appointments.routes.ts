@@ -267,6 +267,30 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
         },
       });
 
+      if (created.customerId) {
+        await tx.customerHistoryEvent.create({
+          data: {
+            storeId: session.user.storeId,
+            customerId: created.customerId,
+            type: "customer.appointment_created",
+            title: "Agendamento criado",
+            description: created.notes,
+            metadata: {
+              appointmentId: created.id,
+              leadId: created.leadId,
+              vehicleId: created.vehicleId,
+              assignedUserId: created.assignedUserId,
+              appointmentType: created.type,
+              status: created.status,
+              startsAt: created.startsAt.toISOString(),
+              endsAt: created.endsAt?.toISOString() ?? null,
+              origin: "appointment",
+              actorRole: session.user.role,
+            },
+          },
+        });
+      }
+
       return created;
     });
 
@@ -333,7 +357,37 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
         },
       });
 
+      if (updated.customerId) {
+        await tx.customerHistoryEvent.create({
+          data: {
+            storeId: session.user.storeId,
+            customerId: updated.customerId,
+            type: "customer.appointment_updated",
+            title: "Agendamento atualizado",
+            description: updated.notes,
+            metadata: {
+              appointmentId: updated.id,
+              changedFields: Object.keys(input),
+              fromStartsAt: current.startsAt.toISOString(),
+              toStartsAt: updated.startsAt.toISOString(),
+              status: updated.status,
+              origin: "appointment",
+              actorRole: session.user.role,
+            },
+          },
+        });
+      }
+
       return updated;
+    });
+
+    await emitInternalEvent({
+      name: "appointment.updated",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "appointment",
+      entityId: appointment.id,
+      payload: { changedFields: Object.keys(input), customerId: appointment.customerId },
     });
 
     return { data: sanitizeAppointment(appointment) };
@@ -391,6 +445,26 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
           },
         },
       });
+
+      if (updated.customerId) {
+        await tx.customerHistoryEvent.create({
+          data: {
+            storeId: session.user.storeId,
+            customerId: updated.customerId,
+            type: "customer.appointment_status_changed",
+            title: "Status de agendamento atualizado",
+            description: input.reason,
+            metadata: {
+              appointmentId: updated.id,
+              fromStatus: current.status,
+              toStatus: input.status,
+              reason: input.reason,
+              origin: "appointment",
+              actorRole: session.user.role,
+            },
+          },
+        });
+      }
 
       return updated;
     });
