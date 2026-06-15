@@ -2327,6 +2327,17 @@ try {
   assert.ok(customerHistory.json().evaluations.some((evaluation: { id: string }) => evaluation.id === evaluationId));
   assert.ok(customerHistory.json().appointments.some((appointment: { id: string }) => appointment.id === createdAppointmentId));
   assert.ok(customerHistory.json().timeline.some((item: { kind: string; entityId: string }) => item.kind === "appointment" && item.entityId === createdAppointmentId));
+  assert.ok(
+    customerHistory
+      .json()
+      .events.some(
+        (event: { metadata: { actorRole?: string; origin?: string } | null; title: string; type: string }) =>
+          event.type === "customer.created" &&
+          event.title === "Cliente criado" &&
+          event.metadata?.origin === "qa-api" &&
+          event.metadata?.actorRole === ownerBody.user.role,
+      ),
+  );
   assert.ok(customerHistory.json().events.length >= 1);
 
   const blockedCustomerHistoryTracker = await app.inject({

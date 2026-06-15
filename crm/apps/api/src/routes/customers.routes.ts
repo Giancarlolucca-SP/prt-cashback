@@ -1042,6 +1042,20 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         },
       });
 
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: created.id,
+          type: "customer.created",
+          title: "Cliente criado",
+          description: created.notes,
+          metadata: {
+            origin: created.origin,
+            actorRole: session.user.role,
+          },
+        },
+      });
+
       return created;
     });
 
