@@ -137,6 +137,12 @@ Atalho equivalente:
 npm run qa
 ```
 
+Antes de iniciar ou fechar uma nova historia funcional do CRM, rode o gate local de pre-story:
+
+```bash
+npm run qa:pre-story:local
+```
+
 Com API e Web rodando, valide o caminho funcional principal:
 
 ```bash
@@ -286,6 +292,7 @@ Para medir o custo do seed base isolado em multiplas rodadas, use `npm run db:se
 
 - Ler documentacao viva antes de codar.
 - Validar ambiente com `dev:check`; para subir servicos isolados, usar os checks direcionados dos scripts `dev:web` e `dev:api`.
+- Rodar `npm run qa:pre-story:local` antes de novas historias funcionais quando houver API local disponivel.
 - Entregar Frontend Surface quando houver uso operacional.
 - Fazer commit/push por micro-historia validada.
 - Evitar comandos destrutivos sem aprovacao explicita.

@@ -1933,3 +1933,37 @@ Observacoes:
 - A logica especifica de cada runner permaneceu no proprio script para evitar abstracao prematura.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: manter `qa:core:auto:local` como comando padrao de verificacao central antes de novas historias funcionais.
+
+## 2026-06-15 - Gate local pre-story
+
+Contexto:
+
+- Etapa BMAP: formalizar a verificacao padrao antes de iniciar ou fechar novas historias funcionais.
+- Foco: combinar testes unitarios/contratos, typecheck e QA central automatico em um comando unico.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `rg -n "qa:pre-story:local" README.md package.json` | Passou |
+| `npm run qa:pre-story:local` | Passou |
+
+Resultado:
+
+- Criado comando `npm run qa:pre-story:local`.
+- O gate executa `test:unit`, `typecheck` e `qa:core:auto:local`.
+- README passou a recomendar o gate antes de novas historias funcionais quando houver API local disponivel.
+
+Validacao da rodada:
+
+- `test:unit` passou com 13 testes.
+- `typecheck` passou.
+- `qa:core:auto:local` subiu o Web temporario em `http://localhost:3001`, executou `qa:core:local` e encerrou ao final.
+- `qa:functional:local`, `qa:commercial:local` e `qa:vehicles:local` passaram dentro do gate.
+
+Observacoes:
+
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: usar `npm run qa:pre-story:local` como primeiro passo antes da proxima historia funcional de produto.
