@@ -1483,3 +1483,34 @@ Observacoes:
 
 - A variacao entre rodadas segue alta, entao a decisao de otimizar seed ou particionar o smoke deve considerar uma serie de medicoes.
 - Proxima melhoria recomendada: criar um resumidor simples para ler `.dev-logs/auth-smoke-timings.jsonl` e mostrar medias/min/max por checkpoint.
+
+## 2026-06-14 - Resumo dos timings do auth smoke
+
+Contexto:
+
+- Etapa BMAP: leitura rapida do historico local de performance.
+- Foco: transformar o JSONL de timings em media, minimo e maximo por checkpoint.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/summarize-auth-smoke-timings.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run test:smoke:auth:summary` | Passou |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `scripts/summarize-auth-smoke-timings.mjs`.
+- Criado comando `npm run test:smoke:auth:summary`.
+- O resumo mostra quantidade de rodadas, sucessos/falhas, total medio/min/max e media/min/max por checkpoint.
+- O script tolera arquivo ausente e linhas invalidas sem falhar a execucao.
+
+Observacoes:
+
+- A primeira leitura encontrou 1 rodada local registrada em `.dev-logs/auth-smoke-timings.jsonl`.
+- Proxima melhoria recomendada: coletar mais rodadas e usar o resumo para decidir entre otimizar seed/bootstrap ou particionar o auth smoke.

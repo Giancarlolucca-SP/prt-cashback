@@ -123,6 +123,11 @@ npm run test:smoke:auth:timed
 ```
 
 O comando tambem registra o historico local em `.dev-logs/auth-smoke-timings.jsonl`.
+Para resumir esse historico:
+
+```bash
+npm run test:smoke:auth:summary
+```
 
 Atalho equivalente:
 
