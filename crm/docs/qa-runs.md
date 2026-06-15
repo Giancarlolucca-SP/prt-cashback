@@ -1727,3 +1727,39 @@ Observacoes:
 
 - O comportamento padrao do seed continua recalculando hash; a reutilizacao exige flag explicita.
 - Proxima melhoria recomendada: revisar o custo de `module-load` do auth smoke, que agora e maior que o seed base no fluxo completo.
+
+## 2026-06-15 - Runner local de TSX nos smokes
+
+Contexto:
+
+- Etapa BMAP: reduzir overhead de inicializacao dos smokes sem alterar cobertura funcional.
+- Foco: remover `npx tsx` dos wrappers de smoke e chamar o TSX local diretamente via Node.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check tests/auth-api.test.mjs` | Passou |
+| `node --check tests/rate-limit.test.mjs` | Passou |
+| `rg -n "npx tsx" tests scripts` | Passou: sem ocorrencias |
+| `npm run test:smoke:auth:timed` | Passou: total ~11,2s |
+| `npm run test:smoke:rate` | Passou |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+| `npm run test:smoke` | Passou |
+
+Resultado:
+
+- `tests/auth-api.test.mjs` e `tests/rate-limit.test.mjs` passaram a usar `execFileSync(process.execPath, [node_modules/tsx/dist/cli.mjs, ...])`.
+- A execucao deixou de depender de `npx` para resolver o runner TSX em cada smoke.
+
+Medicoes:
+
+- Auth smoke completo antes desta etapa: total ~11.714ms, `module-load` ~3.971ms.
+- Auth smoke completo depois desta etapa: total ~11.179ms, `module-load` ~1.754ms.
+
+Observacoes:
+
+- A reducao de `module-load` foi clara nesta amostra, embora o total do smoke dependa tambem da variacao dos fluxos de dominio.
+- Proxima melhoria recomendada: consolidar a execucao local de smokes em helpers compartilhados para evitar divergencia entre wrappers.
