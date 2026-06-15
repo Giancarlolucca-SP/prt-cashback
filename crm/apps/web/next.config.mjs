@@ -9,6 +9,8 @@ const apiOrigin = (() => {
     return "http://localhost:3333";
   }
 })();
+const isProduction = process.env.NODE_ENV === "production";
+const scriptSrc = ["script-src", "'self'", "'unsafe-inline'", ...(isProduction ? [] : ["'unsafe-eval'"])];
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -17,7 +19,7 @@ const contentSecurityPolicy = [
   "media-src 'self' blob:",
   "frame-src 'none'",
   "object-src 'none'",
-  "script-src 'self' 'unsafe-inline'",
+  scriptSrc.join(" "),
   "style-src 'self' 'unsafe-inline'",
   "base-uri 'self'",
   "form-action 'self'",

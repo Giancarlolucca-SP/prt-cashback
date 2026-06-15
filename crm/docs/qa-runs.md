@@ -2123,3 +2123,35 @@ Observacoes:
 - O QA ainda exibe avisos de `eval()` do React em modo dev sob CSP, mas eles nao bloqueiam a rotina e nao aparecem como falha.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: avaliar se o CSP de desenvolvimento deve permitir `unsafe-eval` apenas em ambiente local para reduzir ruido visual do QA.
+
+## 2026-06-15 - CSP local sem ruido de React dev
+
+Contexto:
+
+- Etapa BMAP: reduzir ruido do QA visual mantendo CSP de producao restrito.
+- Foco: permitir `unsafe-eval` apenas fora de producao, pois React/Next usam eval em modo dev para diagnosticos.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --test tests/web-csp-contract.test.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run test:unit` | Passou: 15 testes |
+| `npm run qa:daily:auto:local` | Passou |
+
+Resultado:
+
+- `apps/web/next.config.mjs` passou a montar `script-src` conforme o ambiente.
+- Em desenvolvimento/local, CSP inclui `'unsafe-eval'` para compatibilidade com React dev.
+- Em producao, CSP continua sem `'unsafe-eval'`.
+- Criado `tests/web-csp-contract.test.mjs` e incluido em `test:unit`.
+
+Observacoes:
+
+- O QA diario automatico passou sem o aviso de `eval()` do React em modo dev.
+- A API local existente foi reutilizada em `http://localhost:3333`.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: revisar se outras regras de CSP precisam de testes de contrato, especialmente `img-src`, `frame-src` e `connect-src`.
