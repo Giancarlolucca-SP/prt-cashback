@@ -2326,3 +2326,30 @@ Observacoes:
 
 - Com esta rodada, os endpoints de follow-up, estoque, servicos e configuracoes possuem negativos reais contra trackers remotos.
 - Proxima melhoria recomendada: voltar para a proxima historia funcional do CRM ou rodar `qa:daily:auto:local` antes de fechar a trilha de seguranca.
+
+## 2026-06-15 - QA diario apos trilha anti-tracker
+
+Contexto:
+
+- Etapa BMAP: fechar a trilha de seguranca anti-tracker com regressao operacional completa.
+- Foco: validar que os guards e negativos adicionados nao quebraram os fluxos comerciais, preferencias, historico do lead e QA visual.
+- Escopo: branch `chore/render-db-cutover-prep`, apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run qa:daily:auto:local` | Passou |
+
+Resultado:
+
+- Preflight do runner passou: `typecheck`, `build:api` e `build:web`.
+- A API existente em `http://localhost:3333` foi reutilizada.
+- O Web temporario subiu em `http://localhost:3001` e foi encerrado ao final.
+- Passaram `qa:commercial:local`, `qa:customer-history-preferences:local`, `qa:lead-history:local`, `qa:profile-preferences:local` e `qa:visual:local`.
+
+Observacoes:
+
+- A rotina diaria passou sem ruidos de `EADDRINUSE` e sem aviso de `unsafe-eval`.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: retomar a proxima historia funcional do CRM ou preparar PR da branch `chore/render-db-cutover-prep`.
