@@ -2182,3 +2182,32 @@ Observacoes:
 
 - Nao houve mudanca funcional no CSP nesta rodada; a politica existente foi protegida por contrato automatizado.
 - Proxima melhoria recomendada: adicionar QA negativo de conteudo remoto em campos do usuario quando houver UI de cadastro/edicao cobrindo esses campos.
+
+## 2026-06-15 - Contratos do detector de conteudo remoto
+
+Contexto:
+
+- Etapa BMAP: proteger a barreira server-side contra trackers e carregamentos remotos informados por usuarios.
+- Foco: testar o detector central usado por mensagens, templates, anuncios, agendamentos, clientes e leads.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --import tsx --test tests/remote-content-guard.test.ts` | Passou: 3 testes |
+| `npm run test:unit` | Passou: 20 testes no total |
+| `npm run typecheck` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+
+Resultado:
+
+- Criado `tests/remote-content-guard.test.ts`.
+- O teste cobre `<img src>`, iframe com `//`, script remoto, `srcset`, CSS `url()` e markdown image remoto.
+- O teste confirma que texto com URL nao carregavel e referencias locais continuam permitidos.
+- `test:unit` passou a executar tambem esse contrato via `node --import tsx --test`.
+
+Observacoes:
+
+- O smoke de API ja bloqueava pixel remoto em mensagens; esta rodada protege o detector central em nivel unitario.
+- Proxima melhoria recomendada: adicionar varredura estatica para campos textuais sensiveis que ainda nao usam `containsRemoteLoadVector`.
