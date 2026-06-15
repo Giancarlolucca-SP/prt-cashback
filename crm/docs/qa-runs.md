@@ -2269,3 +2269,32 @@ Observacoes:
 
 - Esta rodada cobre endpoint real fora de mensagens, complementando o contrato unitario do detector central.
 - Proxima melhoria recomendada: adicionar caso negativo semelhante para estoque ou servicos, que tambem receberam guards novos.
+
+## 2026-06-15 - Negativos de API para estoque e servicos com tracker
+
+Contexto:
+
+- Etapa BMAP: ampliar os casos negativos reais para endpoints protegidos contra recursos remotos carregaveis.
+- Foco: estoque, custos de veiculo, itens de servico e custos de servico.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run test:smoke:auth` | Passou |
+| `npm run test:unit` | Passou: 21 testes no total |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- O smoke de API agora bloqueia estoque com `<iframe src="//tracker...">`.
+- O smoke bloqueia custo de estoque com markdown image remoto.
+- O smoke bloqueia item de servico com `<script src="https://tracker...">`.
+- O smoke bloqueia custo de servico com CSS `url(https://tracker...)`.
+- Os fluxos validos de estoque e servicos continuam passando depois dos negativos.
+
+Observacoes:
+
+- Esta rodada cobre os principais endpoints que receberam guards na varredura de schemas.
+- Proxima melhoria recomendada: avaliar endpoints de configuracao/contador para negativo de API, ou passar para a proxima historia funcional do CRM.

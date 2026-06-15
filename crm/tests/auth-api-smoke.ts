@@ -1492,6 +1492,25 @@ try {
   assert.equal(sellerInventoryCreate.statusCode, 403);
   assert.equal(sellerInventoryCreate.json().error.code, "FORBIDDEN");
 
+  const blockedInventoryTracker = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Honda",
+        model: "Civic",
+        plate: uniquePlate("QA"),
+      },
+      ownershipType: "OWN",
+      notes: '<iframe src="//tracker.example/inventory"></iframe>',
+    },
+  });
+  assert.equal(blockedInventoryTracker.statusCode, 400);
+  assert.equal(blockedInventoryTracker.json().error.code, "VALIDATION_ERROR");
+
   const inventoryPlate = uniquePlate("QA");
   const createInventory = await app.inject({
     method: "POST",
@@ -1579,6 +1598,21 @@ try {
   assert.equal(updateInventory.statusCode, 200);
   assert.equal(updateInventory.json().data.status, "AVAILABLE");
   assert.equal(updateInventory.json().data.askingPrice, "122900");
+
+  const blockedInventoryCostTracker = await app.inject({
+    method: "POST",
+    url: `/inventory/${inventoryId}/costs`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      category: "preparacao",
+      description: "![pixel](https://tracker.example/inventory-cost.png)",
+      amount: 100,
+    },
+  });
+  assert.equal(blockedInventoryCostTracker.statusCode, 400);
+  assert.equal(blockedInventoryCostTracker.json().error.code, "VALIDATION_ERROR");
 
   const addInventoryCost = await app.inject({
     method: "POST",
@@ -1674,6 +1708,21 @@ try {
   assert.equal(listServiceOrders.statusCode, 200);
   assert.ok(listServiceOrders.json().items.some((order: { id: string }) => order.id === serviceOrderId));
 
+  const blockedServiceItemTracker = await app.inject({
+    method: "POST",
+    url: `/services/orders/${serviceOrderId}/items`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      catalogItemId: serviceCatalogId,
+      description: '<script src="https://tracker.example/service.js"></script>',
+      quantity: 1,
+    },
+  });
+  assert.equal(blockedServiceItemTracker.statusCode, 400);
+  assert.equal(blockedServiceItemTracker.json().error.code, "VALIDATION_ERROR");
+
   const addServiceItem = await app.inject({
     method: "POST",
     url: `/services/orders/${serviceOrderId}/items`,
@@ -1690,6 +1739,21 @@ try {
   });
   assert.equal(addServiceItem.statusCode, 201);
   assert.equal(addServiceItem.json().data.unitPrice, "900");
+
+  const blockedServiceCostTracker = await app.inject({
+    method: "POST",
+    url: `/services/orders/${serviceOrderId}/costs`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      providerId: serviceProviderId,
+      description: "background: url(https://tracker.example/service-cost.png)",
+      amount: 100,
+    },
+  });
+  assert.equal(blockedServiceCostTracker.statusCode, 400);
+  assert.equal(blockedServiceCostTracker.json().error.code, "VALIDATION_ERROR");
 
   const addServiceCost = await app.inject({
     method: "POST",
