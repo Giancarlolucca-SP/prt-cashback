@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import SuperAdminRoute from './components/SuperAdminRoute.jsx';
 import Login from './pages/Login.jsx';
@@ -14,6 +15,15 @@ import Relatorios from './pages/Relatorios.jsx';
 import ConfiguracoesCashback from './pages/ConfiguracoesCashback.jsx';
 import ConfiguracoesPosto from './pages/ConfiguracoesPosto.jsx';
 import Ranking from './pages/Ranking.jsx';
+import Atendentes from './pages/Atendentes.jsx';
+import PainelPista from './pages/PainelPista.jsx';
+import Operadores from './pages/Operadores.jsx';
+
+// Role-aware landing: frentista (operador) goes straight to the Pista panel.
+function HomeRedirect() {
+  const { isOperator } = useAuth();
+  return <Navigate to={isOperator ? '/pista' : '/dashboard'} replace />;
+}
 import SaasDashboard from './pages/SaasDashboard.jsx';
 import SaasLogin from './pages/SaasLogin.jsx';
 import CompletarCadastro from './pages/CompletarCadastro.jsx';
@@ -30,7 +40,7 @@ export default function App() {
         <Route path="/logout"   element={<LogoutPage />} />
         <Route path="/register" element={<NovoEstabelecimento />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/"          element={<Navigate to="/dashboard" replace />} />
+          <Route path="/"          element={<HomeRedirect />} />
           <Route path="/consultar" element={<ConsultarCliente />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/resgatar" element={<Resgatar />} />
@@ -42,6 +52,9 @@ export default function App() {
           <Route path="/configuracoes-cashback"  element={<ConfiguracoesCashback />} />
           <Route path="/configuracoes-posto"     element={<ConfiguracoesPosto />} />
           <Route path="/ranking"                 element={<Ranking />} />
+          <Route path="/atendentes"              element={<Atendentes />} />
+          <Route path="/pista"                   element={<PainelPista />} />
+          <Route path="/operadores"              element={<Operadores />} />
           <Route path="/completar-cadastro"      element={<CompletarCadastro />} />
         </Route>
         <Route element={<SuperAdminRoute />}>

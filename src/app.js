@@ -20,7 +20,13 @@ const appRoutes                 = require('./routes/appRoutes');
 const adminPhotoRoutes          = require('./routes/adminPhotoRoutes');
 const stripeRoutes              = require('./routes/stripeRoutes');
 const rankingRoutes             = require('./routes/rankingRoutes');
+const ratingRoutes              = require('./routes/ratingRoutes');
+const attendantRoutes           = require('./routes/attendantRoutes');
+const pistaRoutes               = require('./routes/pistaRoutes');
+const agentRoutes               = require('./routes/agentRoutes');
+const operatorRoutes            = require('./routes/operatorRoutes');
 const adminRoutes               = require('./routes/adminRoutes');
+const { operatorLockdown }      = require('./middlewares/operatorLockdown');
 const { handleWebhook: stripeWebhook } = require('./controllers/stripeController');
 
 const app = express();
@@ -98,8 +104,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ── Operator (frentista) lockdown — only the Pista dashboard + baixa endpoints ──
+app.use(operatorLockdown);
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
+app.use('/operators', operatorRoutes);
 app.use('/customers', customerRoutes);
 app.use('/transactions', transactionRoutes);
 app.use('/redeem', redemptionRoutes);
@@ -114,6 +124,10 @@ app.use('/admin/photo-validations', adminPhotoRoutes);
 app.use('/admin',                  adminRoutes);
 app.use('/stripe',                 stripeRoutes);
 app.use('/ranking',                rankingRoutes);
+app.use('/ratings',                ratingRoutes);
+app.use('/attendants',             attendantRoutes);
+app.use('/pista/abastecimentos',   agentRoutes); // agent-token auth — must precede /pista
+app.use('/pista',                  pistaRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => {

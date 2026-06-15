@@ -18,6 +18,26 @@ landing/acessibilidade/
 landing/design/
 *.pdf
 
+# Companytec reference repo (cloned for protocol docs — not part of the project)
+companytec_kit_desenvolvimento/
+
+# Pista agent — local runtime files
+pista-agent/node_modules/
+pista-agent/.env
+pista-agent/data/
+
+# ── Hardening: segredos e dumps (nunca commitar) ──
+# Qualquer .env em qualquer pasta (mantém os .env.example como template)
+**/.env
+**/.env.*
+!**/.env.example
+# Dumps / backups de banco
+*.dump
+*.sql.gz
+*.backup
+supabase_backup*
+pg_dump*
+
 # CRM automotivo MVP
 crm/node_modules/
 crm/.next/
