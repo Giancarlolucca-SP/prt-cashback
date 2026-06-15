@@ -1862,3 +1862,37 @@ Observacoes:
 - O Web temporario em `3001` foi encerrado ao final da rodada.
 - `apps/web/next-env.d.ts` foi restaurado para o import estavel de build apos o Next dev alterar o caminho para `.next/dev`.
 - Proxima melhoria recomendada: criar um helper de QA que suba Web em porta alternativa quando `3000` estiver ocupada por outro app.
+
+## 2026-06-15 - Runner automatico do QA central
+
+Contexto:
+
+- Etapa BMAP: reduzir atrito para repetir o QA central local quando a porta Web padrao esta ocupada.
+- Foco: subir o Web do CRM em porta livre, apontar o QA central para essa porta e encerrar o processo temporario ao final.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-core-auto-local.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `rg -n "qa:core:auto:local|qa-core-auto-local" README.md package.json scripts` | Passou |
+| `npm run qa:core:auto:local` | Passou |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `scripts/qa-core-auto-local.mjs`.
+- Criado comando `npm run qa:core:auto:local`.
+- O runner valida a API existente em `QA_API_URL` ou `http://localhost:3333`.
+- O runner escolhe uma porta Web livre a partir de `WEB_PORT`/`QA_AUTO_WEB_PORT` ou `3000`; nesta rodada, detectou `3000` ocupado e usou `3001`.
+- O runner executou `qa:core:local` com `QA_WEB_URL=http://localhost:3001` e encerrou o Web temporario ao final.
+
+Observacoes:
+
+- A primeira tentativa revelou que checar apenas `127.0.0.1` nao detectava conflito em `::3000`; a checagem foi corrigida para testar a porta sem fixar host.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: centralizar helpers comuns de `qa-core-auto-local` e `qa-daily-auto-local` quando houver nova duplicacao real.

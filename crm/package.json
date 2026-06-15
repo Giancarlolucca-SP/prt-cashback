@@ -24,6 +24,7 @@
     "db:seed:base:measure": "node scripts/measure-base-seed.mjs",
     "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
     "qa:administrative:local": "node scripts/qa-administrative-local.mjs",
+    "qa:core:auto:local": "node scripts/qa-core-auto-local.mjs",
     "qa:core:local": "node scripts/qa-core-local.mjs",
     "qa:daily:auto:local": "node scripts/qa-daily-auto-local.mjs",
     "qa:local": "npm run qa && npm run qa:regression:local",

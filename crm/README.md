@@ -155,6 +155,12 @@ Para validar a trilha central do CRM com API e Web rodando, agrupando RBAC, clie
 npm run qa:core:local
 ```
 
+Se a API ja estiver rodando e a porta `3000` estiver ocupada, use o runner automatico para subir o Web do CRM em uma porta livre e executar a mesma trilha:
+
+```bash
+npm run qa:core:auto:local
+```
+
 Para validar o fluxo Comercial com perfil Vendedor:
 
 ```bash
