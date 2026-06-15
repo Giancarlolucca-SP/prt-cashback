@@ -2298,3 +2298,31 @@ Observacoes:
 
 - Esta rodada cobre os principais endpoints que receberam guards na varredura de schemas.
 - Proxima melhoria recomendada: avaliar endpoints de configuracao/contador para negativo de API, ou passar para a proxima historia funcional do CRM.
+
+## 2026-06-15 - Negativos de API para configuracoes com tracker
+
+Contexto:
+
+- Etapa BMAP: fechar cobertura negativa de API nos endpoints de configuracao com conteudo editavel.
+- Foco: templates de documento, templates de mensagem e observacoes de contador.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run test:smoke:auth` | Passou |
+| `npm run test:unit` | Passou: 21 testes no total |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- O smoke de API bloqueia template de documento com `<img src="https://tracker...">`.
+- O smoke bloqueia template de mensagem com CSS `url(https://tracker...)`.
+- O smoke bloqueia observacoes de contador com markdown image remoto.
+- Os fluxos validos de templates, parametros e contador continuam passando.
+
+Observacoes:
+
+- Com esta rodada, os endpoints de follow-up, estoque, servicos e configuracoes possuem negativos reais contra trackers remotos.
+- Proxima melhoria recomendada: voltar para a proxima historia funcional do CRM ou rodar `qa:daily:auto:local` antes de fechar a trilha de seguranca.

@@ -3661,6 +3661,21 @@ try {
   assert.equal(createCategory.statusCode, 201);
   assert.equal(createCategory.json().data.domain, "vehicle_cost");
 
+  const blockedDocumentTemplateTracker = await app.inject({
+    method: "POST",
+    url: "/settings/document-templates",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: uniqueToken("Contrato Tracker QA"),
+      module: "sales",
+      content: '<img src="https://tracker.example/document.png">',
+    },
+  });
+  assert.equal(blockedDocumentTemplateTracker.statusCode, 400);
+  assert.equal(blockedDocumentTemplateTracker.json().error.code, "VALIDATION_ERROR");
+
   const createDocumentTemplate = await app.inject({
     method: "POST",
     url: "/settings/document-templates",
@@ -3678,6 +3693,21 @@ try {
   });
   assert.equal(createDocumentTemplate.statusCode, 201);
   assert.equal(createDocumentTemplate.json().data.version, 1);
+
+  const blockedMessageTemplateTracker = await app.inject({
+    method: "POST",
+    url: "/settings/message-templates",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: uniqueToken("Mensagem Tracker QA"),
+      channel: "whatsapp",
+      content: "background-image: url(https://tracker.example/message.png)",
+    },
+  });
+  assert.equal(blockedMessageTemplateTracker.statusCode, 400);
+  assert.equal(blockedMessageTemplateTracker.json().error.code, "VALIDATION_ERROR");
 
   const createMessageTemplate = await app.inject({
     method: "POST",
@@ -3776,6 +3806,20 @@ try {
   });
   assert.equal(createTaxSetting.statusCode, 201);
   assert.equal(createTaxSetting.json().data.profitTaxRate, "0.06");
+
+  const blockedAccountantTracker = await app.inject({
+    method: "POST",
+    url: "/settings/accountants",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: "Contabilidade Tracker QA",
+      notes: "![pixel](https://tracker.example/accountant.png)",
+    },
+  });
+  assert.equal(blockedAccountantTracker.statusCode, 400);
+  assert.equal(blockedAccountantTracker.json().error.code, "VALIDATION_ERROR");
 
   const createAccountant = await app.inject({
     method: "POST",
