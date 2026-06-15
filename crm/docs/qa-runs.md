@@ -1763,3 +1763,34 @@ Observacoes:
 
 - A reducao de `module-load` foi clara nesta amostra, embora o total do smoke dependa tambem da variacao dos fluxos de dominio.
 - Proxima melhoria recomendada: consolidar a execucao local de smokes em helpers compartilhados para evitar divergencia entre wrappers.
+
+## 2026-06-15 - Helper compartilhado para smokes TSX
+
+Contexto:
+
+- Etapa BMAP: consolidacao de infraestrutura de testes apos otimizar os wrappers de smoke.
+- Foco: evitar duplicacao na resolucao do TSX local e padronizar variaveis de ambiente dos smokes.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check tests/helpers/run-tsx-smoke.mjs` | Passou |
+| `node --check tests/auth-api.test.mjs` | Passou |
+| `node --check tests/rate-limit.test.mjs` | Passou |
+| `rg -n "execFileSync\\(|node_modules/tsx/dist/cli|npx tsx" tests` | Passou: chamada centralizada no helper |
+| `npm run test:smoke` | Passou |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+
+Resultado:
+
+- Criado `tests/helpers/run-tsx-smoke.mjs`.
+- `tests/auth-api.test.mjs` e `tests/rate-limit.test.mjs` passaram a usar `runTsxSmoke`.
+- A resolucao de `node_modules/tsx/dist/cli.mjs`, `cwd`, `stdio` e merge de `env` ficou centralizada.
+
+Observacoes:
+
+- A cobertura dos smokes nao mudou; a alteracao reduziu duplicacao e risco de divergencia entre wrappers.
+- Proxima melhoria recomendada: iniciar QA funcional/manual dos fluxos centrais do CRM usando a base de smoke estabilizada.
