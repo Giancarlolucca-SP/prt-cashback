@@ -9,7 +9,8 @@
     "db:migrate": "npx prisma migrate dev --name init",
     "db:seed": "node prisma/seed.js",
     "db:studio": "npx prisma studio",
-    "db:generate": "npx prisma generate"
+    "db:generate": "npx prisma generate",
+    "verify:render-db": "node scripts/verify-render-db.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1032.0",

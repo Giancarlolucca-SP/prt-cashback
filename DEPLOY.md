@@ -33,8 +33,9 @@
 ```
 NODE_ENV=production
 DATABASE_URL=<string de conexão do Supabase>
+DIRECT_URL=<string direta do Supabase para migrations>
 JWT_SECRET=<string aleatória de 64 chars>
-SUPABASE_URL=https://jjzbqkrxvrrkszwajhqb.supabase.co
+SUPABASE_URL=<project url do Supabase>
 SUPABASE_SERVICE_KEY=<sua service key>
 SUPABASE_ANON_KEY=<sua anon key>
 FRONTEND_URL=https://postocash.vercel.app
@@ -123,6 +124,7 @@ npx eas-cli build --platform android --profile production
 | Variável | Onde encontrar |
 |---|---|
 | `DATABASE_URL` | Supabase → Settings → Database → Connection string (Transaction) |
+| `DIRECT_URL` | Supabase → Settings → Database → Connection string direta |
 | `SUPABASE_URL` | Supabase → Settings → API → Project URL |
 | `SUPABASE_SERVICE_KEY` | Supabase → Settings → API → service_role key |
 | `SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public key |
@@ -163,6 +165,12 @@ curl https://postocash-api.onrender.com/health
 
 # Config pública (branding)
 curl https://postocash-api.onrender.com/app/config
+```
+
+Para confirmar que o Render esta apontando para o banco esperado, execute localmente com credenciais de teste armazenadas fora do repositorio:
+
+```bash
+CHECK_EMAIL=<email-de-teste> CHECK_PASSWORD=<senha-de-teste> CHECK_ATTENDANT=<nome-atendente> npm run verify:render-db
 ```
 
 Acesse o admin em `https://postocash-admin.vercel.app` e faça login com as credenciais do operador cadastrado no banco.
