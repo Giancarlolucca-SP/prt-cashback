@@ -130,6 +130,8 @@ async function main() {
     await settleWeb(webUrl);
     await run(process.execPath, npmRunArgs("qa:customer-history-preferences:local"), { env: qaEnv, label: "qa:customer-history-preferences:local" });
     await settleWeb(webUrl);
+    await run(process.execPath, npmRunArgs("qa:lead-history:local"), { env: qaEnv, label: "qa:lead-history:local" });
+    await settleWeb(webUrl);
     await run(process.execPath, npmRunArgs("qa:profile-preferences:local"), { env: qaEnv, label: "qa:profile-preferences:local" });
     await settleWeb(webUrl);
     await run(process.execPath, npmRunArgs("qa:visual:local"), { env: qaEnv, label: "qa:visual:local" });

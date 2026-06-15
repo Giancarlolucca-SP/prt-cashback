@@ -2059,3 +2059,35 @@ Observacoes:
 - O Web do CRM foi iniciado temporariamente em `http://localhost:3001` porque a porta `3000` esta ocupada por outro servico local.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: decidir se `qa:lead-history:local` entra no `qa:daily:local` ou fica como QA funcional sob demanda da historia de leads.
+
+## 2026-06-15 - Historico do lead na rotina diaria de QA
+
+Contexto:
+
+- Etapa BMAP: promover o QA funcional do historico do lead para a rotina diaria/regressao.
+- Foco: evitar regressao silenciosa no modal de historico de leads depois de novas historias comerciais.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-daily-auto-local.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `node --test tests/qa-daily-auto-local.test.mjs` | Passou |
+| `npm run typecheck` | Passou |
+| `npm run qa:daily:auto:local` | Passou |
+
+Resultado:
+
+- `qa:daily:local` passou a executar `qa:lead-history:local`.
+- `qa:regression:local` passou a executar `qa:lead-history:local`.
+- `qa:daily:auto:local` passou a executar o QA do historico do lead entre a timeline do cliente e as preferencias de perfil.
+- README foi atualizado para refletir o novo conjunto diario e o exemplo com `QA_WEB_URL`.
+
+Observacoes:
+
+- O runner diario automatico executou o novo `qa:lead-history:local` com sucesso em `http://localhost:3001`.
+- A API `http://localhost:3333` ja estava rodando no ambiente; por isso o processo temporario registrou `EADDRINUSE`, mas o health check usou a API existente e o runner concluiu OK.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: corrigir o helper automatico para detectar processo API existente antes de tentar subir outro em `3333`, reduzindo ruido no log.

@@ -265,6 +265,7 @@ npm run build:api
 npm run build:web
 npm run qa:commercial:local
 npm run qa:customer-history-preferences:local
+npm run qa:lead-history:local
 npm run qa:profile-preferences:local
 npm run qa:visual:local
 ```
@@ -275,6 +276,7 @@ Quando a Web estiver rodando fora da porta padrao, informe a URL nos QAs de nave
 $env:QA_WEB_URL="http://localhost:3001"
 npm run qa:commercial:local
 npm run qa:customer-history-preferences:local
+npm run qa:lead-history:local
 npm run qa:profile-preferences:local
 npm run qa:visual:local
 Remove-Item Env:\QA_WEB_URL
