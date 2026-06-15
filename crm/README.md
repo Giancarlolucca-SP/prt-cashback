@@ -267,6 +267,7 @@ Remove-Item Env:\QA_WEB_URL
 
 O seed foi estruturado para ser reexecutavel sem duplicar os principais registros demo.
 Para testes que precisam apenas da base de loja, usuarios, roles e permissoes, use `SEED_SKIP_DEMO_DATA=true npm run db:seed`.
+Para medir o custo do seed base isolado em multiplas rodadas, use `npm run db:seed:base:measure`; para mudar a quantidade de rodadas, use `npm run db:seed:base:measure -- 5`.
 
 ## Protocolo BMAP aplicado
 

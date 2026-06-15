@@ -1641,3 +1641,38 @@ Observacoes:
 
 - O seed base continua sendo a maior fatia nesta amostra, seguido pelo carregamento da API.
 - Proxima melhoria recomendada: medir o seed base isolado em multiplas rodadas e avaliar se vale criar um modo de seed que pule rehash de senhas quando usuarios dev ja existem.
+
+## 2026-06-14 - Medicao isolada do seed base
+
+Contexto:
+
+- Etapa BMAP: diagnostico de performance do seed base usado pelos smokes de autenticacao.
+- Foco: medir `db:seed` com `SEED_SKIP_DEMO_DATA=true` em multiplas rodadas, sem carregar a API.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/measure-base-seed.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run db:seed:base:measure` | Passou: media ~14,3s |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `scripts/measure-base-seed.mjs`.
+- Criado comando `npm run db:seed:base:measure`, com suporte a argumento de rodadas via `npm run db:seed:base:measure -- 5`.
+- README documenta o uso do medidor junto da massa demo.
+- Medicao desta rodada:
+  - rodada 1: 10.696ms.
+  - rodada 2: 17.111ms.
+  - rodada 3: 14.989ms.
+  - media: 14.265ms.
+
+Observacoes:
+
+- O custo do seed base isolado e material para um smoke frequente, mesmo sem massa demo operacional.
+- Proxima melhoria recomendada: investigar um modo seguro para reutilizar hashes de senha dos usuarios dev quando eles ja existem, evitando rehash Argon2 desnecessario em seeds repetidos.

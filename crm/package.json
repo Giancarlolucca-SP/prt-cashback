@@ -21,6 +21,7 @@
     "db:backup": "node scripts/db-backup.mjs",
     "db:restore": "node scripts/db-restore.mjs",
     "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
+    "db:seed:base:measure": "node scripts/measure-base-seed.mjs",
     "qa": "npm test && npm run typecheck && npm run build:api && npm run build:web",
     "qa:administrative:local": "node scripts/qa-administrative-local.mjs",
     "qa:daily:auto:local": "node scripts/qa-daily-auto-local.mjs",
