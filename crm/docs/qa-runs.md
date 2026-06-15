@@ -1826,3 +1826,39 @@ Observacoes:
 - A execucao completa de `npm run qa:core:local` nao foi rodada nesta etapa porque exige API e Web locais ativos.
 - O modo `--list` valida a composicao do agregador sem depender dos servicos.
 - Proxima melhoria recomendada: subir API/Web pelo fluxo local e executar `npm run qa:core:local` de ponta a ponta.
+
+## 2026-06-15 - QA central ponta a ponta
+
+Contexto:
+
+- Etapa BMAP: validacao funcional/manual assistida dos fluxos centrais do CRM.
+- Foco: executar a trilha central agrupada com API e Web locais ativos.
+- Escopo: apenas projeto novo `crm/`.
+
+Ambiente:
+
+- API existente em `http://localhost:3333`.
+- Porta `3000` estava ocupada por outro servidor local que nao era o Web do CRM.
+- Web do CRM iniciado temporariamente em `http://localhost:3001`.
+- Docker Desktop nao estava disponivel nesta maquina durante a rodada, mas a API local respondeu `200` em `/health/ready`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run dev:check` | Bloqueou corretamente por API/Web ja presentes nas portas padrao |
+| `Invoke-WebRequest http://localhost:3333/health/ready` | Passou: 200 |
+| `Invoke-WebRequest http://localhost:3001/preview` | Passou: 200 |
+| `QA_API_URL=http://localhost:3333 QA_WEB_URL=http://localhost:3001 npm run qa:core:local` | Passou |
+
+Resultado:
+
+- `qa:functional:local` passou: 7 perfis seedados logaram, 16 permissoes RBAC e 8 endpoints sensiveis foram validados, 13 rotas Web responderam.
+- `qa:commercial:local` passou: cliente/lead minimo, mudanca de etapa, kanban de cliente, agenda, proposta de venda, historico de cliente e bloqueios de financeiro/auditoria.
+- `qa:vehicles:local` passou: estoque, lead de compra, avaliacao, checklist, detalhes da avaliacao, bloqueio de aprovacao indevida e bloqueios de financeiro/auditoria/usuarios/vendas.
+
+Observacoes:
+
+- O Web temporario em `3001` foi encerrado ao final da rodada.
+- `apps/web/next-env.d.ts` foi restaurado para o import estavel de build apos o Next dev alterar o caminho para `.next/dev`.
+- Proxima melhoria recomendada: criar um helper de QA que suba Web em porta alternativa quando `3000` estiver ocupada por outro app.
