@@ -179,6 +179,12 @@ Para validar a preferencia da timeline do cliente ponta a ponta:
 npm run qa:customer-history-preferences:local
 ```
 
+Para validar o modal de historico do lead na tela `/leads`:
+
+```bash
+npm run qa:lead-history:local
+```
+
 Para validar a tela de Perfil listando e limpando preferencias pessoais:
 
 ```bash

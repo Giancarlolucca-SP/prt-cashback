@@ -2027,3 +2027,35 @@ Observacoes:
 - O gate confirmou que `/leads` continua renderizando dentro de `qa:functional:local` e `qa:commercial:local`.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: adicionar QA funcional de UI que clique em `Historico` na tela `/leads` e confirme o modal carregado.
+
+## 2026-06-15 - QA funcional do historico do lead
+
+Contexto:
+
+- Etapa BMAP: proteger o modal de historico do lead com validacao funcional de UI.
+- Foco: garantir que a tela `/leads` abre o historico de um lead real com etapas, follow-ups e agenda.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/qa-lead-history-local.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `rg -n "qa:lead-history:local\|qa-lead-history-local\|modal de historico do lead" README.md package.json scripts` | Passou |
+| `npm run typecheck` | Passou |
+| `QA_WEB_URL=http://localhost:3001 QA_API_URL=http://localhost:3333 npm run qa:lead-history:local` | Passou |
+| `npm run test:unit` | Passou: 13 testes |
+
+Resultado:
+
+- Criado `scripts/qa-lead-history-local.mjs`.
+- O QA cria um lead pelo perfil Vendedor, muda a etapa, agenda follow-up e cria compromisso vinculado.
+- O navegador acessa `/leads`, localiza o lead na fila priorizada, clica em `Historico` e valida o modal carregado.
+- README passou a documentar o comando `npm run qa:lead-history:local`.
+
+Observacoes:
+
+- O Web do CRM foi iniciado temporariamente em `http://localhost:3001` porque a porta `3000` esta ocupada por outro servico local.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: decidir se `qa:lead-history:local` entra no `qa:daily:local` ou fica como QA funcional sob demanda da historia de leads.

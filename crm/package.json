@@ -30,6 +30,7 @@
     "qa:local": "npm run qa && npm run qa:regression:local",
     "qa:commercial:local": "node scripts/qa-commercial-local.mjs",
     "qa:customer-history-preferences:local": "node scripts/qa-customer-history-preferences-local.mjs",
+    "qa:lead-history:local": "node scripts/qa-lead-history-local.mjs",
     "qa:daily:local": "npm run typecheck && npm run build:api && npm run build:web && npm run qa:commercial:local && npm run qa:customer-history-preferences:local && npm run qa:profile-preferences:local && npm run qa:visual:local",
     "qa:functional:local": "node scripts/qa-functional-local.mjs",
     "qa:management:local": "node scripts/qa-management-local.mjs",
