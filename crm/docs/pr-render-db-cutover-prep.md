@@ -30,6 +30,9 @@ Branch: `chore/render-db-cutover-prep`
 - `npm run test:unit`
 - `npm run typecheck`
 - `npm run qa:daily:auto:local`
+- `node --check scripts/verify-render-db.mjs`
+- `node scripts/verify-render-db.mjs` sem `CHECK_EMAIL`/`CHECK_PASSWORD`, esperando falha controlada
+- varredura por defaults sensiveis no `render.yaml` e `scripts/verify-render-db.mjs`
 
 Resultado da rotina diaria:
 
@@ -47,6 +50,7 @@ Resultado da rotina diaria:
 - A branch contem um commit de infraestrutura fora de `crm/` e commits de seguranca/QA dentro de `crm/`.
 - A API local existente em `http://localhost:3333` foi reutilizada durante o `qa:daily:auto:local`.
 - O Web temporario foi iniciado em `http://localhost:3001` e encerrado ao final do QA.
+- `scripts/verify-render-db.mjs` exige `CHECK_EMAIL` e `CHECK_PASSWORD`; nenhuma senha padrao fica commitada.
 - Antes do merge, revisar se o PR deve entrar como uma unica entrega ou ser separado em:
   - preparacao Render/Supabase;
   - reforco anti-tracker do CRM.

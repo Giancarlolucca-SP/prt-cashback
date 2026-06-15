@@ -7,10 +7,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Banco = mesmo Supabase do .env local (jjzbqkrxvrrkszwajhqb / us-east-2).
-      # Os VALORES são definidos manualmente no dashboard do Render (Secret), copiados do .env:
-      #   DATABASE_URL → pooler 6543 ...supabase.com:6543/postgres?pgbouncer=true   (runtime)
-      #   DIRECT_URL   → direto 5432 ...supabase.com:5432/postgres                  (migrations)
+      # Banco = Supabase externo. Os valores sao definidos manualmente no dashboard do Render (Secret).
+      # DATABASE_URL: pooler 6543 com pgbouncer=true para runtime.
+      # DIRECT_URL: conexao direta 5432 para migrations.
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
