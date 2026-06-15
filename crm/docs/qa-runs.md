@@ -1577,3 +1577,32 @@ Observacoes:
 - A terceira rodada de timing foi um outlier geral: total ~60,1s, com aumento em todos os checkpoints; portanto ainda nao ha evidencia suficiente de ganho de performance estavel.
 - O valor principal desta etapa e reduzir dependencia implicita da massa demo e deixar o smoke mais autocontido.
 - Proxima melhoria recomendada: adicionar teste unitario pequeno para garantir que `SEED_SKIP_DEMO_DATA=true` permanece documentado/ligado no auth smoke, ou coletar mais rodadas em ambiente menos ruidoso.
+
+## 2026-06-14 - Contrato do seed base nos testes
+
+Contexto:
+
+- Etapa BMAP: proteger a melhoria de seed base sem rodar smoke pesado.
+- Foco: garantir que o auth smoke continua usando `SEED_SKIP_DEMO_DATA=true` e que a flag segue documentada.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --test tests/seed-contract.test.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run test:unit` | Passou: 12 testes |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `tests/seed-contract.test.mjs`.
+- O teste valida que `seed.mjs` reconhece `SEED_SKIP_DEMO_DATA`, que `seedDemoData` fica protegido por `!skipDemoData`, que o auth smoke envia a flag e que o README documenta o uso.
+- `test:unit` passou a incluir o novo contrato.
+
+Observacoes:
+
+- A protecao e estatica por leitura de arquivo, intencionalmente rapida e sem dependencia de banco.
+- Proxima melhoria recomendada: coletar mais timings em ambiente menos ruidoso ou investigar o custo de module-load com cache/runner dedicado.

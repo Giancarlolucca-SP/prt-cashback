@@ -43,7 +43,7 @@
     "test:smoke:auth:summary": "node scripts/summarize-auth-smoke-timings.mjs",
     "test:smoke:auth:timed": "node scripts/run-auth-smoke-timed.mjs",
     "test:smoke:rate": "node --test tests/rate-limit.test.mjs",
-    "test:unit": "node --test tests/dev-check.test.mjs tests/prisma-log-level.test.mjs tests/prisma-schema-contract.test.mjs tests/qa-daily-auto-local.test.mjs tests/sql-injection-guard.test.mjs",
+    "test:unit": "node --test tests/dev-check.test.mjs tests/prisma-log-level.test.mjs tests/prisma-schema-contract.test.mjs tests/qa-daily-auto-local.test.mjs tests/seed-contract.test.mjs tests/sql-injection-guard.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
