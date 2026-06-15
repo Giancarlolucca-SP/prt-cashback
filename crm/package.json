@@ -40,6 +40,7 @@
     "test": "npm run test:unit && npm run test:smoke",
     "test:smoke": "npm run test:smoke:auth && npm run test:smoke:rate",
     "test:smoke:auth": "node --test tests/auth-api.test.mjs",
+    "test:smoke:auth:bootstrap": "tsx scripts/measure-auth-smoke-bootstrap.mjs",
     "test:smoke:auth:summary": "node scripts/summarize-auth-smoke-timings.mjs",
     "test:smoke:auth:timed": "node scripts/run-auth-smoke-timed.mjs",
     "test:smoke:rate": "node --test tests/rate-limit.test.mjs",

@@ -1606,3 +1606,38 @@ Observacoes:
 
 - A protecao e estatica por leitura de arquivo, intencionalmente rapida e sem dependencia de banco.
 - Proxima melhoria recomendada: coletar mais timings em ambiente menos ruidoso ou investigar o custo de module-load com cache/runner dedicado.
+
+## 2026-06-14 - Medidor de bootstrap do auth smoke
+
+Contexto:
+
+- Etapa BMAP: diagnostico especifico do custo de carregamento do auth smoke.
+- Foco: medir import da API, import do DB, seed base, `buildApp()` e shutdown sem rodar todos os fluxos de dominio.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/measure-auth-smoke-bootstrap.mjs` | Passou |
+| `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package ok')"` | Passou |
+| `npm run test:smoke:auth:bootstrap` | Passou: total ~12,2s |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `scripts/measure-auth-smoke-bootstrap.mjs`.
+- Criado comando `npm run test:smoke:auth:bootstrap`, executado via `tsx` para resolver imports TypeScript da API.
+- Medicao desta rodada:
+  - `import-app`: ~4,4s.
+  - `import-db`: ~0,1s.
+  - `db:seed-base`: ~6,3s.
+  - `build-app`: ~1,0s.
+  - `shutdown`: ~0,4s.
+
+Observacoes:
+
+- O seed base continua sendo a maior fatia nesta amostra, seguido pelo carregamento da API.
+- Proxima melhoria recomendada: medir o seed base isolado em multiplas rodadas e avaliar se vale criar um modo de seed que pule rehash de senhas quando usuarios dev ja existem.

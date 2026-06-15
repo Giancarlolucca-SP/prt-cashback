@@ -119,10 +119,12 @@ npm run test:smoke:rate
 Para diagnosticar quais blocos do auth smoke estao mais lentos:
 
 ```bash
+npm run test:smoke:auth:bootstrap
 npm run test:smoke:auth:timed
 ```
 
-O comando tambem registra o historico local em `.dev-logs/auth-smoke-timings.jsonl`.
+`test:smoke:auth:bootstrap` mede apenas carregamento, seed base e bootstrap da API.
+O comando `test:smoke:auth:timed` tambem registra o historico local em `.dev-logs/auth-smoke-timings.jsonl`.
 Para resumir esse historico:
 
 ```bash
