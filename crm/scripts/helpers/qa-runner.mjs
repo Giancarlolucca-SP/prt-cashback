@@ -40,6 +40,15 @@ export async function findFreePort(preferredPort, range = 40) {
   throw new Error(`No free port found from ${preferredPort} to ${preferredPort + range - 1}`);
 }
 
+export async function isUrlReady(url) {
+  try {
+    const response = await fetch(url);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function waitForUrl(url, label, timeoutMs = 90000) {
   const startedAt = Date.now();
   let lastError = null;

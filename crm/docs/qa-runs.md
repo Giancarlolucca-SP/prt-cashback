@@ -2091,3 +2091,35 @@ Observacoes:
 - A API `http://localhost:3333` ja estava rodando no ambiente; por isso o processo temporario registrou `EADDRINUSE`, mas o health check usou a API existente e o runner concluiu OK.
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: corrigir o helper automatico para detectar processo API existente antes de tentar subir outro em `3333`, reduzindo ruido no log.
+
+## 2026-06-15 - Reuso de API existente no QA diario automatico
+
+Contexto:
+
+- Etapa BMAP: reduzir ruido operacional do runner diario automatico.
+- Foco: reaproveitar a API local quando `http://localhost:3333/health/ready` ja esta saudavel.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check scripts/helpers/qa-runner.mjs` | Passou |
+| `node --check scripts/qa-daily-auto-local.mjs` | Passou |
+| `node --test tests/qa-runner.test.mjs tests/qa-daily-auto-local.test.mjs` | Passou: 3 testes |
+| `npm run typecheck` | Passou |
+| `npm run qa:daily:auto:local` | Passou |
+
+Resultado:
+
+- Criado helper `isUrlReady`.
+- `qa:daily:auto:local` agora verifica a API preferida antes de iniciar outro processo.
+- Quando a API ja esta pronta, o runner registra `API existente` e usa a URL atual.
+- O teste de helper cobre URLs saudaveis, indisponiveis e porta ocupada.
+
+Observacoes:
+
+- O runner diario automatico passou sem o erro `EADDRINUSE`.
+- O QA ainda exibe avisos de `eval()` do React em modo dev sob CSP, mas eles nao bloqueiam a rotina e nao aparecem como falha.
+- `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
+- Proxima melhoria recomendada: avaliar se o CSP de desenvolvimento deve permitir `unsafe-eval` apenas em ambiente local para reduzir ruido visual do QA.

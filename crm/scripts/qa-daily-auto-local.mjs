@@ -3,7 +3,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { findFreePort, localBin, npmRunArgs, stopService, waitForUrl } from "./helpers/qa-runner.mjs";
+import { findFreePort, isUrlReady, localBin, npmRunArgs, stopService, waitForUrl } from "./helpers/qa-runner.mjs";
 
 const preferredApiPort = Number(process.env.QA_AUTO_API_PORT || process.env.API_PORT || 3333);
 const preferredWebPort = Number(process.env.QA_AUTO_WEB_PORT || 3001);
@@ -106,13 +106,24 @@ async function main() {
   await run(process.execPath, npmRunArgs("build:api"), { label: "build:api" });
   await run(process.execPath, npmRunArgs("build:web"), { label: "build:web" });
 
-  const apiPort = await findFreePort(preferredApiPort);
+  let apiPort = preferredApiPort;
   const webPort = await findFreePort(preferredWebPort);
-  const apiUrl = `http://localhost:${apiPort}`;
+  let apiUrl = `http://localhost:${apiPort}`;
   const webUrl = `http://localhost:${webPort}`;
-  appendLog(`apiUrl: ${apiUrl}`);
+  let apiProcess = null;
+  let apiLogSuffix = "";
+
+  if (await isUrlReady(`${apiUrl}/health/ready`)) {
+    apiLogSuffix = " (reusing existing API)";
+    console.log(`qa:daily:auto:local API existente: ${apiUrl}`);
+  } else {
+    apiPort = await findFreePort(preferredApiPort);
+    apiUrl = `http://localhost:${apiPort}`;
+    apiProcess = startService("api", process.execPath, [localBin("node_modules/tsx/dist/cli.mjs"), "apps/api/src/server.ts"], { API_PORT: String(apiPort) });
+  }
+
+  appendLog(`apiUrl: ${apiUrl}${apiLogSuffix}`);
   appendLog(`webUrl: ${webUrl}`);
-  const apiProcess = startService("api", process.execPath, [localBin("node_modules/tsx/dist/cli.mjs"), "apps/api/src/server.ts"], { API_PORT: String(apiPort) });
   const webProcess = startService("web", process.execPath, [localBin("node_modules/next/dist/bin/next"), "dev", "apps/web", "-p", String(webPort)], {
     NEXT_PUBLIC_API_URL: apiUrl,
   });
