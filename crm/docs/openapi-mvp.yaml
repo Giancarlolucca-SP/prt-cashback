@@ -126,6 +126,8 @@ paths:
     delete: { tags: [Customers], summary: Arquiva cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /customers/{id}/history:
     get: { tags: [Customers], summary: Lista historico comercial do cliente com vendas, compras, avaliacoes e eventos., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /customers/{id}/history-notes:
+    post: { tags: [Customers], summary: Registra observacao manual na timeline do cliente., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "201": { $ref: "#/components/responses/Created" } } }
   /customers/{id}/kanban-status:
     post: { tags: [Customers], summary: Move cliente/lead no Kanban operacional., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
 

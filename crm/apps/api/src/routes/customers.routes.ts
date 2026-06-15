@@ -67,6 +67,16 @@ const updateCustomerKanbanStatusSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
+const createCustomerHistoryNoteSchema = z.object({
+  description: z
+    .string()
+    .trim()
+    .min(3)
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacao do historico") }),
+  noteType: z.enum(["OBSERVATION", "FOLLOW_UP", "ATTENDANCE", "OTHER"]).default("OBSERVATION"),
+});
+
 const customerKanbanColumns = customerKanbanStatusSchema.options;
 
 const createMinimalLeadSchema = z.object({
@@ -785,6 +795,86 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       events: sanitizedEvents,
       timeline,
     };
+  });
+
+  app.post("/:id/history-notes", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "customers",
+      action: "update_status",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = customerParamsSchema.parse(request.params);
+    const input = createCustomerHistoryNoteSchema.parse(request.body);
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...customerScopeWhere(session.user),
+      },
+    });
+
+    if (!customer) {
+      return denyOwnershipAccess({
+        action: "create_history_note",
+        entityId: params.id,
+        entityType: "customer",
+        message: "Cliente nao encontrado.",
+        module: "customers",
+        request,
+        session,
+      });
+    }
+
+    const event = await prisma.$transaction(async (tx) => {
+      const created = await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          type: "customer.manual_note_created",
+          title: "Observacao manual registrada",
+          description: input.description,
+          metadata: {
+            noteType: input.noteType,
+            origin: "manual",
+            actorRole: session.user.role,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "customers",
+          action: "history_note_created",
+          entityType: "customer",
+          entityId: customer.id,
+          result: "SUCCESS",
+          metadata: {
+            noteType: input.noteType,
+          },
+        },
+      });
+
+      return created;
+    });
+
+    await emitInternalEvent({
+      name: "customer.history_note_created",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "customer",
+      entityId: customer.id,
+      payload: {
+        noteType: input.noteType,
+      },
+    });
+
+    return reply.code(201).send({ data: sanitizeCustomerHistoryEvent(event) });
   });
 
   app.post("/:id/kanban-status", async (request) => {

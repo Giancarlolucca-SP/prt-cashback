@@ -2329,6 +2329,51 @@ try {
   assert.ok(customerHistory.json().timeline.some((item: { kind: string; entityId: string }) => item.kind === "appointment" && item.entityId === createdAppointmentId));
   assert.ok(customerHistory.json().events.length >= 1);
 
+  const blockedCustomerHistoryTracker = await app.inject({
+    method: "POST",
+    url: `/customers/${createdCustomerId}/history-notes`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      description: '<img src="https://tracker.example/customer-history.png">',
+      noteType: "OBSERVATION",
+    },
+  });
+  assert.equal(blockedCustomerHistoryTracker.statusCode, 400);
+  assert.equal(blockedCustomerHistoryTracker.json().error.code, "VALIDATION_ERROR");
+
+  const createCustomerHistoryNote = await app.inject({
+    method: "POST",
+    url: `/customers/${createdCustomerId}/history-notes`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      description: "Cliente pediu retorno com proposta revisada.",
+      noteType: "FOLLOW_UP",
+    },
+  });
+  assert.equal(createCustomerHistoryNote.statusCode, 201);
+  const customerHistoryNoteId = createCustomerHistoryNote.json().data.id as string;
+  assert.equal(createCustomerHistoryNote.json().data.type, "customer.manual_note_created");
+  assert.equal(createCustomerHistoryNote.json().data.description, "Cliente pediu retorno com proposta revisada.");
+
+  const customerHistoryAfterManualNote = await app.inject({
+    method: "GET",
+    url: `/customers/${createdCustomerId}/history`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(customerHistoryAfterManualNote.statusCode, 200);
+  assert.ok(customerHistoryAfterManualNote.json().events.some((event: { id: string }) => event.id === customerHistoryNoteId));
+  assert.ok(
+    customerHistoryAfterManualNote
+      .json()
+      .timeline.some((item: { entityId: string; kind: string; title: string }) => item.entityId === customerHistoryNoteId && item.kind === "event" && item.title === "Observacao manual registrada"),
+  );
+
   const soldInventory = await app.inject({
     method: "GET",
     url: `/inventory/${inventoryId}`,
@@ -2956,6 +3001,19 @@ try {
     },
   });
   assert.equal(sellerMoveOtherCustomer.statusCode, 404);
+
+  const sellerNoteOtherCustomer = await app.inject({
+    method: "POST",
+    url: `/customers/${createdCustomerId}/history-notes`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      description: "Tentativa de observacao fora da carteira.",
+      noteType: "OBSERVATION",
+    },
+  });
+  assert.equal(sellerNoteOtherCustomer.statusCode, 404);
 
   const sellerUpdateOtherCustomer = await app.inject({
     method: "PATCH",

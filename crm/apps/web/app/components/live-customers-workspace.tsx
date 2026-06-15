@@ -89,6 +89,8 @@ type CustomerHistoryEvent = {
   occurredAt: string;
 };
 
+type CustomerHistoryNoteType = "OBSERVATION" | "FOLLOW_UP" | "ATTENDANCE" | "OTHER";
+
 type CustomerHistoryTimelineItem = {
   id: string;
   entityId: string;
@@ -379,6 +381,7 @@ export function LiveCustomersWorkspace() {
   const canUpdateCustomers = hasPermission({ module: "customers", action: "update" });
   const canMoveCustomers = hasPermission({ module: "customers", action: "update_status" });
   const canDeleteCustomers = hasPermission({ module: "customers", action: "delete" });
+  const canCreateHistoryNote = canMoveCustomers;
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [archiveReason, setArchiveReason] = useState("Cadastro duplicado ou inativo por revisao operacional.");
   const [archivingId, setArchivingId] = useState<string | null>(null);
@@ -396,11 +399,15 @@ export function LiveCustomersWorkspace() {
   const [leadForm, setLeadForm] = useState<MinimalLeadFormState>(emptyMinimalLeadForm);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyNoteDescription, setHistoryNoteDescription] = useState("");
+  const [historyNoteError, setHistoryNoteError] = useState<string | null>(null);
+  const [historyNoteType, setHistoryNoteType] = useState<CustomerHistoryNoteType>("OBSERVATION");
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [purchaseFilter, setPurchaseFilter] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [savingHistoryNote, setSavingHistoryNote] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expandedTimelineItemId, setExpandedTimelineItemId] = useState<string | null>(null);
@@ -757,6 +764,9 @@ export function LiveCustomersWorkspace() {
 
     setSelectedHistoryStatus("loading");
     setExpandedTimelineItemId(null);
+    setHistoryNoteDescription("");
+    setHistoryNoteError(null);
+    setHistoryNoteType("OBSERVATION");
     setHistoryModalOpen(false);
     setSelectedHistory({ customer, sales: [], purchaseLeads: [], evaluations: [], appointments: [], events: [], timeline: [] });
 
@@ -766,6 +776,55 @@ export function LiveCustomersWorkspace() {
       setSelectedHistoryStatus("loaded");
     } catch {
       setSelectedHistoryStatus("error");
+    }
+  }
+
+  async function handleCreateHistoryNote(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!token || !selectedHistory || !canCreateHistoryNote || savingHistoryNote) {
+      return;
+    }
+
+    const description = historyNoteDescription.trim();
+    if (description.length < 3) {
+      setHistoryNoteError("Informe uma observacao com pelo menos 3 caracteres.");
+      return;
+    }
+
+    setSavingHistoryNote(true);
+    setHistoryNoteError(null);
+
+    try {
+      const response = await apiPost<{ data: CustomerHistoryEvent }>(`/customers/${selectedHistory.customer.id}/history-notes`, token, {
+        description,
+        noteType: historyNoteType,
+      });
+      const timelineEntry: CustomerHistoryTimelineItem = {
+        id: `event-${response.data.id}`,
+        entityId: response.data.id,
+        kind: "event",
+        title: response.data.title,
+        description: response.data.description ?? response.data.type,
+        occurredAt: response.data.occurredAt,
+      };
+
+      setSelectedHistory((current) =>
+        current
+          ? {
+              ...current,
+              events: [response.data, ...current.events],
+              timeline: [timelineEntry, ...current.timeline].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).slice(0, 20),
+            }
+          : current,
+      );
+      setHistoryNoteDescription("");
+      setHistoryNoteType("OBSERVATION");
+      setSelectedHistoryStatus("loaded");
+    } catch {
+      setHistoryNoteError("Nao foi possivel registrar a observacao. Confira permissao e texto informado.");
+    } finally {
+      setSavingHistoryNote(false);
     }
   }
 
@@ -966,6 +1025,7 @@ export function LiveCustomersWorkspace() {
           <li className={canUpdateCustomers ? "allowed" : "locked"}>Editar ficha mestre</li>
           <li className={canDeleteCustomers ? "allowed" : "locked"}>Arquivar cliente</li>
           <li className={canMoveCustomers ? "allowed" : "locked"}>Mover Kanban</li>
+          <li className={canCreateHistoryNote ? "allowed" : "locked"}>Registrar historico</li>
         </ul>
         <p>{customerAccessMode}</p>
       </section>
@@ -1378,6 +1438,33 @@ export function LiveCustomersWorkspace() {
                       value={selectedHistoryTimelineSearch}
                     />
                   </label>
+                  <form className="customer-history-note-form" onSubmit={handleCreateHistoryNote}>
+                    <div>
+                      <select
+                        aria-label="Tipo da observacao"
+                        disabled={!canCreateHistoryNote || savingHistoryNote}
+                        onChange={(event) => setHistoryNoteType(event.target.value as CustomerHistoryNoteType)}
+                        value={historyNoteType}
+                      >
+                        <option value="OBSERVATION">Observacao</option>
+                        <option value="FOLLOW_UP">Follow-up</option>
+                        <option value="ATTENDANCE">Atendimento</option>
+                        <option value="OTHER">Outro</option>
+                      </select>
+                      <button disabled={!canCreateHistoryNote || savingHistoryNote || historyNoteDescription.trim().length < 3} type="submit">
+                        {savingHistoryNote ? "Registrando..." : "Registrar"}
+                      </button>
+                    </div>
+                    <textarea
+                      aria-label="Nova observacao do historico"
+                      disabled={!canCreateHistoryNote || savingHistoryNote}
+                      maxLength={1000}
+                      onChange={(event) => setHistoryNoteDescription(event.target.value)}
+                      placeholder={canCreateHistoryNote ? "Registrar observacao, atendimento ou follow-up..." : "Seu perfil nao registra observacoes neste historico."}
+                      value={historyNoteDescription}
+                    />
+                    {historyNoteError ? <span>{historyNoteError}</span> : null}
+                  </form>
                   <div className="customer-history-actions">
                     {hasCustomHistoryPreference ? <span>Preferencia salva</span> : null}
                     <button disabled={!hasCustomHistoryPreference || clearingHistoryPreference} onClick={() => void clearCustomerHistoryPreference()} type="button">

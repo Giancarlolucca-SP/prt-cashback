@@ -3247,6 +3247,61 @@ input:focus-visible {
   width: 100%;
 }
 
+.customer-history-note-form {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  width: 100%;
+}
+
+.customer-history-note-form div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.customer-history-note-form select,
+.customer-history-note-form textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  padding: 8px 9px;
+  width: 100%;
+}
+
+.customer-history-note-form textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.customer-history-note-form button {
+  background: var(--ink);
+  border: 0;
+  border-radius: 8px;
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 8px 10px;
+}
+
+.customer-history-note-form button:disabled,
+.customer-history-note-form select:disabled,
+.customer-history-note-form textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.customer-history-note-form > span {
+  color: var(--rose);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .customer-history-actions {
   align-items: center;
   display: flex;

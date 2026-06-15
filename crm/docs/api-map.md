@@ -66,6 +66,8 @@ Endpoints principais:
 - `GET/PATCH/DELETE /customers/:id`
 - `GET /customers/:id/history`
   - Retorna vendas, compras, avaliacoes, appointments, eventos e `timeline` ordenada do cliente; appointments originados de follow-up trazem `origin: "follow_up"`.
+- `POST /customers/:id/history-notes`
+  - Registra observacao manual, atendimento, follow-up ou outro evento operacional na timeline do cliente, respeitando escopo/carteira.
 - `POST /customers/:id/kanban-status`
 - `GET/POST /leads`
 - `GET /leads/outcome-reasons`
