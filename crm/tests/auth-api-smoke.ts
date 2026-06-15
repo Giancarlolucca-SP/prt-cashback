@@ -1000,6 +1000,24 @@ try {
           item.entityId === convertedAppointment.id && item.kind === "appointment" && item.description.includes("Origem follow-up"),
       ),
   );
+
+  const leadHistory = await app.inject({
+    method: "GET",
+    url: `/leads/${createdLeadId}/history`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(leadHistory.statusCode, 200);
+  assert.equal(leadHistory.json().lead.id, createdLeadId);
+  assert.ok(
+    leadHistory
+      .json()
+      .stageHistory.some((item: { fromStage: string; toStage: string }) => item.fromStage === "CONTACTED" && item.toStage === "LOST"),
+  );
+  assert.ok(leadHistory.json().followUps.some((followUp: { id: string }) => followUp.id === createdFollowUp.id));
+  assert.ok(leadHistory.json().appointments.some((appointment: { id: string }) => appointment.id === convertedAppointment.id));
+  assert.ok(leadHistory.json().events.some((event: { action: string }) => event.action === "follow_up_scheduled"));
   checkpoint("leads/follow-ups");
 
   const appraiserLogin = await app.inject({

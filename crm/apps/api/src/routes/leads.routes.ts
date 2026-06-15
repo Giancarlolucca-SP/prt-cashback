@@ -146,6 +146,29 @@ type AppointmentRecord = {
   updatedAt: Date;
 };
 
+type LeadStageHistoryRecord = {
+  id: string;
+  leadId: string;
+  fromStage: string | null;
+  toStage: string;
+  actorUserId: string | null;
+  reason: string | null;
+  createdAt: Date;
+};
+
+type AuditLogRecord = {
+  id: string;
+  actorId: string | null;
+  actorRole: string | null;
+  module: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  result: string;
+  metadata: unknown;
+  createdAt: Date;
+};
+
 function sanitizeLead(lead: LeadRecord) {
   return {
     id: lead.id,
@@ -162,6 +185,18 @@ function sanitizeLead(lead: LeadRecord) {
   };
 }
 
+function sanitizeLeadStageHistory(item: LeadStageHistoryRecord) {
+  return {
+    id: item.id,
+    leadId: item.leadId,
+    fromStage: item.fromStage,
+    toStage: item.toStage,
+    actorUserId: item.actorUserId,
+    reason: item.reason,
+    createdAt: item.createdAt.toISOString(),
+  };
+}
+
 function sanitizeFollowUp(followUp: FollowUpRecord) {
   return {
     id: followUp.id,
@@ -174,6 +209,21 @@ function sanitizeFollowUp(followUp: FollowUpRecord) {
     notes: followUp.notes,
     createdAt: followUp.createdAt.toISOString(),
     updatedAt: followUp.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeAuditEvent(event: AuditLogRecord) {
+  return {
+    id: event.id,
+    actorId: event.actorId,
+    actorRole: event.actorRole,
+    module: event.module,
+    action: event.action,
+    entityType: event.entityType,
+    entityId: event.entityId,
+    result: event.result,
+    metadata: event.metadata,
+    createdAt: event.createdAt.toISOString(),
   };
 }
 
@@ -650,6 +700,83 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       appointment: sanitizeAppointment(result.appointment),
       followUp: sanitizeFollowUp(result.followUp),
     });
+  });
+
+  app.get("/:id/history", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = leadParamsSchema.parse(request.params);
+
+    const lead = await prisma.lead.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...leadScopeWhere(session.user),
+      },
+    });
+
+    if (!lead) {
+      return denyOwnershipAccess({
+        action: "history_read",
+        entityId: params.id,
+        entityType: "lead",
+        message: "Lead nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
+    }
+
+    const [stageHistory, followUps, appointments, events] = await Promise.all([
+      prisma.leadStageHistory.findMany({
+        where: {
+          leadId: lead.id,
+          storeId: session.user.storeId,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      prisma.followUp.findMany({
+        where: {
+          leadId: lead.id,
+          storeId: session.user.storeId,
+          ...followUpScopeWhere(session.user),
+        },
+        orderBy: [{ dueAt: "desc" }, { createdAt: "desc" }],
+        take: 50,
+      }),
+      prisma.appointment.findMany({
+        where: {
+          leadId: lead.id,
+          storeId: session.user.storeId,
+          deletedAt: null,
+        },
+        orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
+        take: 50,
+      }),
+      prisma.auditLog.findMany({
+        where: {
+          storeId: session.user.storeId,
+          entityType: "lead",
+          entityId: lead.id,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    ]);
+
+    return {
+      lead: sanitizeLead(lead),
+      stageHistory: stageHistory.map(sanitizeLeadStageHistory),
+      followUps: followUps.map(sanitizeFollowUp),
+      appointments: appointments.map(sanitizeAppointment),
+      events: events.map(sanitizeAuditEvent),
+    };
   });
 
   app.get("/:id", async (request) => {

@@ -1967,3 +1967,34 @@ Observacoes:
 
 - `apps/web/next-env.d.ts` foi restaurado apos o Next dev alterar o import para `.next/dev`.
 - Proxima melhoria recomendada: usar `npm run qa:pre-story:local` como primeiro passo antes da proxima historia funcional de produto.
+
+## 2026-06-15 - Historico operacional do lead
+
+Contexto:
+
+- Etapa BMAP: primeira micro-historia funcional apos estabilizar o gate pre-story.
+- Foco: dar visao historica propria ao lead, sem depender apenas do historico consolidado do cliente.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run test:smoke:auth` | Passou |
+| `npm run test:unit` | Passou: 13 testes |
+| `npm run qa:pre-story:local` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- Criado `GET /leads/:id/history`.
+- A rota retorna `lead`, `stageHistory`, `followUps`, `appointments` e `events` do lead.
+- A rota respeita o mesmo ownership/escopo de leitura do lead e retorna 404 auditavel quando o lead nao pertence ao usuario.
+- O auth smoke passou a validar a rota usando um lead com mudanca de etapa, follow-up concluido e appointment convertido.
+- O gate `qa:pre-story:local` passou completo apos a mudanca.
+
+Observacoes:
+
+- A UI ainda nao exibe esse historico; a API ficou pronta e protegida para a proxima etapa de frontend.
+- Proxima melhoria recomendada: adicionar painel/modal de historico do lead na tela `/leads`, reaproveitando o padrao visual do historico do cliente.
