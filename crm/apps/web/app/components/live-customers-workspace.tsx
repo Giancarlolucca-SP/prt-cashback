@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, CarFront, FileText, History, Phone, Plus, Search, UserRoundCheck, X } from "lucide-react";
+import { CalendarClock, CarFront, FileText, History, LockKeyhole, Phone, Plus, Search, ShieldCheck, UserRoundCheck, X } from "lucide-react";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../auth/auth-client";
 import { useAuth } from "../auth/auth-provider";
 
@@ -416,6 +416,12 @@ export function LiveCustomersWorkspace() {
   const historyPreferenceKey = user?.id ? `gt3-crm-customer-history:${user.id}` : null;
   const skipNextHistoryPreferenceSync = useRef(false);
   const hasCustomHistoryPreference = selectedHistoryTimelineFilter !== "all" || selectedHistoryTimelineSearch.trim().length > 0;
+  const roleLabel = user?.role ? user.role.replace(/_/g, " ").toLowerCase() : "perfil nao identificado";
+  const customerAccessMode = canUpdateCustomers
+    ? "Ficha mestre liberada para edicao administrativa."
+    : "Ficha mestre em somente leitura; use historico e Kanban conforme sua carteira.";
+  const customerArchiveMode = canDeleteCustomers ? "Arquivamento liberado com motivo auditavel." : "Arquivamento restrito a Administrativo/Gestor.";
+  const customerKanbanMode = canMoveCustomers ? "Movimentacao operacional liberada no Kanban." : "Kanban em consulta; movimentacao bloqueada para este perfil.";
 
   useEffect(() => {
     if (!token) {
@@ -946,6 +952,24 @@ export function LiveCustomersWorkspace() {
         </button>
       </section>
 
+      <section className="customer-access-panel panel" aria-label="Permissoes desta tela">
+        <div>
+          <ShieldCheck aria-hidden="true" size={20} />
+          <div>
+            <p className="eyebrow">Perfil atual</p>
+            <h3>{roleLabel}</h3>
+          </div>
+        </div>
+        <ul>
+          <li className={canCreateCustomers ? "allowed" : "locked"}>Cliente completo</li>
+          <li className={canCreateLeads ? "allowed" : "locked"}>Lead minimo</li>
+          <li className={canUpdateCustomers ? "allowed" : "locked"}>Editar ficha mestre</li>
+          <li className={canDeleteCustomers ? "allowed" : "locked"}>Arquivar cliente</li>
+          <li className={canMoveCustomers ? "allowed" : "locked"}>Mover Kanban</li>
+        </ul>
+        <p>{customerAccessMode}</p>
+      </section>
+
       {modalOpen ? (
         <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label={editingCustomer ? "Editar cliente" : "Novo cliente"}>
           <section className="dre-modal lead-modal">
@@ -960,6 +984,11 @@ export function LiveCustomersWorkspace() {
             </header>
 
             <form className="lead-modal-form" onSubmit={handleCreateCustomer}>
+              {editingCustomer && !canUpdateCustomers ? (
+                <p className="lead-modal-warning">
+                  Este perfil nao pode editar dados sensiveis da ficha mestre. A permissao final tambem e validada no backend.
+                </p>
+              ) : null}
               <label>
                 Nome
                 <input
@@ -1273,19 +1302,26 @@ export function LiveCustomersWorkspace() {
                   <span>{customer.origin ?? "Origem nao informada"}</span>
                   <span>{customer.primaryInterest ?? "Interesse principal pendente"}</span>
                   <span>{birthMonthLabel(customer.birthDate)}</span>
+                  {!canUpdateCustomers ? <span className="customer-scope-chip">Ficha somente leitura</span> : null}
+                  {!canDeleteCustomers ? <span className="customer-scope-chip locked">Arquivamento restrito</span> : null}
                 </div>
                 <div className="blueprint-value">
                   <strong>{relativeDate(customer.updatedAt)}</strong>
                   <span>{statusLabels[customer.status]}</span>
                   <div className="customer-row-actions">
-                    <button disabled={!canUpdateCustomers} onClick={() => openEditModal(customer)} type="button">
+                    <button disabled={!canUpdateCustomers} onClick={() => openEditModal(customer)} title={!canUpdateCustomers ? customerAccessMode : undefined} type="button">
                       Editar
                     </button>
                     <button disabled={!canReadCustomers} onClick={() => void openCustomerHistory(customer)} type="button">
                       Historico
                     </button>
                     {customer.status !== "ARCHIVED" ? (
-                      <button disabled={!canDeleteCustomers || archivingId === customer.id} onClick={() => void handleArchiveCustomer(customer)} type="button">
+                      <button
+                        disabled={!canDeleteCustomers || archivingId === customer.id}
+                        onClick={() => void handleArchiveCustomer(customer)}
+                        title={!canDeleteCustomers ? customerArchiveMode : undefined}
+                        type="button"
+                      >
                         {archivingId === customer.id ? "Arquivando" : "Arquivar"}
                       </button>
                     ) : null}
@@ -1362,12 +1398,13 @@ export function LiveCustomersWorkspace() {
               </li>
             ) : null}
             <li>
-              <FileText aria-hidden="true" size={18} />
+              {canDeleteCustomers ? <FileText aria-hidden="true" size={18} /> : <LockKeyhole aria-hidden="true" size={18} />}
               <div>
                 <strong>Motivo de arquivamento</strong>
-                <span>Usado para auditoria quando um cliente e arquivado.</span>
+                <span>{customerArchiveMode}</span>
                 <input
                   className="customer-archive-reason"
+                  disabled={!canDeleteCustomers}
                   minLength={8}
                   onChange={(event) => setArchiveReason(event.target.value)}
                   value={archiveReason}
@@ -1385,7 +1422,7 @@ export function LiveCustomersWorkspace() {
               <FileText aria-hidden="true" size={18} />
               <div>
                 <strong>Dados sensiveis</strong>
-                <span>CPF/CNPJ, nascimento e documentos obedecem RBAC.</span>
+                <span>{customerAccessMode}</span>
               </div>
             </li>
             <li>
@@ -1399,7 +1436,7 @@ export function LiveCustomersWorkspace() {
               <CalendarClock aria-hidden="true" size={18} />
               <div>
                 <strong>Rotinas futuras</strong>
-                <span>Gerar alertas de recompra e aniversario quando autorizado.</span>
+                <span>{customerKanbanMode}</span>
               </div>
             </li>
             <li>
