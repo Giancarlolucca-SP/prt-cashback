@@ -1514,3 +1514,33 @@ Observacoes:
 
 - A primeira leitura encontrou 1 rodada local registrada em `.dev-logs/auth-smoke-timings.jsonl`.
 - Proxima melhoria recomendada: coletar mais rodadas e usar o resumo para decidir entre otimizar seed/bootstrap ou particionar o auth smoke.
+
+## 2026-06-14 - Segunda amostra dos timings do auth smoke
+
+Contexto:
+
+- Etapa BMAP: decisao orientada por dados sobre a regressao pesada.
+- Foco: comparar mais de uma execucao antes de otimizar seed/bootstrap ou particionar o auth smoke.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run test:smoke:auth:timed` | Passou: runner ~17,7s |
+| `npm run test:smoke:auth:summary` | Passou: 2 rodadas lidas |
+
+Resultado:
+
+- O historico local passou a ter 2 rodadas bem-sucedidas.
+- Resumo com 2 rodadas:
+  - Total medio: ~19,0s; minimo ~17,6s; maximo ~20,4s.
+  - `module-load`: media ~5,7s.
+  - `db:seed`: media ~3,8s.
+  - `app-bootstrap`: media ~0,7s.
+  - Maior bloco de dominio: `sales/finance/contracts/dispatch`, media ~1,4s.
+
+Observacoes:
+
+- Com as duas amostras atuais, particionar o auth smoke por dominio tende a economizar menos que reduzir custo de module-load/seed para feedback local.
+- Proxima melhoria recomendada: investigar se `db:seed` pode ter modo rapido/idempotente para testes, ou se o auth smoke pode reutilizar seed validado em ambiente local controlado.
