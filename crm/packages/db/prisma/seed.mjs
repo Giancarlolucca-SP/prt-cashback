@@ -4,6 +4,7 @@ import argon2 from "argon2";
 const prisma = new PrismaClient();
 
 const DEV_PASSWORD = "Gt3@2026dev";
+const skipDemoData = process.env.SEED_SKIP_DEMO_DATA === "true";
 
 async function hashPassword(password) {
   return argon2.hash(password, {
@@ -540,10 +541,15 @@ async function main() {
     userByRole.set(role, user);
   }
 
-  await seedDemoData(store, userByRole);
+  if (!skipDemoData) {
+    await seedDemoData(store, userByRole);
+  }
 
   console.log("Seed concluido.");
   console.log(`Loja: ${store.name}`);
+  if (skipDemoData) {
+    console.log("Massa demo operacional: ignorada por SEED_SKIP_DEMO_DATA=true");
+  }
   console.log("Usuarios dev:");
   for (const [, email] of users) {
     console.log(`- ${email}`);

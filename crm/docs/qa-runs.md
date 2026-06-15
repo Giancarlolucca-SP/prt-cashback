@@ -1544,3 +1544,36 @@ Observacoes:
 
 - Com as duas amostras atuais, particionar o auth smoke por dominio tende a economizar menos que reduzir custo de module-load/seed para feedback local.
 - Proxima melhoria recomendada: investigar se `db:seed` pode ter modo rapido/idempotente para testes, ou se o auth smoke pode reutilizar seed validado em ambiente local controlado.
+
+## 2026-06-14 - Seed base para auth smoke
+
+Contexto:
+
+- Etapa BMAP: reduzir preparacao desnecessaria em smokes que criam a propria massa operacional.
+- Foco: permitir que testes usem apenas loja, usuarios, roles e permissoes sem semear dados demo completos.
+- Escopo: apenas projeto novo `crm/`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `node --check packages/db/prisma/seed.mjs` | Passou |
+| `node --check tests/auth-api-smoke.ts` | Passou |
+| `npm run test:smoke:auth:timed` | Passou: runner ~60,2s |
+| `npm run test:smoke:auth:summary` | Passou: 3 rodadas lidas |
+| `npm run test:unit` | Passou |
+| `npm run typecheck` | Passou |
+| `git diff --check -- crm` | Passou |
+
+Resultado:
+
+- `packages/db/prisma/seed.mjs` passou a aceitar `SEED_SKIP_DEMO_DATA=true`.
+- O modo base ainda cria loja, configuracao de marca, roles, permissoes, relacoes role-permission, usuarios dev e escopos.
+- O auth smoke passou a executar `db:seed` com `SEED_SKIP_DEMO_DATA=true`, validando que ele nao depende da massa demo operacional.
+- README documenta a flag para testes que precisam apenas da base de acesso.
+
+Observacoes:
+
+- A terceira rodada de timing foi um outlier geral: total ~60,1s, com aumento em todos os checkpoints; portanto ainda nao ha evidencia suficiente de ganho de performance estavel.
+- O valor principal desta etapa e reduzir dependencia implicita da massa demo e deixar o smoke mais autocontido.
+- Proxima melhoria recomendada: adicionar teste unitario pequeno para garantir que `SEED_SKIP_DEMO_DATA=true` permanece documentado/ligado no auth smoke, ou coletar mais rodadas em ambiente menos ruidoso.

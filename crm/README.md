@@ -264,6 +264,7 @@ Remove-Item Env:\QA_WEB_URL
 - repasse, conversas, automacoes, anexos e auditoria.
 
 O seed foi estruturado para ser reexecutavel sem duplicar os principais registros demo.
+Para testes que precisam apenas da base de loja, usuarios, roles e permissoes, use `SEED_SKIP_DEMO_DATA=true npm run db:seed`.
 
 ## Protocolo BMAP aplicado
 

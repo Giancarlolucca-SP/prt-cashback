@@ -51,7 +51,10 @@ checkpoint("module-load");
 execSync("npm run db:seed", {
   cwd: process.cwd(),
   stdio: "ignore",
-  env: process.env,
+  env: {
+    ...process.env,
+    SEED_SKIP_DEMO_DATA: "true",
+  },
 });
 checkpoint("db:seed");
 
