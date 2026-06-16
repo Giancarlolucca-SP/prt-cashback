@@ -100,7 +100,7 @@ type CustomerHistoryTimelineItem = {
   occurredAt: string;
 };
 
-type CustomerHistoryTimelineFilter = CustomerHistoryTimelineItem["kind"] | "all";
+type CustomerHistoryTimelineFilter = "all" | "attendance" | "kanban" | "scheduling" | "sale" | "system";
 
 type CustomerHistoryPreference = {
   filter?: CustomerHistoryTimelineFilter;
@@ -174,11 +174,11 @@ const emptyMinimalLeadForm: MinimalLeadFormState = {
 
 const customerHistoryTimelineFilters: Array<{ key: CustomerHistoryTimelineFilter; label: string }> = [
   { key: "all", label: "Todos" },
-  { key: "sale", label: "Vendas" },
-  { key: "appointment", label: "Agenda" },
-  { key: "purchase_lead", label: "Compras" },
-  { key: "evaluation", label: "Avaliacoes" },
-  { key: "event", label: "Eventos" },
+  { key: "attendance", label: "Atendimento" },
+  { key: "kanban", label: "Kanban" },
+  { key: "scheduling", label: "Agendamentos" },
+  { key: "sale", label: "Venda" },
+  { key: "system", label: "Sistema" },
 ];
 
 const customerHistoryPreferenceApiKey = "customer_history_timeline";
@@ -348,14 +348,35 @@ function isCustomerHistoryTimelineFilter(value: unknown): value is CustomerHisto
   return customerHistoryTimelineFilters.some((filter) => filter.key === value);
 }
 
+function normalizeCustomerHistoryTimelineFilter(value: unknown): CustomerHistoryTimelineFilter | null {
+  if (isCustomerHistoryTimelineFilter(value)) {
+    return value;
+  }
+
+  if (value === "appointment") {
+    return "scheduling";
+  }
+
+  if (value === "sale" || value === "purchase_lead" || value === "evaluation") {
+    return "sale";
+  }
+
+  if (value === "event") {
+    return "system";
+  }
+
+  return null;
+}
+
 function normalizeCustomerHistoryPreference(value: unknown): CustomerHistoryPreference | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
   const preference = value as { filter?: unknown; search?: unknown };
+  const filter = normalizeCustomerHistoryTimelineFilter(preference.filter);
   return {
-    ...(isCustomerHistoryTimelineFilter(preference.filter) ? { filter: preference.filter } : {}),
+    ...(filter ? { filter } : {}),
     ...(typeof preference.search === "string" ? { search: preference.search.slice(0, 80) } : {}),
   };
 }
@@ -870,17 +891,43 @@ export function LiveCustomersWorkspace() {
       return [];
     }
 
-    const filteredByKind =
+    const timelineGroup = (item: CustomerHistoryTimelineItem): CustomerHistoryTimelineFilter => {
+      if (item.kind === "appointment") {
+        return "scheduling";
+      }
+
+      if (item.kind === "sale" || item.kind === "purchase_lead" || item.kind === "evaluation") {
+        return "sale";
+      }
+
+      const eventType = selectedHistory.events.find((event) => event.id === item.entityId)?.type ?? "";
+
+      if (eventType.includes(".appointment_")) {
+        return "scheduling";
+      }
+
+      if (eventType.includes(".kanban_")) {
+        return "kanban";
+      }
+
+      if (eventType === "customer.manual_note_created") {
+        return "attendance";
+      }
+
+      return "system";
+    };
+
+    const filteredByGroup =
       selectedHistoryTimelineFilter === "all"
         ? selectedHistory.timeline
-        : selectedHistory.timeline.filter((item) => item.kind === selectedHistoryTimelineFilter);
+        : selectedHistory.timeline.filter((item) => timelineGroup(item) === selectedHistoryTimelineFilter);
     const searchTerm = selectedHistoryTimelineSearch.trim().toLowerCase();
 
     if (!searchTerm) {
-      return filteredByKind;
+      return filteredByGroup;
     }
 
-    return filteredByKind.filter((item) =>
+    return filteredByGroup.filter((item) =>
       [item.title, item.description, item.kind, item.occurredAt].some((value) => value?.toLowerCase().includes(searchTerm)),
     );
   }, [selectedHistory, selectedHistoryTimelineFilter, selectedHistoryTimelineSearch]);
