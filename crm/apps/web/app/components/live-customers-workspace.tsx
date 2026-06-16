@@ -910,6 +910,10 @@ export function LiveCustomersWorkspace() {
         return "kanban";
       }
 
+      if (eventType.includes(".sales_handoff_")) {
+        return "sale";
+      }
+
       if (eventType === "customer.manual_note_created") {
         return "attendance";
       }

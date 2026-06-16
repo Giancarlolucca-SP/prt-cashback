@@ -3001,6 +3001,40 @@ try {
   assert.equal(sellerMoveOwnCustomer.statusCode, 200);
   assert.equal(sellerMoveOwnCustomer.json().data.operationalStatus, "NEGOTIATION");
 
+  const sellerPrepareSalesHandoff = await app.inject({
+    method: "POST",
+    url: `/customers/${sellerCustomerId}/kanban-status`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      toStatus: "WAITING_PURCHASE_CONFIRMATION",
+      reason: "Cliente aguardando confirmacao de compra apos proposta alinhada.",
+    },
+  });
+  assert.equal(sellerPrepareSalesHandoff.statusCode, 200);
+  assert.equal(sellerPrepareSalesHandoff.json().data.operationalStatus, "WAITING_PURCHASE_CONFIRMATION");
+
+  const sellerCustomerHistoryAfterHandoff = await app.inject({
+    method: "GET",
+    url: `/customers/${sellerCustomerId}/history`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+  });
+  assert.equal(sellerCustomerHistoryAfterHandoff.statusCode, 200);
+  assert.ok(
+    sellerCustomerHistoryAfterHandoff
+      .json()
+      .events.some(
+        (event: { metadata: { nextWorkflow?: string; toStatus?: string } | null; title: string; type: string }) =>
+          event.type === "customer.sales_handoff_prepared" &&
+          event.title === "Passagem futura para vendas preparada" &&
+          event.metadata?.toStatus === "WAITING_PURCHASE_CONFIRMATION" &&
+          event.metadata?.nextWorkflow === "sales_documentation_kanban",
+      ),
+  );
+
   const sellerKanban = await app.inject({
     method: "GET",
     url: "/customers/kanban?page=1&page_size=20",
@@ -3012,7 +3046,7 @@ try {
   assert.ok(
     sellerKanban
       .json()
-      .columns.some((column: { status: string; items: Array<{ id: string }> }) => column.status === "NEGOTIATION" && column.items.some((item) => item.id === sellerCustomerId)),
+      .columns.some((column: { status: string; items: Array<{ id: string }> }) => column.status === "WAITING_PURCHASE_CONFIRMATION" && column.items.some((item) => item.id === sellerCustomerId)),
   );
 
   const sellerOtherCustomer = await app.inject({

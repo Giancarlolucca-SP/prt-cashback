@@ -936,6 +936,25 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         },
       });
 
+      if (input.toStatus === "WAITING_PURCHASE_CONFIRMATION") {
+        await tx.customerHistoryEvent.create({
+          data: {
+            storeId: session.user.storeId,
+            customerId: current.id,
+            type: "customer.sales_handoff_prepared",
+            title: "Passagem futura para vendas preparada",
+            description: input.reason,
+            metadata: {
+              fromStatus,
+              toStatus: input.toStatus,
+              nextWorkflow: "sales_documentation_kanban",
+              currentWorkflow: "lead_attendance_kanban",
+              reason: input.reason,
+            },
+          },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           storeId: session.user.storeId,
@@ -974,6 +993,21 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         reason: input.reason,
       },
     });
+
+    if (input.toStatus === "WAITING_PURCHASE_CONFIRMATION") {
+      await emitInternalEvent({
+        name: "customer.sales_handoff_prepared",
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        entityType: "customer",
+        entityId: customer.id,
+        payload: {
+          fromStatus,
+          toStatus: input.toStatus,
+          nextWorkflow: "sales_documentation_kanban",
+        },
+      });
+    }
 
     return {
       data: {

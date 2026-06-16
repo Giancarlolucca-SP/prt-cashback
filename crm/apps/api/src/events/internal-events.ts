@@ -20,6 +20,7 @@ export type InternalEventName =
   | "customer.deleted"
   | "customer.kanban_status_changed"
   | "customer.history_note_created"
+  | "customer.sales_handoff_prepared"
   | "lead.created"
   | "lead.follow_up_completed"
   | "lead.follow_up_converted"
