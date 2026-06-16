@@ -169,7 +169,7 @@ const fallbackOrders: ServiceOrder[] = [
 
 const leadStatuses: LeadStatus[] = ["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "COLD", "WON", "LOST"];
 const purchaseStatuses: PurchaseStatus[] = ["OPEN", "EVALUATING", "APPROVED", "REJECTED", "PURCHASED", "CANCELLED"];
-const inventoryStatuses: InventoryStatus[] = ["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REPASSE", "REMOVED"];
+const commonInventoryStatuses: InventoryStatus[] = ["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REMOVED"];
 const serviceStatuses: ServiceStatus[] = ["OPEN", "SCHEDULED", "RUNNING", "WAITING_PROVIDER", "WAITING_INVOICE", "DONE", "CANCELLED"];
 
 const leadLabels: Record<LeadStatus, string> = {
@@ -281,6 +281,8 @@ export function LiveKanbansWorkspace() {
     }
   }, [isLoading, loadBoards]);
 
+  const commonInventory = useMemo(() => inventory.filter((item) => item.status !== "REPASSE"), [inventory]);
+
   const boards = useMemo<Board[]>(() => [
     {
       accent: "teal",
@@ -296,7 +298,7 @@ export function LiveKanbansWorkspace() {
     },
     {
       accent: "blue",
-      columns: makeColumns(inventoryStatuses, inventoryLabels, inventory, (item) => `${vehicleLabel(item)} - ${money(item.askingPrice)}`),
+      columns: makeColumns(commonInventoryStatuses, inventoryLabels, commonInventory, (item) => `${vehicleLabel(item)} - ${money(item.askingPrice)}`),
       purpose: "Transformar veiculo em item pronto para venda e anuncio.",
       title: "Estoque / Preparacao",
     },
@@ -306,24 +308,24 @@ export function LiveKanbansWorkspace() {
       purpose: "Controlar execucao, prestadores, anexos, NF e checklist final.",
       title: "Servicos / OS",
     },
-  ], [inventory, leads, orders, purchases]);
+  ], [commonInventory, leads, orders, purchases]);
 
   const metrics = useMemo(() => {
     const activeCards =
       leads.filter((lead) => lead.status !== "WON" && lead.status !== "LOST").length +
       purchases.filter((purchase) => !["CANCELLED", "PURCHASED", "REJECTED"].includes(purchase.status)).length +
-      inventory.filter((item) => item.status !== "REMOVED" && item.status !== "SOLD").length +
+      commonInventory.filter((item) => item.status !== "REMOVED" && item.status !== "SOLD").length +
       orders.filter((order) => order.status !== "CANCELLED" && order.status !== "DONE").length;
 
     const bottlenecks =
       leads.filter((lead) => lead.status === "COLD").length +
-      inventory.filter((item) => item.status === "IN_PREPARATION" || item.status === "REPASSE").length +
+      commonInventory.filter((item) => item.status === "IN_PREPARATION").length +
       orders.filter((order) => order.status === "WAITING_INVOICE" || order.status === "WAITING_PROVIDER").length;
 
     const completed =
       leads.filter((lead) => lead.status === "WON").length +
       purchases.filter((purchase) => purchase.status === "PURCHASED").length +
-      inventory.filter((item) => item.status === "AVAILABLE").length +
+      commonInventory.filter((item) => item.status === "AVAILABLE").length +
       orders.filter((order) => order.status === "DONE").length;
 
     const columnCount = boards.reduce((total, board) => total + board.columns.length, 0);
@@ -331,10 +333,10 @@ export function LiveKanbansWorkspace() {
     return [
       { label: "Fluxos conectados", value: String(boards.length), detail: "leads, compra, estoque e OS", tone: "teal" },
       { label: "Cards ativos", value: String(activeCards), detail: "itens ainda em movimento", tone: "blue" },
-      { label: "Gargalos", value: String(bottlenecks), detail: "risco, preparo, repasse ou espera", tone: "amber" },
+      { label: "Gargalos", value: String(bottlenecks), detail: "risco, preparo ou espera", tone: "amber" },
       { label: "Colunas vivas", value: String(columnCount), detail: `${completed} concluidos/prontos`, tone: "rose" },
     ];
-  }, [boards, inventory, leads, orders, purchases]);
+  }, [boards, commonInventory, leads, orders, purchases]);
 
   const statusText = status === "loading" ? "Atualizando dados" : status === "error" ? "Parcial com fallback" : "Dados conectados";
 
@@ -393,7 +395,7 @@ export function LiveKanbansWorkspace() {
           <ul className="macro-note-list">
             <li>Cada coluna reflete status reais dos modulos conectados.</li>
             <li>Permissoes controlam quais fluxos sao buscados da API.</li>
-            <li>Gargalos destacam leads frios, preparo, repasse e OS esperando terceiros ou NF.</li>
+            <li>Gargalos destacam leads frios, preparo e OS esperando terceiros ou NF.</li>
             <li>Drag-and-drop pode entrar depois com endpoints especificos de transicao.</li>
           </ul>
         </article>
