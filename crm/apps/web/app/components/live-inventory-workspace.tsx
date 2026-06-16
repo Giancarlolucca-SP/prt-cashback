@@ -16,6 +16,7 @@ type Vehicle = {
   plate: string | null;
   color: string | null;
   mileage: number | null;
+  relevantOptions: string | null;
 };
 
 type InventoryItem = {
@@ -49,6 +50,7 @@ type InventoryFormState = {
   ownerCustomerId: string;
   plate: string;
   purchaseCost: string;
+  relevantOptions: string;
   status: InventoryStatus;
   version: string;
   yearModel: string;
@@ -102,6 +104,7 @@ const emptyForm: InventoryFormState = {
   ownerCustomerId: "",
   plate: "",
   purchaseCost: "",
+  relevantOptions: "",
   status: "IN_PREPARATION",
   version: "",
   yearModel: "",
@@ -117,7 +120,7 @@ const emptyCostForm: CostFormState = {
 const fallbackItems: InventoryItem[] = [
   {
     id: "fallback-1",
-    vehicle: { brand: "Toyota", model: "Corolla", version: "XEI", yearModel: 2021, plate: "GTC-2A91", color: "Prata", mileage: 45000 },
+    vehicle: { brand: "Toyota", model: "Corolla", version: "XEI", yearModel: 2021, plate: "GTC-2A91", color: "Prata", mileage: 45000, relevantOptions: "Couro, multimidia, camera de re" },
     ownershipType: "OWN",
     status: "AVAILABLE",
     ownerCustomerId: null,
@@ -128,7 +131,7 @@ const fallbackItems: InventoryItem[] = [
   },
   {
     id: "fallback-2",
-    vehicle: { brand: "Jeep", model: "Compass", version: "Longitude", yearModel: 2020, plate: "FJN-8D22", color: "Branco", mileage: 69000 },
+    vehicle: { brand: "Jeep", model: "Compass", version: "Longitude", yearModel: 2020, plate: "FJN-8D22", color: "Branco", mileage: 69000, relevantOptions: "Automatica, sensor de estacionamento" },
     ownershipType: "OWN",
     status: "IN_PREPARATION",
     ownerCustomerId: null,
@@ -293,6 +296,7 @@ export function LiveInventoryWorkspace() {
           mileage: form.mileage ? Number(form.mileage) : undefined,
           model: form.model.trim(),
           plate: form.plate.trim() || undefined,
+          relevantOptions: form.relevantOptions.trim() || undefined,
           version: form.version.trim() || undefined,
           yearModel: form.yearModel ? Number(form.yearModel) : undefined,
         },
@@ -427,6 +431,7 @@ export function LiveInventoryWorkspace() {
             <span className={item.ownershipType === "CONSIGNED" ? "ownership-chip consigned" : "ownership-chip"}>{ownershipLabels[item.ownershipType]}</span>
             <span>{statusLabels[item.status]}</span>
             <span>{item.notes ?? "Sem observacoes"}</span>
+            <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{daysInStock(item.entryDate)} dias</span>
           </div>
           <div className="vehicle-price">
@@ -554,6 +559,7 @@ export function LiveInventoryWorkspace() {
               <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as InventoryStatus }))}>{stockStatusOptions.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
               <label>Custo compra<input min="0" type="number" value={form.purchaseCost} onChange={(event) => setForm((current) => ({ ...current, purchaseCost: event.target.value }))} /></label>
               <label>Preco venda<input min="0" type="number" value={form.askingPrice} onChange={(event) => setForm((current) => ({ ...current, askingPrice: event.target.value }))} /></label>
+              <label className="lead-modal-wide">Opcionais relevantes<input value={form.relevantOptions} onChange={(event) => setForm((current) => ({ ...current, relevantOptions: event.target.value }))} /></label>
               <label className="lead-modal-wide">Observacoes<input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></label>
               {saveError ? <p className="lead-modal-error">{saveError}</p> : null}
               <div className="lead-modal-actions">

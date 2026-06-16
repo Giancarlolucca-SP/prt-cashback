@@ -1560,6 +1560,7 @@ try {
         plate: inventoryPlate,
         color: "Prata",
         mileage: 42000,
+        relevantOptions: "Teto solar, multimidia e bancos em couro",
       },
       ownershipType: "OWN",
       status: "IN_PREPARATION",
@@ -1571,6 +1572,7 @@ try {
   });
   assert.equal(createInventory.statusCode, 201);
   assert.equal(createInventory.json().data.vehicle.plate, inventoryPlate);
+  assert.equal(createInventory.json().data.vehicle.relevantOptions, "Teto solar, multimidia e bancos em couro");
   assert.equal(createInventory.json().data.purchaseCost, "101000");
   const inventoryId = createInventory.json().data.id as string;
   const inventoryVehicleId = createInventory.json().data.vehicle.id as string;
@@ -1725,6 +1727,7 @@ try {
   });
   assert.equal(getInventory.statusCode, 200);
   assert.equal(getInventory.json().data.vehicle.model, "Civic");
+  assert.equal(getInventory.json().data.vehicle.relevantOptions, "Teto solar, multimidia e bancos em couro");
 
   const sellerListInventory = await app.inject({
     method: "GET",
@@ -2370,6 +2373,7 @@ try {
   assert.equal(invalidCommonRepasseInventory.statusCode, 400);
   assert.equal(invalidCommonRepasseInventory.json().error.code, "VALIDATION_ERROR");
 
+  const repasseInventoryPlate = uniquePlate("R2");
   const createRepasseInventory = await app.inject({
     method: "POST",
     url: "/inventory",
@@ -2382,7 +2386,7 @@ try {
         model: "Corolla",
         version: "XEi Repasse",
         yearModel: 2018,
-        plate: repassePlate,
+        plate: repasseInventoryPlate,
         color: "Preto",
         mileage: 88000,
       },

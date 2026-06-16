@@ -35,6 +35,12 @@ const vehiclePayloadSchema = z.object({
   color: z.string().trim().max(40).optional(),
   mileage: z.number().int().min(0).optional(),
   fipeCode: z.string().trim().max(40).optional(),
+  relevantOptions: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Opcionais relevantes") })
+    .optional(),
 });
 
 const createVehiclePayloadSchema = vehiclePayloadSchema.extend({
@@ -108,6 +114,7 @@ type VehicleRecord = {
   color: string | null;
   mileage: number | null;
   fipeCode: string | null;
+  relevantOptions: string | null;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -141,6 +148,7 @@ function sanitizeVehicle(vehicle: VehicleRecord) {
     color: vehicle.color,
     mileage: vehicle.mileage,
     fipeCode: vehicle.fipeCode,
+    relevantOptions: vehicle.relevantOptions,
     status: vehicle.status,
     createdAt: vehicle.createdAt.toISOString(),
     updatedAt: vehicle.updatedAt.toISOString(),
