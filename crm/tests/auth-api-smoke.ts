@@ -2127,6 +2127,16 @@ try {
   const repasseVehicleId = createRepasseInventory.json().data.vehicle.id as string;
   const repasseInventoryId = createRepasseInventory.json().data.id as string;
 
+  const defaultInventoryWithoutRepasse = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(defaultInventoryWithoutRepasse.statusCode, 200);
+  assert.ok(!defaultInventoryWithoutRepasse.json().items.some((item: { id: string }) => item.id === repasseInventoryId));
+
   const sellerRepasseList = await app.inject({
     method: "GET",
     url: "/repasse",

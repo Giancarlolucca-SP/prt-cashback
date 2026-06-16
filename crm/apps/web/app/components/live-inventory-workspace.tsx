@@ -111,7 +111,6 @@ const filters: Array<{ label: string; ownershipType?: OwnershipType; status?: In
   { label: "Prontos", status: "AVAILABLE" },
   { label: "Preparacao", status: "IN_PREPARATION" },
   { label: "Reservados", status: "RESERVED" },
-  { label: "Repasses", status: "REPASSE" },
 ];
 
 const statusLabels: Record<InventoryStatus, string> = {
@@ -129,6 +128,7 @@ const ownershipLabels: Record<OwnershipType, string> = {
   REPASSE: "Repasse",
   TRADE_IN: "Troca",
 };
+const stockOwnershipOptions: OwnershipType[] = ["OWN", "CONSIGNED", "TRADE_IN"];
 
 const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
 const percent = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1, style: "percent" });
@@ -282,23 +282,24 @@ export function LiveInventoryWorkspace() {
   }
 
   const view = useMemo(() => {
-    const own = items.filter((item) => item.ownershipType === "OWN").length;
-    const consigned = items.filter((item) => item.ownershipType === "CONSIGNED").length;
-    const totalStockValue = items.reduce((sum, item) => sum + Number(item.askingPrice ?? 0), 0);
-    const projectedMargin = items.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0);
+    const stockItems = items.filter((item) => item.ownershipType !== "REPASSE" && item.status !== "REPASSE");
+    const own = stockItems.filter((item) => item.ownershipType === "OWN").length;
+    const consigned = stockItems.filter((item) => item.ownershipType === "CONSIGNED").length;
+    const totalStockValue = stockItems.reduce((sum, item) => sum + Number(item.askingPrice ?? 0), 0);
+    const projectedMargin = stockItems.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0);
     const avgMargin = totalStockValue > 0 ? projectedMargin / totalStockValue : 0;
-    const pending = items.filter((item) => item.status === "IN_PREPARATION" || item.status === "REPASSE").length;
+    const pending = stockItems.filter((item) => item.status === "IN_PREPARATION").length;
 
     return {
-      consignedItems: items.filter((item) => item.ownershipType === "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
+      consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
       metrics: [
         { label: "Proprios", value: String(own), detail: "capital da loja em estoque", tone: "teal" },
         { label: "Consignados", value: String(consigned), detail: "terceiros sob contrato", tone: "blue" },
         { label: "Margem media", value: percent.format(avgMargin), detail: `${currency.format(projectedMargin)} sobre ${currency.format(totalStockValue)}`, tone: "amber" },
-        { label: "Pendencias criticas", value: String(pending), detail: "preparacao, repasse ou remocao", tone: "rose" },
+        { label: "Pendencias criticas", value: String(pending), detail: "preparacao ou remocao", tone: "rose" },
       ],
-      ownItems: items.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
-      prepQueue: items.filter((item) => item.status === "IN_PREPARATION" || item.status === "REPASSE").slice(0, 4),
+      ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
+      prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
     };
   }, [items]);
 
@@ -437,7 +438,7 @@ export function LiveInventoryWorkspace() {
               <label>Ano modelo<input type="number" value={form.yearModel} onChange={(event) => setForm((current) => ({ ...current, yearModel: event.target.value }))} /></label>
               <label>Placa<input value={form.plate} onChange={(event) => setForm((current) => ({ ...current, plate: event.target.value }))} /></label>
               <label>Cor<input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} /></label>
-              <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType }))}>{(Object.keys(ownershipLabels) as OwnershipType[]).map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
+              <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType }))}>{stockOwnershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
               <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as InventoryStatus }))}>{(Object.keys(statusLabels) as InventoryStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
               <label>Custo compra<input min="0" type="number" value={form.purchaseCost} onChange={(event) => setForm((current) => ({ ...current, purchaseCost: event.target.value }))} /></label>
               <label>Preco venda<input min="0" type="number" value={form.askingPrice} onChange={(event) => setForm((current) => ({ ...current, askingPrice: event.target.value }))} /></label>

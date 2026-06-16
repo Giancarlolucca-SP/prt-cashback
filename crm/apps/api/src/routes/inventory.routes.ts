@@ -223,6 +223,11 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       deletedAt: null,
       ...(query.status ? { status: query.status } : {}),
       ...(query.ownership_type ? { ownershipType: query.ownership_type } : {}),
+      ...(!query.status && !query.ownership_type
+        ? {
+            NOT: [{ status: "REPASSE" as const }, { ownershipType: "REPASSE" as const }],
+          }
+        : {}),
       ...(matchingVehicleIds ? { vehicleId: { in: matchingVehicleIds } } : {}),
     };
 
