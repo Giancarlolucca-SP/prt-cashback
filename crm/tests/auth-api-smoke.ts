@@ -2661,6 +2661,20 @@ try {
   assert.equal(revenueForCancelledRepasse.statusCode, 400);
   assert.equal(revenueForCancelledRepasse.json().error.code, "VALIDATION_ERROR");
 
+  const updateCancelledRepasse = await app.inject({
+    method: "PATCH",
+    url: `/repasse/${cancelableRepasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "SENT",
+      price: 71000,
+    },
+  });
+  assert.equal(updateCancelledRepasse.statusCode, 400);
+  assert.equal(updateCancelledRepasse.json().error.code, "VALIDATION_ERROR");
+
   const updateRepasse = await app.inject({
     method: "PATCH",
     url: `/repasse/${repasseId}`,

@@ -237,6 +237,9 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
     const params = repasseParamsSchema.parse(request.params);
     const input = updateRepasseSchema.parse(request.body);
     const current = await getRepasseOrThrow(session.user.storeId, params.id);
+    if (current.status === "CANCELLED") {
+      throw new ApiError("VALIDATION_ERROR", "Repasse cancelado nao aceita novas atualizacoes.");
+    }
 
     const process = await prisma.$transaction(async (tx) => {
       const updated = await tx.repasseProcess.update({
