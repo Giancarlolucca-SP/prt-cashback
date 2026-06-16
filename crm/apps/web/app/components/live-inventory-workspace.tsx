@@ -42,6 +42,7 @@ type InventoryFormState = {
   brand: string;
   color: string;
   entryDate: string;
+  mileage: string;
   model: string;
   notes: string;
   ownershipType: OwnershipType;
@@ -94,6 +95,7 @@ const emptyForm: InventoryFormState = {
   brand: "",
   color: "",
   entryDate: new Date().toISOString().slice(0, 10),
+  mileage: "",
   model: "",
   notes: "",
   ownershipType: "OWN",
@@ -288,6 +290,7 @@ export function LiveInventoryWorkspace() {
         vehicle: {
           brand: form.brand.trim(),
           color: form.color.trim() || undefined,
+          mileage: form.mileage ? Number(form.mileage) : undefined,
           model: form.model.trim(),
           plate: form.plate.trim() || undefined,
           version: form.version.trim() || undefined,
@@ -415,8 +418,8 @@ export function LiveInventoryWorkspace() {
             </div>
             <div>
               <strong>{vehicleTitle(item)}</strong>
-              <span>
-                {item.vehicle?.yearModel ?? "Ano n/d"} | {item.vehicle?.plate ?? "Sem placa"}
+            <span>
+                {item.vehicle?.yearModel ?? "Ano n/d"} | {item.vehicle?.plate ?? "Sem placa"} | {item.vehicle?.mileage != null ? `${item.vehicle.mileage.toLocaleString("pt-BR")} km` : "Km n/d"}
               </span>
             </div>
           </div>
@@ -535,6 +538,7 @@ export function LiveInventoryWorkspace() {
               <label>Entrada<input required type="date" value={form.entryDate} onChange={(event) => setForm((current) => ({ ...current, entryDate: event.target.value }))} /></label>
               <label>Placa<input value={form.plate} onChange={(event) => setForm((current) => ({ ...current, plate: event.target.value }))} /></label>
               <label>Cor<input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} /></label>
+              <label>Km<input min="0" type="number" value={form.mileage} onChange={(event) => setForm((current) => ({ ...current, mileage: event.target.value }))} /></label>
               <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType, ownerCustomerId: event.target.value === "CONSIGNED" ? current.ownerCustomerId : "" }))}>{stockOwnershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
               {form.ownershipType === "CONSIGNED" ? (
                 <label>
