@@ -46,9 +46,10 @@ export function AuthProvider({ children }) {
 
   const isAdmin      = operator?.perfil === 'ADMIN';
   const isSuperAdmin = operator?.perfil === 'SUPERADMIN';
+  const isOperator   = operator?.perfil === 'OPERATOR';
 
   return (
-    <AuthContext.Provider value={{ operator, token, isAdmin, isSuperAdmin, loading, login, logout, updateOperator }}>
+    <AuthContext.Provider value={{ operator, token, isAdmin, isSuperAdmin, isOperator, loading, login, logout, updateOperator }}>
       {children}
     </AuthContext.Provider>
   );

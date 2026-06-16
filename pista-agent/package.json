@@ -1,0 +1,16 @@
+{
+  "name": "pista-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PostoCash — Agente da Pista: lê abastecimentos do concentrador Companytec (CBC) e envia para a nuvem.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test/protocol.test.js",
+    "fake": "node test/fake-concentrator.js",
+    "mock": "node test/mock-concentrador.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}

@@ -109,9 +109,10 @@ async function findByCpf(cpf, establishmentId) {
   };
 }
 
-async function listAll({ page = 1, limit = 20 } = {}, establishmentId) {
+async function listAll({ page = 1, limit = 20, includeUnregistered = false } = {}, establishmentId) {
   const skip = (page - 1) * limit;
   const where = { establishmentId };
+  if (!includeUnregistered) where.registered = true; // hide pista stub rows by default
 
   const [customers, total] = await Promise.all([
     prisma.customer.findMany({
@@ -132,10 +133,11 @@ async function listAll({ page = 1, limit = 20 } = {}, establishmentId) {
   };
 }
 
-async function list({ search = '', page = 1, limit = 20 } = {}, establishmentId) {
+async function list({ search = '', page = 1, limit = 20, includeUnregistered = false } = {}, establishmentId) {
   const skip = (page - 1) * limit;
 
   const where = { establishmentId };
+  if (!includeUnregistered) where.registered = true; // hide pista stub rows by default
   if (search && search.trim()) {
     const s = search.trim();
     const cleanDigits = s.replace(/\D/g, '');

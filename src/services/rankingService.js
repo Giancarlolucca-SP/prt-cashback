@@ -140,6 +140,26 @@ async function getRanking(operator, query = {}) {
     (a, b) => b.totalTransactions - a.totalTransactions,
   );
 
+  // ── Rating stats per attendant (same establishment + period) ──────────────────
+  // Keeps ranking and ratings consistent: grouped by the same attendantName key.
+  const ratingMap = new Map();
+  try {
+    const grouped = await prisma.attendantRating.groupBy({
+      by:     ['attendantName'],
+      where:  { establishmentId, createdAt: { gte: startDate, lte: endDate } },
+      _avg:   { stars: true },
+      _count: { _all: true },
+    });
+    for (const g of grouped) {
+      ratingMap.set(g.attendantName, {
+        avgStars:     g._avg.stars != null ? round2(g._avg.stars) : null,
+        totalRatings: g._count._all,
+      });
+    }
+  } catch (err) {
+    console.error('[ranking] Erro ao agregar avaliações:', err.message);
+  }
+
   // ── Compute trend (first half vs second half of period) ───────────────────────
   const midTime  = (startDate.getTime() + endDate.getTime()) / 2;
   const totalTxns = sorted.reduce((s, a) => s + a.totalTransactions, 0);
@@ -154,6 +174,8 @@ async function getRanking(operator, query = {}) {
     else if (secondHalf > firstHalf * 1.1)        trend = 'up';
     else if (secondHalf < firstHalf * 0.9)        trend = 'down';
 
+    const ratingStats = ratingMap.get(a.raw) || { avgStars: null, totalRatings: 0 };
+
     return {
       name:              a.name,
       code:              a.code,
@@ -167,6 +189,8 @@ async function getRanking(operator, query = {}) {
       trend,
       rank:        idx + 1,
       belowAverage: a.totalTransactions < avgCount * 0.5,
+      avgStars:     ratingStats.avgStars,
+      totalRatings: ratingStats.totalRatings,
     };
   });
 
@@ -221,4 +245,11 @@ async function getRanking(operator, query = {}) {
   };
 }
 
-module.exports = { getRanking };
+module.exports = {
+  getRanking,
+  // Exported so the ratings feature reuses the exact same period/establishment/
+  // attendant-key conventions, keeping ranking and ratings consistent.
+  resolveRange,
+  resolveEstablishmentId,
+  parseAttendantRaw,
+};

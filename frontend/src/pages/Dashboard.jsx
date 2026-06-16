@@ -14,6 +14,7 @@ import {
 import { dashboardAPI, campaignsAPI, establishmentsAPI } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import RatingNotifications from '../components/RatingNotifications.jsx';
 import { Mailbox, Envelope, CheckCircle, Megaphone, Tag, Warning, Eye, CreditCard } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1641,6 +1642,9 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* ── Ratings: overall average + comment notifications ── */}
+      <RatingNotifications params={apiParams} />
 
       {/* ── Queue monitor (admin only, shown when there are pending messages) ── */}
       <QueueMonitorWidget isAdmin={isAdmin} />

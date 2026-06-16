@@ -1,11 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { SquaresFour, ArrowCounterClockwise, UserPlus, Megaphone, ShieldCheck, Users, ChartBar, Trophy, Percent, Gear, Storefront, ChartLineUp } from '@phosphor-icons/react';
+import { SquaresFour, ArrowCounterClockwise, UserPlus, Megaphone, ShieldCheck, Users, ChartBar, Trophy, Percent, Gear, Storefront, ChartLineUp, IdentificationBadge, GasPump, UserGear } from '@phosphor-icons/react';
 
 // ── Nav items ─────────────────────────────────────────────────────────────────
+// operatorAllowed: visible to the frentista (operador) login. Everything else is
+// hidden from operador (they only get the Pista panel).
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Painel',    icon: <SquaresFour size={20} weight="duotone" />, highlight: true },
+  { to: '/pista',     label: 'Pista',     icon: <GasPump size={20} weight="duotone" />, operatorAllowed: true },
   { to: '/resgatar',  label: 'Resgatar',  icon: <ArrowCounterClockwise size={20} weight="duotone" /> },
   { to: '/cadastrar', label: 'Cadastrar', icon: <UserPlus size={20} weight="duotone" /> },
   { to: '/campanhas', label: 'Campanhas', icon: <Megaphone size={20} weight="duotone" /> },
@@ -13,6 +16,8 @@ const NAV_ITEMS = [
   { to: '/clientes',  label: 'Clientes',  icon: <Users size={20} weight="duotone" /> },
   { to: '/relatorios',label: 'Relatórios',icon: <ChartBar size={20} weight="duotone" /> },
   { to: '/ranking',   label: 'Ranking',   icon: <Trophy size={20} weight="duotone" /> },
+  { to: '/atendentes',label: 'Atendentes',icon: <IdentificationBadge size={20} weight="duotone" /> },
+  { to: '/operadores',label: 'Operadores',icon: <UserGear size={20} weight="duotone" />, adminOnly: true },
   { to: '/configuracoes-cashback', label: 'Cashback', icon: <Percent size={20} weight="duotone" /> },
 ];
 
@@ -52,7 +57,7 @@ function SidebarLink({ to, icon, label, highlight, onClick }) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export default function Navbar({ open, onClose }) {
-  const { operator, isAdmin, isSuperAdmin, logout } = useAuth();
+  const { operator, isAdmin, isSuperAdmin, isOperator, logout } = useAuth();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -60,7 +65,11 @@ export default function Navbar({ open, onClose }) {
     navigate('/login');
   }
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (isOperator) return !!item.operatorAllowed;          // frentista: só o Painel da Pista
+    if (item.adminOnly) return isAdmin || isSuperAdmin;     // itens admin-only
+    return true;
+  });
 
   return (
     <aside

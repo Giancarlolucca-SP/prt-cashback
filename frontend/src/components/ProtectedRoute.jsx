@@ -28,8 +28,11 @@ const BOTTOM_TABS = [
   { to: '/configuracoes-cashback', label: 'Configurações',icon: <Gear size={16} weight="duotone" /> },
 ];
 
+// Paths a frentista (operador) may reach — everything else redirects to /pista.
+const OPERATOR_PATHS = ['/pista', '/logout'];
+
 export default function ProtectedRoute() {
-  const { token, loading, operator } = useAuth();
+  const { token, loading, operator, isOperator } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
@@ -62,6 +65,11 @@ export default function ProtectedRoute() {
 
   if (!token) return <Navigate to="/login" replace />;
 
+  // Frentista (operador) is locked to the Pista panel.
+  if (isOperator && !OPERATOR_PATHS.includes(location.pathname)) {
+    return <Navigate to="/pista" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
 
@@ -83,7 +91,8 @@ export default function ProtectedRoute() {
         </main>
       </div>
 
-      {/* ── Bottom tab bar (mobile only) ────────────────────────────────────── */}
+      {/* ── Bottom tab bar (mobile only; hidden for frentista/operador) ──────── */}
+      {!isOperator && (
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#1e3a5f] border-t border-white/10 flex">
         {BOTTOM_TABS.map((tab) => (
           <NavLink
@@ -104,6 +113,7 @@ export default function ProtectedRoute() {
           </NavLink>
         ))}
       </nav>
+      )}
 
     </div>
   );

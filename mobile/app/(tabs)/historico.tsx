@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import StatementItem, { StatementEntry } from '../../src/components/StatementItem';
+import AttendantRating, { DetectedAttendant } from '../../src/components/AttendantRating';
 import { customerApi } from '../../src/api/client';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -37,6 +38,8 @@ interface HistEntry {
   data:              string | null;
   dataISO:           string | null;
   status?:           string;
+  atendente?:        DetectedAttendant | null;
+  jaAvaliado?:       boolean;
 }
 
 interface StmtResumo {
@@ -114,6 +117,7 @@ export default function HistoricoScreen() {
   const [customFrom,    setCustomFrom]    = useState('');
   const [customTo,      setCustomTo]      = useState('');
   const [activeFilter,  setActiveFilter]  = useState<ActiveFilter | null>(null);
+  const [rating,        setRating]        = useState<{ transactionId: string; attendant: DetectedAttendant | null } | null>(null);
 
   const slideAnim = useRef(new Animated.Value(500)).current;
 
@@ -285,7 +289,12 @@ export default function HistoricoScreen() {
         <FlatList
           data={histEntries}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <FuelItem item={item} />}
+          renderItem={({ item }) => (
+            <FuelItem
+              item={item}
+              onRate={() => item.atendente && setRating({ transactionId: item.id, attendant: item.atendente })}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32, paddingTop: 4 }}
           refreshControl={
@@ -335,6 +344,20 @@ export default function HistoricoScreen() {
           }
         />
       )}
+
+      {/* ── Rating overlay ── */}
+      <Modal visible={!!rating} transparent animationType="fade" onRequestClose={() => setRating(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 }}>
+          {rating && (
+            <AttendantRating
+              transactionId={rating.transactionId}
+              attendant={rating.attendant}
+              onDone={() => setRating(null)}
+              onSubmitted={refetchHist}
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* ── Filter bottom sheet ── */}
       <Modal
@@ -565,11 +588,12 @@ function ExtratoHeader({ resumo, count }: { resumo: StmtResumo; count: number })
 
 // ── FuelItem ───────────────────────────────────────────────────────────────────
 
-function FuelItem({ item }: { item: HistEntry }) {
+function FuelItem({ item, onRate }: { item: HistEntry; onRate: () => void }) {
   const fuelKey   = item.tipoCombustivel;
   const fuelLabel = fuelKey ? (FUEL_LABELS[fuelKey] ?? fuelKey) : 'Combustível';
   const fuelIcon  = fuelKey ? (FUEL_ICONS[fuelKey]  ?? '⛽')    : '⛽';
   const isPending = item.status === 'PENDING_VALIDATION';
+  const canRate   = !isPending && !!item.atendente && !item.jaAvaliado;
 
   const time = item.dataISO
     ? new Date(item.dataISO).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -656,6 +680,29 @@ function FuelItem({ item }: { item: HistEntry }) {
           }}>
             {item.codigoCupom}
           </Text>
+        </View>
+      ) : null}
+
+      {/* Rate attendant (auto-detected from the cupom) */}
+      {canRate ? (
+        <TouchableOpacity
+          onPress={onRate}
+          activeOpacity={0.85}
+          style={{
+            marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            gap: 6, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a',
+            borderRadius: 12, paddingVertical: 10,
+          }}
+        >
+          <Ionicons name="star" size={15} color="#D97706" />
+          <Text style={{ color: '#B45309', fontSize: 13, fontWeight: '700' }}>
+            Avaliar atendimento{item.atendente?.name ? ` · ${item.atendente.name}` : ''}
+          </Text>
+        </TouchableOpacity>
+      ) : item.jaAvaliado ? (
+        <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+          <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '600' }}>Atendimento avaliado</Text>
         </View>
       ) : null}
     </View>

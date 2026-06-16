@@ -43,8 +43,32 @@ export const authAPI = {
 export const customersAPI = {
   upsert: (data) => api.post('/customers', data),
   findByCpf: (cpf) => api.get(`/customers/${cpf}`),
-  listAll: (page = 1) => api.get('/customers/all', { params: { page } }),
-  list: (search = '', page = 1) => api.get('/customers', { params: { search, page } }),
+  listAll: (page = 1, includeUnregistered = false) =>
+    api.get('/customers/all', { params: { page, ...(includeUnregistered ? { includeUnregistered: 1 } : {}) } }),
+  list: (search = '', page = 1, includeUnregistered = false) =>
+    api.get('/customers', { params: { search, page, ...(includeUnregistered ? { includeUnregistered: 1 } : {}) } }),
+};
+
+// ── Painel da Pista (cashback interno do frentista) ───────────────────────────
+export const pistaAPI = {
+  accrue:            (data)      => api.post('/pista/accrual', data),                 // Plano B: CPF + valor
+  accrueFromFueling: (data)      => api.post('/pista/accrual-from-fueling', data),    // seleção de abastecimento
+  fuelings:          (params = {}) => api.get('/pista/fuelings', { params }),
+  dashboard:         ()          => api.get('/pista/dashboard'),
+  listRequests:      ()          => api.get('/pista/redemption-requests'),
+  confirmRequest:    (id, data)  => api.post(`/pista/redemption-requests/${id}/confirm`, data),
+  cancelRequest:     (id)        => api.post(`/pista/redemption-requests/${id}/cancel`),
+  comprovante:       (type, id)  => api.get(`/pista/comprovante/${type}/${id}`),
+  caixa:             (params = {}) => api.get('/pista/caixa', { params }),
+  // Config — fuel map (bico → combustível)
+  fuelMap:           ()          => api.get('/pista/fuel-map'),
+  upsertFuelMap:     (data)      => api.post('/pista/fuel-map', data),
+  deleteFuelMap:     (id)        => api.delete(`/pista/fuel-map/${id}`),
+  backfillFuel:      ()          => api.post('/pista/fuel-map/backfill'),
+  // Config — card map (Identfid → frentista)
+  cardMap:           ()          => api.get('/pista/card-map'),
+  upsertCardMap:     (data)      => api.post('/pista/card-map', data),
+  deleteCardMap:     (id)        => api.delete(`/pista/card-map/${id}`),
 };
 
 // ── Transactions ──────────────────────────────────────────────────────────────
@@ -120,6 +144,35 @@ export const subscriptionAPI = {
 // ── Ranking ───────────────────────────────────────────────────────────────────
 export const rankingAPI = {
   get: (params = {}) => api.get('/ranking', { params }),
+};
+
+// ── Ratings (avaliações de atendentes) ────────────────────────────────────────
+export const ratingsAPI = {
+  // Admin/operator: list ratings (newest first) + per-attendant aggregates
+  get: (params = {}) => api.get('/ratings', { params }),
+};
+
+// ── Operadores (logins de frentista — admin only) ─────────────────────────────
+export const operatorsAPI = {
+  list:   ()     => api.get('/operators'),
+  create: (data) => api.post('/operators', data),
+  remove: (id)   => api.delete(`/operators/${id}`),
+};
+
+// ── Attendants (registro de frentistas) ───────────────────────────────────────
+export const attendantsAPI = {
+  list:   ()         => api.get('/attendants'),
+  sync:   ()         => api.post('/attendants/sync'),
+  create: (data)     => api.post('/attendants', data),
+  update: (id, data) => api.patch(`/attendants/${id}`, data),
+  remove: (id)       => api.delete(`/attendants/${id}`),
+  uploadPhoto: (id, file) => {
+    const form = new FormData();
+    form.append('photo', file);
+    return api.post(`/attendants/${id}/photo`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // ── Establishment completion (OAuth) ─────────────────────────────────────────

@@ -234,6 +234,14 @@ export const customerApi = {
   generateRedemption: (data: { amount: number; latitude?: number; longitude?: number }) =>
     api.post('/app/redeem/generate', data),
 
+  // Painel da Pista — redemption request queue (no QR; frentista confirms at the caixa)
+  requestRedemption: (data: { amount?: number }) =>
+    api.post('/app/redeem/request', data),
+  getRedemptionRequest: () =>
+    api.get<{ solicitacao: null | { id: string; valor: number; valorFormatado: string; status: 'PENDING' | 'CONFIRMED' | 'CANCELLED'; criadoEm: string; resolvidoEm: string | null } }>('/app/redeem/request'),
+  cancelRedemptionRequest: () =>
+    api.post('/app/redeem/request/cancel'),
+
   validateRedemption: (data: { code: string; latitude?: number; longitude?: number }) =>
     api.post('/app/redeem/validate', data),
 
@@ -251,4 +259,27 @@ export const customerApi = {
 
   refreshToken: () =>
     api.post('/app/token/refresh'),
+};
+
+// ── Ratings API (attendant evaluation) ────────────────────────────────────────
+
+export interface Attendant {
+  key:       string;   // ranking key ("code-name") — sent back as attendantCode
+  code:      string;
+  name:      string;
+  photoUrl?: string | null;
+}
+
+export const ratingApi = {
+  // List attendants available for the customer to evaluate
+  getAttendants: () =>
+    api.get<{ atendentes: Attendant[] }>('/ratings/attendants'),
+
+  // Submit an attendant rating
+  submit: (data: {
+    attendantCode:  string;
+    stars:          number;
+    comment?:       string;
+    transactionId?: string;
+  }) => api.post('/ratings', data),
 };

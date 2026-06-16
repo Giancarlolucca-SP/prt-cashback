@@ -11,6 +11,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
 import Input from '../../src/components/ui/Input';
 import Button from '../../src/components/ui/Button';
+import AttendantRating from '../../src/components/AttendantRating';
 import { customerApi } from '../../src/api/client';
 import { formatBRL } from '../../src/utils/formatters';
 
@@ -25,6 +26,7 @@ const FUEL_TYPES = [
 
 interface TransactionResult {
   transacao: {
+    id:                 string;
     cashbackGerado:     string;
     percentualCashback: string;
     novoSaldo:          string;
@@ -88,7 +90,12 @@ export default function AbastecerScreen() {
     const t = result.transacao;
     return (
       <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
-        <View className="flex-1 items-center justify-center px-6">
+        <ScrollView
+          className="flex-1 px-6"
+          contentContainerClassName="py-6 gap-4"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View className="bg-white rounded-3xl p-8 w-full items-center shadow-sm border border-slate-100">
             <View className="w-20 h-20 rounded-full bg-green-100 items-center justify-center mb-4">
               <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
@@ -104,16 +111,10 @@ export default function AbastecerScreen() {
               <Row label="Novo saldo"        value={t.novoSaldo}          />
               <Row label="Cupom"             value={t.codigoCupom}        mono />
             </View>
-
-            <Button
-              title="Novo abastecimento"
-              fullWidth
-              variant="secondary"
-              onPress={() => setResult(null)}
-              className="mt-6"
-            />
           </View>
-        </View>
+
+          <AttendantRating transactionId={t.id} onDone={() => setResult(null)} />
+        </ScrollView>
       </SafeAreaView>
     );
   }

@@ -30,6 +30,8 @@ export default function ResgatarScreen() {
   const [amount,     setAmount]     = useState('');
   const [qrResult,   setQrResult]   = useState<QRData | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [requesting, setRequesting] = useState(false);
+  const [confirmed,  setConfirmed]  = useState<{ valorFormatado: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: balanceData } = useQuery({
@@ -81,6 +83,55 @@ export default function ResgatarScreen() {
       Alert.alert('Erro', err.response?.data?.erro ?? 'Não foi possível gerar o código.');
     },
   });
+
+  // ── Redemption request (caixa queue) ─────────────────────────────────────────
+
+  const { mutate: requestRedeem, isPending: isRequesting } = useMutation({
+    mutationFn: () =>
+      customerApi.requestRedemption({ amount: parseFloat(amount.replace(',', '.')) }),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRequesting(true);
+    },
+    onError: (err: any) => {
+      Alert.alert('Erro', err.response?.data?.erro ?? 'Não foi possível enviar a solicitação.');
+    },
+  });
+
+  // Poll the request status while waiting at the caixa
+  const { data: reqStatus } = useQuery({
+    queryKey: ['redeem-request'],
+    queryFn:  () => customerApi.getRedemptionRequest().then((r) => r.data.solicitacao),
+    enabled:  requesting,
+    refetchInterval: requesting ? 4000 : false,
+  });
+
+  useEffect(() => {
+    if (!requesting || !reqStatus) return;
+    if (reqStatus.status === 'CONFIRMED') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRequesting(false);
+      setConfirmed({ valorFormatado: reqStatus.valorFormatado });
+      setAmount('');
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
+      queryClient.invalidateQueries({ queryKey: ['statement'] });
+    } else if (reqStatus.status === 'CANCELLED') {
+      setRequesting(false);
+      Alert.alert('Solicitação encerrada', 'O resgate foi recusado ou cancelado no caixa.');
+    }
+  }, [reqStatus, requesting, queryClient]);
+
+  async function cancelRequest() {
+    try { await customerApi.cancelRedemptionRequest(); } catch {}
+    setRequesting(false);
+  }
+
+  function handleRequest() {
+    const parsed = parseFloat(amount.replace(',', '.'));
+    if (!amount || isNaN(parsed) || parsed <= 0) { Alert.alert('Valor inválido', 'Informe o valor a resgatar.'); return; }
+    if (parsed > saldo) { Alert.alert('Saldo insuficiente', `Seu saldo é de ${saldoFormatado}.`); return; }
+    requestRedeem();
+  }
 
   function activateQr(data: QRData) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -184,6 +235,45 @@ export default function ResgatarScreen() {
     );
   }
 
+  // ── Confirmed (caixa) ─────────────────────────────────────────────────────────
+
+  if (confirmed) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center px-6" edges={['bottom']}>
+        <View className="bg-white rounded-3xl p-8 w-full items-center shadow-sm border border-slate-100">
+          <View className="w-20 h-20 rounded-full bg-green-100 items-center justify-center mb-4">
+            <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
+          </View>
+          <Text className="text-slate-800 text-xl font-bold mb-1">Resgate confirmado!</Text>
+          <Text className="text-slate-500 text-sm mb-4 text-center">
+            O frentista confirmou seu resgate de {confirmed.valorFormatado}.
+          </Text>
+          <Button title="Concluir" fullWidth variant="secondary" onPress={() => setConfirmed(null)} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Waiting at the caixa ──────────────────────────────────────────────────────
+
+  if (requesting) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center px-6" edges={['bottom']}>
+        <View className="bg-white rounded-3xl p-8 w-full items-center shadow-sm border border-slate-100">
+          <View className="w-20 h-20 rounded-full bg-amber-100 items-center justify-center mb-4">
+            <Ionicons name="hourglass-outline" size={44} color="#D97706" />
+          </View>
+          <Text className="text-slate-800 text-xl font-bold mb-1">Solicitação enviada ao caixa</Text>
+          <Text className="text-slate-500 text-sm mb-4 text-center">
+            Aguarde o frentista confirmar seu resgate de{' '}
+            <Text className="font-bold text-slate-700">{formatBRL(parseFloat(amount.replace(',', '.')) || 0)}</Text>.
+          </Text>
+          <Button title="Cancelar solicitação" fullWidth variant="ghost" onPress={cancelRequest} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // ── Input screen ──────────────────────────────────────────────────────────────
 
   return (
@@ -225,7 +315,17 @@ export default function ResgatarScreen() {
             loading={isPending}
             disabled={saldo <= 0}
             onPress={handleGenerate}
-            className="mt-2 mb-8"
+            className="mt-2 mb-3"
+          />
+
+          <Button
+            title="Solicitar no caixa (sem QR)"
+            fullWidth
+            variant="ghost"
+            loading={isRequesting}
+            disabled={saldo <= 0}
+            onPress={handleRequest}
+            className="mb-8"
           />
 
           {saldo <= 0 && (

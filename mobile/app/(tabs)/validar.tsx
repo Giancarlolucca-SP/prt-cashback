@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, Alert, Animated, StyleSheet,
-  ScrollView, ActivityIndicator, Image,
+  ScrollView, ActivityIndicator, Image, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { customerApi, isTokenExpired } from '../../src/api/client';
 import { useAuthStore } from '../../src/store/auth';
 import Button from '../../src/components/ui/Button';
+import AttendantRating, { DetectedAttendant } from '../../src/components/AttendantRating';
 import { useBranding } from '../../src/hooks/useBranding';
 
 // ── Result types ───────────────────────────────────────────────────────────────
@@ -46,12 +47,14 @@ interface NfceResult {
     litros:          string | null;
   };
   transacao?: {
+    id?:            string;
     cashbackGerado: string;
     percentual:     string;
     novoSaldo:      string;
     novoSaldoNum:   number;
     codigoCupom:    string;
   };
+  atendente?: DetectedAttendant | null;
 }
 
 type ScanResult =
@@ -124,6 +127,7 @@ export default function ValidarScreen() {
   const [photoStep,       setPhotoStep]      = useState<PhotoStep>(null);
   const [photoData,       setPhotoData]      = useState<string | null>(null);
   const [tokenStatus,     setTokenStatus]    = useState<'checking' | 'valid' | 'expired'>('checking');
+  const [rating,          setRating]         = useState<{ transactionId: string; attendant: DetectedAttendant | null } | null>(null);
 
   const photoCameraRef = useRef<CameraView>(null);
   const scanLock       = useRef(false);
@@ -212,6 +216,11 @@ export default function ValidarScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setResult({ kind: 'nfce', data, via: 'qr' });
         scanLock.current = false;
+        // Auto-present the rating step right after a successful validation.
+        // Matched attendant → photo + name; otherwise the manual picker.
+        if (data.transacao?.id) {
+          setRating({ transactionId: data.transacao.id, attendant: data.atendente ?? null });
+        }
       }
     },
     onError: (err: any) => {
@@ -322,9 +331,23 @@ function handleSendPhoto() {
               data={result.data}
               via={result.via}
               onNew={() => { setResult(null); setScanning(false); }}
+              onRate={(txnId, attendant) => setRating({ transactionId: txnId, attendant })}
             />
           )}
         </ScrollView>
+
+        {/* Rating overlay */}
+        <Modal visible={!!rating} transparent animationType="fade" onRequestClose={() => setRating(null)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 }}>
+            {rating && (
+              <AttendantRating
+                transactionId={rating.transactionId}
+                attendant={rating.attendant}
+                onDone={() => setRating(null)}
+              />
+            )}
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -781,7 +804,12 @@ function RedemptionResultCard({ data, onNew }: { data: RedemptionResult; onNew: 
   );
 }
 
-function NfceResultCard({ data, via, onNew }: { data: NfceResult; via?: 'qr' | 'photo'; onNew: () => void }) {
+function NfceResultCard({ data, via, onNew, onRate }: {
+  data: NfceResult;
+  via?: 'qr' | 'photo';
+  onNew: () => void;
+  onRate: (transactionId: string, attendant: DetectedAttendant | null) => void;
+}) {
   const isPendente = data.pendente === true;
   const isPhoto    = via === 'photo';
 
@@ -854,6 +882,17 @@ function NfceResultCard({ data, via, onNew }: { data: NfceResult; via?: 'qr' | '
               <InfoRow label="Cupom"           value={data.transacao.codigoCupom} mono />
             </View>
           )}
+
+          {/* Rate the attendant (auto-detected from the cupom when available) */}
+          {data.transacao?.id && (
+            <Button
+              title="Avaliar atendimento"
+              fullWidth
+              onPress={() => onRate(data.transacao!.id!, data.atendente ?? null)}
+              icon={<Ionicons name="star" size={18} color="white" />}
+              className="mt-6"
+            />
+          )}
         </>
       )}
 
@@ -862,7 +901,7 @@ function NfceResultCard({ data, via, onNew }: { data: NfceResult; via?: 'qr' | '
         fullWidth
         variant="secondary"
         onPress={onNew}
-        className="mt-6"
+        className="mt-3"
       />
     </View>
   );

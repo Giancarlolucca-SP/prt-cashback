@@ -10,7 +10,8 @@ import {
   Legend,
 } from 'recharts';
 import { rankingAPI } from '../services/api.js';
-import { GasPump, Trophy, ChartBar, TrendUp, Warning, Mailbox } from '@phosphor-icons/react';
+import RatingsModal from '../components/RatingsModal.jsx';
+import { GasPump, Trophy, ChartBar, TrendUp, Warning, Mailbox, Star, ChatCircleText, X } from '@phosphor-icons/react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -261,6 +262,19 @@ function AttendantAvatar({ name, size = 40, color = '#F59E0B' }) {
   );
 }
 
+// ── Rating helpers ────────────────────────────────────────────────────────────
+
+function StarsBadge({ avgStars, totalRatings }) {
+  if (!totalRatings) return <span className="text-slate-300 text-[13px]">—</span>;
+  return (
+    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-amber-600">
+      <Star size={14} weight="fill" className="text-amber-400" />
+      {Number(avgStars).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+      <span className="text-slate-400 font-normal">({fmtInt(totalRatings)})</span>
+    </span>
+  );
+}
+
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function RankingSkeleton() {
@@ -396,7 +410,7 @@ function TrendIcon({ trend }) {
   return <span className="text-gray-400 text-base leading-none">→</span>;
 }
 
-function RankingTable({ attendants, selectedAttendant, onSelect }) {
+function RankingTable({ attendants, selectedAttendant, onSelect, onShowComments }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -417,6 +431,7 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
               <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Valor Total</th>
               <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Cashback</th>
               <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Ticket Médio</th>
+              <th className="px-3 py-3 text-center text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Avaliação</th>
               <th className="px-3 py-3 text-right text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Última Atividade</th>
               <th className="px-4 py-3 text-center text-[12px] font-semibold text-slate-500 uppercase tracking-[0.05em] whitespace-nowrap">Tendência</th>
             </tr>
@@ -492,6 +507,22 @@ function RankingTable({ attendants, selectedAttendant, onSelect }) {
                   {/* Avg ticket */}
                   <td className="py-3 px-3 text-right text-[14px] text-slate-600 tabular-nums">
                     {fmtBRL(att.avgTicket)}
+                  </td>
+
+                  {/* Rating */}
+                  <td className="py-3 px-3 text-center whitespace-nowrap">
+                    {att.totalRatings > 0 ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onShowComments(att.name); }}
+                        title="Ver comentários"
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-amber-50 transition-colors"
+                      >
+                        <StarsBadge avgStars={att.avgStars} totalRatings={att.totalRatings} />
+                        <ChatCircleText size={14} className="text-slate-300" />
+                      </button>
+                    ) : (
+                      <StarsBadge avgStars={att.avgStars} totalRatings={att.totalRatings} />
+                    )}
                   </td>
 
                   {/* Last activity */}
@@ -666,6 +697,7 @@ export default function Ranking() {
   const [chartMetric,       setChartMetric]       = useState('transactions');
   const [selectedAttendant, setSelectedAttendant] = useState(null);
   const [knownAttendants,   setKnownAttendants]   = useState([]);
+  const [commentsFor,       setCommentsFor]       = useState(null);
 
   const hasCustom = !!(customStart && customEnd);
 
@@ -810,6 +842,7 @@ export default function Ranking() {
             attendants={attendants}
             selectedAttendant={selectedAttendant}
             onSelect={handleSelectAttendant}
+            onShowComments={setCommentsFor}
           />
 
           {/* Evolution chart */}
@@ -832,6 +865,15 @@ export default function Ranking() {
             </p>
           )}
         </>
+      )}
+
+      {/* Comments modal */}
+      {commentsFor && (
+        <RatingsModal
+          attendantName={commentsFor}
+          params={apiParams}
+          onClose={() => setCommentsFor(null)}
+        />
       )}
 
     </div>

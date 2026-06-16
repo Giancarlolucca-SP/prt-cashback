@@ -14,7 +14,7 @@ const MIN_REDEMPTION = parseFloat(process.env.MIN_REDEMPTION_AMOUNT || '10');
 const MAX_DAILY_REDEMPTION = parseFloat(process.env.MAX_DAILY_REDEMPTION || '500');
 const COOLDOWN_MINUTES = parseInt(process.env.REDEMPTION_COOLDOWN_MINUTES || '5', 10);
 
-async function redeem({ cpf, amount }, operator) {
+async function redeem({ cpf, amount, source = null, metadata = null }, operator) {
   // --- Validation ---
   if (!cpf) throw createError('CPF é obrigatório.', 400);
   if (!isValidCpf(cpf)) throw createError('CPF inválido.', 400);
@@ -107,6 +107,8 @@ async function redeem({ cpf, amount }, operator) {
         amountUsed: parsedAmount,
         status: 'CONFIRMED',
         receiptCode: generateReceiptCode('RSG'),
+        ...(source ? { source } : {}),
+        ...(metadata ? { metadata } : {}),
       },
     }),
     prisma.customer.update({
@@ -163,6 +165,12 @@ async function redeem({ cpf, amount }, operator) {
       saldoAnterior: formatBRL(currentBalance),
       novoSaldo: formatBRL(newBalance),
       data: formatDateBR(redemption.createdAt),
+      // raw fields used by the pista panel / comprovante
+      clienteNome: customer.name,
+      cpf: customer.cpf,
+      valorNum: parsedAmount,
+      novoSaldoNum: newBalance,
+      createdAt: redemption.createdAt,
     },
     cupom: receipt,
   };
