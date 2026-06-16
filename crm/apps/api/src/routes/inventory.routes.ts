@@ -259,6 +259,12 @@ function enforceConsignedInventoryRules(input: {
   }
 }
 
+function enforceCommonInventoryScope(input: { ownershipType?: string; status?: string }) {
+  if (input.ownershipType === "REPASSE" || input.status === "REPASSE") {
+    throw new ApiError("VALIDATION_ERROR", "Repasse e um modulo separado e nao entra no estoque comum da loja.");
+  }
+}
+
 async function getInventoryOrThrow(storeId: string, id: string) {
   const inventory = await prisma.vehicleInventoryRecord.findFirst({
     where: { id, storeId, deletedAt: null },
@@ -417,6 +423,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     });
     const input = createInventorySchema.parse(request.body);
 
+    enforceCommonInventoryScope(input);
     enforceConsignedInventoryRules(input);
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
 
@@ -496,6 +503,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     });
     const params = inventoryParamsSchema.parse(request.params);
     const input = updateInventorySchema.parse(request.body);
+    enforceCommonInventoryScope(input);
     const current = await getInventoryOrThrow(session.user.storeId, params.id);
     const nextOwnershipType = input.ownershipType ?? current.inventory.ownershipType;
     const nextOwnerCustomerId = input.ownerCustomerId === undefined ? current.inventory.ownerCustomerId : input.ownerCustomerId;

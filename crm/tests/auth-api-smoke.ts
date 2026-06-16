@@ -2338,6 +2338,28 @@ try {
   assert.equal(getCampaign.json().results.length, 1);
 
   const repassePlate = uniquePlate("RP");
+  const invalidCommonRepasseInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Toyota",
+        model: "Corolla",
+        yearModel: 2018,
+        plate: repassePlate,
+      },
+      ownershipType: "REPASSE",
+      status: "REPASSE",
+      askingPrice: 76500,
+      entryDate: "2026-06-06T13:00:00.000Z",
+    },
+  });
+  assert.equal(invalidCommonRepasseInventory.statusCode, 400);
+  assert.equal(invalidCommonRepasseInventory.json().error.code, "VALIDATION_ERROR");
+
   const createRepasseInventory = await app.inject({
     method: "POST",
     url: "/inventory",
@@ -2354,8 +2376,8 @@ try {
         color: "Preto",
         mileage: 88000,
       },
-      ownershipType: "REPASSE",
-      status: "REPASSE",
+      ownershipType: "TRADE_IN",
+      status: "IN_PREPARATION",
       askingPrice: 76500,
       entryDate: "2026-06-06T13:00:00.000Z",
     },
@@ -2363,16 +2385,6 @@ try {
   assert.equal(createRepasseInventory.statusCode, 201);
   const repasseVehicleId = createRepasseInventory.json().data.vehicle.id as string;
   const repasseInventoryId = createRepasseInventory.json().data.id as string;
-
-  const defaultInventoryWithoutRepasse = await app.inject({
-    method: "GET",
-    url: "/inventory?page=1&page_size=100",
-    headers: {
-      authorization: `Bearer ${ownerBody.token}`,
-    },
-  });
-  assert.equal(defaultInventoryWithoutRepasse.statusCode, 200);
-  assert.ok(!defaultInventoryWithoutRepasse.json().items.some((item: { id: string }) => item.id === repasseInventoryId));
 
   const sellerRepasseList = await app.inject({
     method: "GET",
@@ -2404,6 +2416,16 @@ try {
   assert.equal(createRepasse.json().data.vehicleId, repasseVehicleId);
   assert.equal(createRepasse.json().data.price, "76000");
   const repasseId = createRepasse.json().data.id as string;
+
+  const defaultInventoryWithoutRepasse = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(defaultInventoryWithoutRepasse.statusCode, 200);
+  assert.ok(!defaultInventoryWithoutRepasse.json().items.some((item: { id: string }) => item.id === repasseInventoryId));
 
   const repasseInventory = await app.inject({
     method: "GET",
