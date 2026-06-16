@@ -578,6 +578,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
             leadId: lead.id,
             origin: input.origin,
             interest: input.interest,
+            actorRole: session.user.role,
           },
         },
       });
@@ -932,6 +933,8 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
             fromStatus,
             toStatus: input.toStatus,
             reason: input.reason,
+            origin: "kanban",
+            actorRole: session.user.role,
           },
         },
       });
@@ -950,6 +953,8 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
               nextWorkflow: "sales_documentation_kanban",
               currentWorkflow: "lead_attendance_kanban",
               reason: input.reason,
+              origin: "kanban",
+              actorRole: session.user.role,
             },
           },
         });
@@ -1169,6 +1174,8 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           title: "Cadastro de cliente atualizado",
           metadata: {
             changedFields: Object.keys(input),
+            origin: "administrative",
+            actorRole: session.user.role,
           },
         },
       });
@@ -1254,6 +1261,8 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           description: input.reason,
           metadata: {
             reason: input.reason,
+            origin: "administrative",
+            actorRole: session.user.role,
           },
         },
       });

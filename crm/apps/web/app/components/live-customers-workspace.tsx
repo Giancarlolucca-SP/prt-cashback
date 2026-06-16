@@ -86,6 +86,7 @@ type CustomerHistoryEvent = {
   type: string;
   title: string;
   description: string | null;
+  metadata: Record<string, unknown> | null;
   occurredAt: string;
 };
 
@@ -379,6 +380,16 @@ function normalizeCustomerHistoryPreference(value: unknown): CustomerHistoryPref
     ...(filter ? { filter } : {}),
     ...(typeof preference.search === "string" ? { search: preference.search.slice(0, 80) } : {}),
   };
+}
+
+function metadataText(metadata: Record<string, unknown> | null | undefined, key: string) {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function metadataArrayText(metadata: Record<string, unknown> | null | undefined, key: string) {
+  const value = metadata?.[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
 function customerToForm(customer: Customer): CustomerFormState {
@@ -969,7 +980,40 @@ export function LiveCustomersWorkspace() {
     }
 
     const event = selectedHistory.events.find((historyItem) => historyItem.id === item.entityId);
-    return event ? [`Tipo: ${event.type}`, event.description ?? "Sem descricao complementar"] : [];
+    if (!event) {
+      return [];
+    }
+
+    const details = [`Tipo: ${event.type}`];
+    const origin = metadataText(event.metadata, "origin");
+    const actorRole = metadataText(event.metadata, "actorRole");
+    const fromStatus = metadataText(event.metadata, "fromStatus");
+    const toStatus = metadataText(event.metadata, "toStatus");
+    const nextWorkflow = metadataText(event.metadata, "nextWorkflow");
+    const appointmentType = metadataText(event.metadata, "appointmentType");
+    const changedFields = metadataArrayText(event.metadata, "changedFields");
+
+    if (origin) {
+      details.push(`Origem: ${origin}`);
+    }
+    if (actorRole) {
+      details.push(`Perfil: ${actorRole}`);
+    }
+    if (fromStatus || toStatus) {
+      details.push(`Status: ${fromStatus ?? "inicio"} -> ${toStatus ?? "sem alteracao"}`);
+    }
+    if (appointmentType) {
+      details.push(`Agendamento: ${appointmentType}`);
+    }
+    if (nextWorkflow) {
+      details.push(`Proximo fluxo: ${nextWorkflow}`);
+    }
+    if (changedFields.length > 0) {
+      details.push(`Campos alterados: ${changedFields.join(", ")}`);
+    }
+
+    details.push(event.description ?? "Sem descricao complementar");
+    return details;
   }
 
   function renderTimelineEntry(item: CustomerHistoryTimelineItem) {
