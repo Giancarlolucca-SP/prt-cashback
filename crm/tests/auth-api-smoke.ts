@@ -3084,6 +3084,23 @@ try {
   });
   assert.equal(sellerNoteOtherCustomer.statusCode, 404);
 
+  const sellerScheduleOtherCustomer = await app.inject({
+    method: "POST",
+    url: "/appointments",
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+    payload: {
+      customerId: createdCustomerId,
+      type: "ligacao",
+      title: "Tentativa fora da carteira",
+      startsAt: "2026-06-09T14:00:00.000Z",
+      notes: "Nao deve criar agendamento em cliente de outro responsavel.",
+    },
+  });
+  assert.equal(sellerScheduleOtherCustomer.statusCode, 404);
+  assert.equal(sellerScheduleOtherCustomer.json().error.code, "NOT_FOUND");
+
   const sellerUpdateOtherCustomer = await app.inject({
     method: "PATCH",
     url: `/customers/${createdCustomerId}`,

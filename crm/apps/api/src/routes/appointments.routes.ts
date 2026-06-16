@@ -103,11 +103,27 @@ function appointmentScopeWhere(user: { id: string; role: string }) {
   return {};
 }
 
-async function ensureCustomerInStore(storeId: string, customerId?: string) {
+function appointmentRelatedEntityScopeWhere(user: { id: string; role: string }) {
+  if (user.role === "SELLER" || user.role === "SDR") {
+    return { createdByUserId: user.id };
+  }
+
+  return {};
+}
+
+function appointmentLeadScopeWhere(user: { id: string; role: string }) {
+  if (user.role === "SELLER" || user.role === "SDR") {
+    return { assignedUserId: user.id };
+  }
+
+  return {};
+}
+
+async function ensureCustomerInStore(storeId: string, user: { id: string; role: string }, customerId?: string) {
   if (!customerId) return;
 
   const customer = await prisma.customer.findFirst({
-    where: { id: customerId, storeId, deletedAt: null },
+    where: { id: customerId, storeId, deletedAt: null, ...appointmentRelatedEntityScopeWhere(user) },
     select: { id: true },
   });
 
@@ -116,11 +132,11 @@ async function ensureCustomerInStore(storeId: string, customerId?: string) {
   }
 }
 
-async function ensureLeadInStore(storeId: string, leadId?: string) {
+async function ensureLeadInStore(storeId: string, user: { id: string; role: string }, leadId?: string) {
   if (!leadId) return;
 
   const lead = await prisma.lead.findFirst({
-    where: { id: leadId, storeId, deletedAt: null },
+    where: { id: leadId, storeId, deletedAt: null, ...appointmentLeadScopeWhere(user) },
     select: { id: true },
   });
 
@@ -227,8 +243,8 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
     const input = createAppointmentSchema.parse(request.body);
     const assignedUserId = input.assignedUserId ?? session.user.id;
 
-    await ensureCustomerInStore(session.user.storeId, input.customerId);
-    await ensureLeadInStore(session.user.storeId, input.leadId);
+    await ensureCustomerInStore(session.user.storeId, session.user, input.customerId);
+    await ensureLeadInStore(session.user.storeId, session.user, input.leadId);
     await ensureVehicleInStore(session.user.storeId, input.vehicleId);
     await ensureUserInStore(session.user.storeId, assignedUserId);
 
@@ -332,8 +348,8 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
       });
     }
 
-    await ensureCustomerInStore(session.user.storeId, input.customerId);
-    await ensureLeadInStore(session.user.storeId, input.leadId);
+    await ensureCustomerInStore(session.user.storeId, session.user, input.customerId);
+    await ensureLeadInStore(session.user.storeId, session.user, input.leadId);
     await ensureVehicleInStore(session.user.storeId, input.vehicleId);
     await ensureUserInStore(session.user.storeId, input.assignedUserId);
 
