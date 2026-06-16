@@ -8,7 +8,7 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 
 const repasseStatusSchema = z.enum(["DRAFT", "READY", "SENT", "INTEREST", "SOLD", "REVENUE_RECOGNIZED", "CANCELLED"]);
-const initialRepasseStatusSchema = z.enum(["DRAFT", "READY", "SENT", "INTEREST", "SOLD"]);
+const initialRepasseStatusSchema = z.enum(["DRAFT", "READY", "SENT", "INTEREST"]);
 const terminalRepasseStatuses = new Set(["CANCELLED", "REVENUE_RECOGNIZED"]);
 
 const repasseQuerySchema = z.object({
