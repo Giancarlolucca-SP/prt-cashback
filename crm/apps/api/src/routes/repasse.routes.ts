@@ -92,6 +92,8 @@ async function ensureVehicleEligibleForRepasse(storeId: string, vehicleId: strin
   if (!inventory) {
     throw new ApiError("VALIDATION_ERROR", "Repasse exige veiculo elegivel no estoque comum da loja.");
   }
+
+  return inventory;
 }
 
 function enforceRepasseIsEditable(status: string) {
@@ -188,7 +190,7 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
       sensitiveArea: "general",
     });
     const input = createRepasseSchema.parse(request.body);
-    await ensureVehicleEligibleForRepasse(session.user.storeId, input.vehicleId);
+    const eligibleInventory = await ensureVehicleEligibleForRepasse(session.user.storeId, input.vehicleId);
 
     const process = await prisma.$transaction(async (tx) => {
       const created = await tx.repasseProcess.create({
@@ -201,8 +203,8 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
         },
       });
 
-      await tx.vehicleInventoryRecord.updateMany({
-        where: { storeId: session.user.storeId, vehicleId: input.vehicleId, deletedAt: null },
+      await tx.vehicleInventoryRecord.update({
+        where: { id: eligibleInventory.id },
         data: { status: "REPASSE" },
       });
 
