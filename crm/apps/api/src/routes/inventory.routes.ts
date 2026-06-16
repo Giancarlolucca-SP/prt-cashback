@@ -135,6 +135,11 @@ type InventoryRecord = {
   updatedAt: Date;
 };
 
+function calculateDaysInStock(record: Pick<InventoryRecord, "entryDate" | "exitDate">) {
+  const endDate = record.exitDate ?? new Date();
+  return Math.max(0, Math.floor((endDate.getTime() - record.entryDate.getTime()) / 86400000));
+}
+
 function sanitizeVehicle(vehicle: VehicleRecord) {
   return {
     id: vehicle.id,
@@ -167,6 +172,7 @@ function sanitizeInventory(record: InventoryRecord, vehicle: VehicleRecord | und
     askingPrice: record.askingPrice?.toString() ?? null,
     entryDate: record.entryDate.toISOString(),
     exitDate: record.exitDate?.toISOString() ?? null,
+    daysInStock: calculateDaysInStock(record),
     notes: record.notes,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),

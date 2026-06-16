@@ -1730,7 +1730,10 @@ try {
     },
   });
   assert.equal(listInventory.statusCode, 200);
-  assert.ok(listInventory.json().items.some((item: { id: string }) => item.id === inventoryId));
+  const listedInventoryItem = listInventory.json().items.find((item: { id: string }) => item.id === inventoryId);
+  assert.ok(listedInventoryItem);
+  assert.equal(typeof listedInventoryItem.daysInStock, "number");
+  assert.ok(listedInventoryItem.daysInStock >= 0);
 
   const listInventoryByYear = await app.inject({
     method: "GET",
@@ -1765,6 +1768,7 @@ try {
   assert.ok(sellerListItem);
   assert.equal(sellerListItem.purchaseCost, null);
   assert.equal(sellerListItem.askingPrice, "124900");
+  assert.equal(typeof sellerListItem.daysInStock, "number");
 
   const sellerGetInventory = await app.inject({
     method: "GET",

@@ -28,6 +28,7 @@ type InventoryItem = {
   purchaseCost: string | null;
   askingPrice: string | null;
   entryDate: string;
+  daysInStock?: number;
   notes: string | null;
 };
 
@@ -179,6 +180,10 @@ function money(value: string | null) {
 
 function daysInStock(entryDate: string) {
   return Math.max(0, Math.round((Date.now() - new Date(entryDate).getTime()) / 86400000));
+}
+
+function operationalDaysInStock(item: InventoryItem) {
+  return item.daysInStock ?? daysInStock(item.entryDate);
 }
 
 function vehicleTitle(item: InventoryItem) {
@@ -391,7 +396,7 @@ export function LiveInventoryWorkspace() {
     const pending = stockItems.filter((item) => item.status === "IN_PREPARATION").length;
 
     return {
-      consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
+      consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED").sort((a, b) => operationalDaysInStock(b) - operationalDaysInStock(a)),
       metrics: [
         { label: "Proprios", value: String(own), detail: "capital da loja em estoque", tone: "teal" },
         { label: "Consignados", value: String(consigned), detail: "terceiros sob contrato", tone: "blue" },
@@ -403,7 +408,7 @@ export function LiveInventoryWorkspace() {
         },
         { label: "Pendencias criticas", value: String(pending), detail: "preparacao ou remocao", tone: "rose" },
       ],
-      ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
+      ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => operationalDaysInStock(b) - operationalDaysInStock(a)),
       prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
     };
   }, [canReadInventoryCosts, items]);
@@ -442,7 +447,7 @@ export function LiveInventoryWorkspace() {
             <span>{statusLabels[item.status]}</span>
             <span>{item.notes ?? "Sem observacoes"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
-            <span>{daysInStock(item.entryDate)} dias</span>
+            <span>{operationalDaysInStock(item)} dias</span>
           </div>
           <div className="vehicle-price">
             <strong>{money(item.askingPrice)}</strong>
