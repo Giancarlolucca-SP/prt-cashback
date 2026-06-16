@@ -97,6 +97,7 @@ const statusLabels: Record<RepasseStatus, string> = {
   SOLD: "Vendido",
 };
 
+const initialRepasseStatuses: RepasseStatus[] = ["DRAFT", "READY", "SENT", "INTEREST", "SOLD"];
 const terminalRepasseStatuses = new Set(["CANCELLED", "REVENUE_RECOGNIZED"]);
 const channelOptions = ["Site loja", "Lista Repasse SP", "Grupo Lojistas Premium", "Compradores SUV Campinas", "Lista Interior", "Instagram loja"];
 const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
@@ -345,7 +346,7 @@ export function LiveRepasseWorkspace() {
               {!canReadInventory ? <p className="lead-modal-error">Sem permissao para listar estoque.</p> : null}
               {inventoryStatus === "error" ? <p className="lead-modal-error">Nao foi possivel carregar estoque.</p> : null}
               <label>Preco<input min="0" type="number" value={form.price} onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} /></label>
-              <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as RepasseStatus }))}>{(Object.keys(statusLabels) as RepasseStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
+              <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as RepasseStatus }))}>{initialRepasseStatuses.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
               <label className="lead-modal-wide">Mensagem base<textarea maxLength={400} value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} /></label>
               <div className="lead-modal-wide repasse-target-grid">
                 {channelOptions.map((channel) => (
