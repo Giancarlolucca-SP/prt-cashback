@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ApiError } from "../api/errors.js";
 import { requirePermission } from "../api/auth-guards.js";
+import { canUser } from "../auth/rbac.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
@@ -146,7 +147,7 @@ function sanitizeVehicle(vehicle: VehicleRecord) {
   };
 }
 
-function sanitizeInventory(record: InventoryRecord, vehicle?: VehicleRecord) {
+function sanitizeInventory(record: InventoryRecord, vehicle: VehicleRecord | undefined, options: { includeCosts: boolean }) {
   return {
     id: record.id,
     vehicleId: record.vehicleId,
@@ -154,7 +155,7 @@ function sanitizeInventory(record: InventoryRecord, vehicle?: VehicleRecord) {
     ownershipType: record.ownershipType,
     status: record.status,
     ownerCustomerId: record.ownerCustomerId,
-    purchaseCost: record.purchaseCost?.toString() ?? null,
+    purchaseCost: options.includeCosts ? (record.purchaseCost?.toString() ?? null) : null,
     askingPrice: record.askingPrice?.toString() ?? null,
     entryDate: record.entryDate.toISOString(),
     exitDate: record.exitDate?.toISOString() ?? null,
@@ -162,6 +163,17 @@ function sanitizeInventory(record: InventoryRecord, vehicle?: VehicleRecord) {
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
+}
+
+async function canReadInventoryCosts(user: Parameters<typeof canUser>[0]) {
+  const decision = await canUser(user, {
+    module: "inventory",
+    action: "read_costs",
+    scope: "ALL",
+    sensitiveArea: "margin",
+  });
+
+  return decision.allowed;
 }
 
 function sanitizeInventoryDocument(input: {
@@ -275,6 +287,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       scope: "STORE",
       sensitiveArea: "general",
     });
+    const includeCosts = await canReadInventoryCosts(session.user);
     const query = inventoryQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
 
@@ -325,7 +338,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
     return listResponse(
-      items.map((item) => sanitizeInventory(item, vehicleById.get(item.vehicleId))),
+      items.map((item) => sanitizeInventory(item, vehicleById.get(item.vehicleId), { includeCosts })),
       query,
       total,
     );
@@ -339,6 +352,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       sensitiveArea: "general",
     });
     const params = inventoryParamsSchema.parse(request.params);
+    const includeCosts = await canReadInventoryCosts(session.user);
     const { inventory, vehicle } = await getInventoryOrThrow(session.user.storeId, params.id);
     const links = await prisma.fileAttachmentLink.findMany({
       where: {
@@ -371,7 +385,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     });
 
     return {
-      data: sanitizeInventory(inventory, vehicle),
+      data: sanitizeInventory(inventory, vehicle, { includeCosts }),
       documents: links.flatMap((link) => {
         const attachment = attachmentById.get(link.attachmentId);
         return attachment ? [sanitizeInventoryDocument({ attachment, link })] : [];
@@ -388,9 +402,10 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       sensitiveArea: "general",
     });
     const params = inventoryParamsSchema.parse(request.params);
+    const includeCosts = await canReadInventoryCosts(session.user);
     const { inventory, vehicle } = await getInventoryOrThrow(session.user.storeId, params.id);
 
-    return { data: sanitizeInventory(inventory, vehicle) };
+    return { data: sanitizeInventory(inventory, vehicle, { includeCosts }) };
   });
 
   app.post("/", async (request, reply) => {
@@ -469,7 +484,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       payload: { vehicleId: result.vehicle.id, status: result.inventory.status },
     });
 
-    return reply.code(201).send({ data: sanitizeInventory(result.inventory, result.vehicle) });
+    return reply.code(201).send({ data: sanitizeInventory(result.inventory, result.vehicle, { includeCosts: await canReadInventoryCosts(session.user) }) });
   });
 
   app.patch("/:id", async (request) => {
@@ -596,7 +611,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       });
     }
 
-    return { data: sanitizeInventory(result.inventory, result.vehicle) };
+    return { data: sanitizeInventory(result.inventory, result.vehicle, { includeCosts: await canReadInventoryCosts(session.user) }) };
   });
 
   app.post("/:id/costs", async (request, reply) => {

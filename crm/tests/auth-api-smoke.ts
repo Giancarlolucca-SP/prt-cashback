@@ -574,6 +574,7 @@ try {
   assert.ok(listProviders.json().items.some((provider: { name: string; hasSecret: boolean }) => provider.name === `Prestador ${serviceToken}` && provider.hasSecret));
 
   const postSaleCatalogName = `Servico ${serviceToken}`;
+  const postSaleCatalogCategory = `QA-${serviceToken}`;
   const createCatalogItem = await app.inject({
     method: "POST",
     url: "/services/catalog",
@@ -582,7 +583,7 @@ try {
     },
     payload: {
       basePrice: 990,
-      category: "QA",
+      category: postSaleCatalogCategory,
       name: postSaleCatalogName,
       slaHours: 4,
     },
@@ -592,7 +593,7 @@ try {
 
   const listCatalog = await app.inject({
     method: "GET",
-    url: "/services/catalog?page=1&page_size=100&category=QA",
+    url: `/services/catalog?page=1&page_size=100&category=${encodeURIComponent(postSaleCatalogCategory)}`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -1715,6 +1716,30 @@ try {
   assert.equal(getInventory.statusCode, 200);
   assert.equal(getInventory.json().data.vehicle.model, "Civic");
 
+  const sellerListInventory = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=5&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerListInventory.statusCode, 200);
+  const sellerListItem = sellerListInventory.json().items.find((item: { id: string }) => item.id === inventoryId);
+  assert.ok(sellerListItem);
+  assert.equal(sellerListItem.purchaseCost, null);
+  assert.equal(sellerListItem.askingPrice, "124900");
+
+  const sellerGetInventory = await app.inject({
+    method: "GET",
+    url: `/inventory/${inventoryId}`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerGetInventory.statusCode, 200);
+  assert.equal(sellerGetInventory.json().data.purchaseCost, null);
+  assert.equal(sellerGetInventory.json().data.askingPrice, "124900");
+
   const inventoryDetailWithoutListings = await app.inject({
     method: "GET",
     url: `/inventory/${inventoryId}/detail`,
@@ -1726,6 +1751,17 @@ try {
   assert.equal(inventoryDetailWithoutListings.json().data.id, inventoryId);
   assert.deepEqual(inventoryDetailWithoutListings.json().documents, []);
   assert.deepEqual(inventoryDetailWithoutListings.json().activeListings, []);
+
+  const sellerInventoryDetail = await app.inject({
+    method: "GET",
+    url: `/inventory/${inventoryId}/detail`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerInventoryDetail.statusCode, 200);
+  assert.equal(sellerInventoryDetail.json().data.purchaseCost, null);
+  assert.equal(sellerInventoryDetail.json().data.askingPrice, "124900");
 
   const updateInventory = await app.inject({
     method: "PATCH",
