@@ -240,6 +240,9 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
     if (current.status === "CANCELLED") {
       throw new ApiError("VALIDATION_ERROR", "Repasse cancelado nao aceita novas atualizacoes.");
     }
+    if (current.status === "REVENUE_RECOGNIZED") {
+      throw new ApiError("VALIDATION_ERROR", "Repasse com receita reconhecida nao aceita novas atualizacoes.");
+    }
 
     const process = await prisma.$transaction(async (tx) => {
       const updated = await tx.repasseProcess.update({

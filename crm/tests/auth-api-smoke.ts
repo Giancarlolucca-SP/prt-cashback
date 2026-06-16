@@ -2724,6 +2724,20 @@ try {
   assert.equal(getRepasse.statusCode, 200);
   assert.equal(getRepasse.json().data.status, "REVENUE_RECOGNIZED");
   assert.ok(getRepasse.json().revenues.some((revenue: { amount: string }) => revenue.amount === "2500"));
+
+  const updateRecognizedRepasse = await app.inject({
+    method: "PATCH",
+    url: `/repasse/${repasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "SENT",
+      price: 75200,
+    },
+  });
+  assert.equal(updateRecognizedRepasse.statusCode, 400);
+  assert.equal(updateRecognizedRepasse.json().error.code, "VALIDATION_ERROR");
   checkpoint("purchases/listings/repasse");
 
   const unauthenticatedSales = await app.inject({
