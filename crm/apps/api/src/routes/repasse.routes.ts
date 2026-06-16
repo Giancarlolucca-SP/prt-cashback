@@ -351,6 +351,9 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
     if (process.status === "CANCELLED") {
       throw new ApiError("VALIDATION_ERROR", "Repasse cancelado nao aceita reconhecimento de receita.");
     }
+    if (process.status === "REVENUE_RECOGNIZED") {
+      throw new ApiError("VALIDATION_ERROR", "Repasse ja possui receita reconhecida.");
+    }
     await ensureSaleInStore(session.user.storeId, input.saleId);
 
     const revenue = await prisma.$transaction(async (tx) => {

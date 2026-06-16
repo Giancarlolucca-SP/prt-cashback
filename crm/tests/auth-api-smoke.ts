@@ -2755,6 +2755,22 @@ try {
   assert.equal(getRepasse.json().data.status, "REVENUE_RECOGNIZED");
   assert.ok(getRepasse.json().revenues.some((revenue: { amount: string }) => revenue.amount === "2500"));
 
+  const duplicateRepasseRevenue = await app.inject({
+    method: "POST",
+    url: `/repasse/${repasseId}/revenues`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      amount: 900,
+      snapshot: {
+        source: "qa-repasse-duplicado",
+      },
+    },
+  });
+  assert.equal(duplicateRepasseRevenue.statusCode, 400);
+  assert.equal(duplicateRepasseRevenue.json().error.code, "VALIDATION_ERROR");
+
   const updateRecognizedRepasse = await app.inject({
     method: "PATCH",
     url: `/repasse/${repasseId}`,
