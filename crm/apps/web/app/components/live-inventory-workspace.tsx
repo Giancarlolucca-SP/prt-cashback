@@ -36,7 +36,17 @@ type ListResponse<T> = {
   items: T[];
   page: number;
   pageSize: number;
+  summary?: InventoryOperationalSummary;
   total?: number;
+};
+
+type InventoryOperationalSummary = {
+  total: number;
+  own: number;
+  consigned: number;
+  ownPercent: number;
+  consignedPercent: number;
+  byStatus: Partial<Record<InventoryStatus, number>>;
 };
 
 type InventoryFormState = {
@@ -222,6 +232,7 @@ export function LiveInventoryWorkspace() {
   const [items, setItems] = useState(fallbackItems);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [operationalSummary, setOperationalSummary] = useState<InventoryOperationalSummary | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -246,6 +257,7 @@ export function LiveInventoryWorkspace() {
       .then((list) => {
         if (!isCurrent) return;
         setItems(list.items.filter(isCommonStockItem));
+        setOperationalSummary(list.summary ?? null);
         setStatus("live");
       })
       .catch(() => {
@@ -388,18 +400,18 @@ export function LiveInventoryWorkspace() {
 
   const view = useMemo(() => {
     const stockItems = items.filter(isCommonStockItem);
-    const own = stockItems.filter((item) => item.ownershipType === "OWN").length;
-    const consigned = stockItems.filter((item) => item.ownershipType === "CONSIGNED").length;
+    const own = operationalSummary?.own ?? stockItems.filter((item) => item.ownershipType === "OWN").length;
+    const consigned = operationalSummary?.consigned ?? stockItems.filter((item) => item.ownershipType === "CONSIGNED").length;
     const totalStockValue = stockItems.reduce((sum, item) => sum + Number(item.askingPrice ?? 0), 0);
     const projectedMargin = canReadInventoryCosts ? stockItems.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0) : null;
     const avgMargin = projectedMargin !== null && totalStockValue > 0 ? projectedMargin / totalStockValue : null;
-    const pending = stockItems.filter((item) => item.status === "IN_PREPARATION").length;
+    const pending = operationalSummary?.byStatus.IN_PREPARATION ?? stockItems.filter((item) => item.status === "IN_PREPARATION").length;
 
     return {
       consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED").sort((a, b) => operationalDaysInStock(b) - operationalDaysInStock(a)),
       metrics: [
-        { label: "Proprios", value: String(own), detail: "capital da loja em estoque", tone: "teal" },
-        { label: "Consignados", value: String(consigned), detail: "terceiros sob contrato", tone: "blue" },
+        { label: "Proprios", value: String(own), detail: operationalSummary ? percent.format(operationalSummary.ownPercent) : "capital da loja em estoque", tone: "teal" },
+        { label: "Consignados", value: String(consigned), detail: operationalSummary ? percent.format(operationalSummary.consignedPercent) : "terceiros sob contrato", tone: "blue" },
         {
           label: "Margem media",
           value: avgMargin === null ? "Restrito" : percent.format(avgMargin),
@@ -411,7 +423,7 @@ export function LiveInventoryWorkspace() {
       ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => operationalDaysInStock(b) - operationalDaysInStock(a)),
       prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
     };
-  }, [canReadInventoryCosts, items]);
+  }, [canReadInventoryCosts, items, operationalSummary]);
 
   const ownershipOptions = canReadInventoryCosts ? stockOwnershipOptions : stockOwnershipOptions.filter((item) => item !== "CONSIGNED");
 

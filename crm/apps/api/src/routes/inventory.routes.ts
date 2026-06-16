@@ -140,6 +140,26 @@ function calculateDaysInStock(record: Pick<InventoryRecord, "entryDate" | "exitD
   return Math.max(0, Math.floor((endDate.getTime() - record.entryDate.getTime()) / 86400000));
 }
 
+function buildInventoryOperationalSummary(input: {
+  byOwnership: Array<{ ownershipType: string; _count: { _all: number } }>;
+  byStatus: Array<{ status: string; _count: { _all: number } }>;
+  total: number;
+}) {
+  const countByOwnership = Object.fromEntries(input.byOwnership.map((item) => [item.ownershipType, item._count._all]));
+  const countByStatus = Object.fromEntries(input.byStatus.map((item) => [item.status, item._count._all]));
+  const own = countByOwnership.OWN ?? 0;
+  const consigned = countByOwnership.CONSIGNED ?? 0;
+
+  return {
+    total: input.total,
+    own,
+    consigned,
+    ownPercent: input.total > 0 ? own / input.total : 0,
+    consignedPercent: input.total > 0 ? consigned / input.total : 0,
+    byStatus: countByStatus,
+  };
+}
+
 function sanitizeVehicle(vehicle: VehicleRecord) {
   return {
     id: vehicle.id,
@@ -388,7 +408,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       ...(matchingVehicleIds ? { vehicleId: { in: matchingVehicleIds } } : {}),
     };
 
-    const [items, total] = await Promise.all([
+    const [items, total, byOwnership, byStatus] = await Promise.all([
       prisma.vehicleInventoryRecord.findMany({
         where,
         orderBy: { entryDate: "desc" },
@@ -396,17 +416,30 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         take,
       }),
       prisma.vehicleInventoryRecord.count({ where }),
+      prisma.vehicleInventoryRecord.groupBy({
+        by: ["ownershipType"],
+        where,
+        _count: { _all: true },
+      }),
+      prisma.vehicleInventoryRecord.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+      }),
     ]);
     const vehicles = await prisma.vehicle.findMany({
       where: { id: { in: items.map((item) => item.vehicleId) }, storeId: session.user.storeId },
     });
     const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
-    return listResponse(
-      items.map((item) => sanitizeInventory(item, vehicleById.get(item.vehicleId), { includeCosts })),
-      query,
-      total,
-    );
+    return {
+      ...listResponse(
+        items.map((item) => sanitizeInventory(item, vehicleById.get(item.vehicleId), { includeCosts })),
+        query,
+        total,
+      ),
+      summary: buildInventoryOperationalSummary({ byOwnership, byStatus, total }),
+    };
   });
 
   app.get("/:id/detail", async (request) => {

@@ -1734,6 +1734,10 @@ try {
   assert.ok(listedInventoryItem);
   assert.equal(typeof listedInventoryItem.daysInStock, "number");
   assert.ok(listedInventoryItem.daysInStock >= 0);
+  assert.ok(listInventory.json().summary.total >= 1);
+  assert.ok(listInventory.json().summary.own >= 1);
+  assert.equal(typeof listInventory.json().summary.ownPercent, "number");
+  assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
 
   const listInventoryByYear = await app.inject({
     method: "GET",
@@ -1769,6 +1773,7 @@ try {
   assert.equal(sellerListItem.purchaseCost, null);
   assert.equal(sellerListItem.askingPrice, "124900");
   assert.equal(typeof sellerListItem.daysInStock, "number");
+  assert.ok(sellerListInventory.json().summary.total >= 1);
 
   const sellerGetInventory = await app.inject({
     method: "GET",
