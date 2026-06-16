@@ -71,7 +71,11 @@ function uniqueToken(prefix: string) {
 
 function uniquePlate(prefix: string) {
   uniqueCounter += 1;
-  return `${prefix}${Date.now().toString(36).slice(-4)}${(uniqueCounter % 36).toString(36)}`.toUpperCase();
+  const letters = `${prefix}AAA`.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 3).padEnd(3, "A");
+  const number = String(uniqueCounter % 10);
+  const letter = String.fromCharCode(65 + (uniqueCounter % 26));
+  const suffix = String(uniqueCounter % 100).padStart(2, "0");
+  return `${letters}${number}${letter}${suffix}`;
 }
 
 try {
@@ -1495,6 +1499,25 @@ try {
   assert.equal(sellerInventoryCreate.statusCode, 403);
   assert.equal(sellerInventoryCreate.json().error.code, "FORBIDDEN");
 
+  const invalidInventoryVehicle = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Honda",
+        model: "Civic",
+        plate: "INVALIDA",
+      },
+      ownershipType: "OWN",
+      status: "IN_PREPARATION",
+    },
+  });
+  assert.equal(invalidInventoryVehicle.statusCode, 400);
+  assert.equal(invalidInventoryVehicle.json().error.code, "VALIDATION_ERROR");
+
   const inventoryPlate = uniquePlate("QA");
   const createInventory = await app.inject({
     method: "POST",
@@ -1537,9 +1560,11 @@ try {
       vehicle: {
         brand: "Honda",
         model: "Civic",
+        yearModel: 2021,
         plate: inventoryPlate,
       },
       ownershipType: "OWN",
+      entryDate: "2026-06-06T12:00:00.000Z",
     },
   });
   assert.equal(duplicateInventory.statusCode, 409);

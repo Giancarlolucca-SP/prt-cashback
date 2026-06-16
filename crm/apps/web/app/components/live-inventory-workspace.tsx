@@ -41,6 +41,7 @@ type InventoryFormState = {
   askingPrice: string;
   brand: string;
   color: string;
+  entryDate: string;
   model: string;
   notes: string;
   ownershipType: OwnershipType;
@@ -62,6 +63,7 @@ const emptyForm: InventoryFormState = {
   askingPrice: "",
   brand: "",
   color: "",
+  entryDate: new Date().toISOString().slice(0, 10),
   model: "",
   notes: "",
   ownershipType: "OWN",
@@ -211,6 +213,7 @@ export function LiveInventoryWorkspace() {
     try {
       const response = await apiPost<{ data: InventoryItem }>("/inventory", token, {
         askingPrice: form.askingPrice ? Number(form.askingPrice) : undefined,
+        entryDate: form.entryDate ? new Date(`${form.entryDate}T12:00:00.000Z`).toISOString() : undefined,
         notes: form.notes.trim() || undefined,
         ownershipType: form.ownershipType,
         purchaseCost: form.purchaseCost ? Number(form.purchaseCost) : undefined,
@@ -435,7 +438,8 @@ export function LiveInventoryWorkspace() {
               <label>Marca<input autoFocus required value={form.brand} onChange={(event) => setForm((current) => ({ ...current, brand: event.target.value }))} /></label>
               <label>Modelo<input required value={form.model} onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))} /></label>
               <label>Versao<input value={form.version} onChange={(event) => setForm((current) => ({ ...current, version: event.target.value }))} /></label>
-              <label>Ano modelo<input type="number" value={form.yearModel} onChange={(event) => setForm((current) => ({ ...current, yearModel: event.target.value }))} /></label>
+              <label>Ano modelo<input required type="number" value={form.yearModel} onChange={(event) => setForm((current) => ({ ...current, yearModel: event.target.value }))} /></label>
+              <label>Entrada<input required type="date" value={form.entryDate} onChange={(event) => setForm((current) => ({ ...current, entryDate: event.target.value }))} /></label>
               <label>Placa<input value={form.plate} onChange={(event) => setForm((current) => ({ ...current, plate: event.target.value }))} /></label>
               <label>Cor<input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} /></label>
               <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType }))}>{stockOwnershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
@@ -446,7 +450,7 @@ export function LiveInventoryWorkspace() {
               {saveError ? <p className="lead-modal-error">{saveError}</p> : null}
               <div className="lead-modal-actions">
                 <button className="text-button" onClick={() => setModalOpen(false)} type="button">Cancelar</button>
-                <button className="primary-action" disabled={saving || form.brand.trim().length < 2 || form.model.trim().length < 1} type="submit">{saving ? "Salvando..." : "Criar entrada"}</button>
+                <button className="primary-action" disabled={saving || form.brand.trim().length < 2 || form.model.trim().length < 1 || !form.yearModel || !form.entryDate} type="submit">{saving ? "Salvando..." : "Criar entrada"}</button>
               </div>
             </form>
           </section>

@@ -24,21 +24,30 @@ const vehiclePayloadSchema = z.object({
   version: z.string().trim().max(120).optional(),
   yearModel: z.number().int().min(1900).max(2100).optional(),
   yearBuild: z.number().int().min(1900).max(2100).optional(),
-  plate: z.string().trim().min(5).max(12).optional(),
+  plate: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, "Informe uma placa valida no padrao ABC1234 ou ABC1D23.")
+    .optional(),
   vin: z.string().trim().min(6).max(32).optional(),
   color: z.string().trim().max(40).optional(),
   mileage: z.number().int().min(0).optional(),
   fipeCode: z.string().trim().max(40).optional(),
 });
 
+const createVehiclePayloadSchema = vehiclePayloadSchema.extend({
+  yearModel: z.number().int().min(1900).max(2100),
+});
+
 const createInventorySchema = z.object({
-  vehicle: vehiclePayloadSchema,
+  vehicle: createVehiclePayloadSchema,
   ownershipType: ownershipTypeSchema,
   status: inventoryStatusSchema.default("IN_PREPARATION"),
   ownerCustomerId: z.string().uuid().optional(),
   purchaseCost: z.number().nonnegative().optional(),
   askingPrice: z.number().nonnegative().optional(),
-  entryDate: z.coerce.date().optional(),
+  entryDate: z.coerce.date(),
   notes: z
     .string()
     .trim()
