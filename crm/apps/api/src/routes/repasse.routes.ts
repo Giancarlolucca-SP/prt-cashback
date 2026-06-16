@@ -64,7 +64,7 @@ function sanitizeRepasse(process: RepasseRecord) {
   };
 }
 
-async function ensureVehicleInStore(storeId: string, vehicleId: string) {
+async function ensureVehicleEligibleForRepasse(storeId: string, vehicleId: string) {
   const vehicle = await prisma.vehicle.findFirst({
     where: { id: vehicleId, storeId, deletedAt: null },
     select: { id: true },
@@ -72,6 +72,21 @@ async function ensureVehicleInStore(storeId: string, vehicleId: string) {
 
   if (!vehicle) {
     throw new ApiError("NOT_FOUND", "Veiculo do repasse nao encontrado.");
+  }
+
+  const inventory = await prisma.vehicleInventoryRecord.findFirst({
+    where: {
+      vehicleId,
+      storeId,
+      deletedAt: null,
+      ownershipType: { not: "REPASSE" },
+      status: { notIn: ["REPASSE", "SOLD", "REMOVED"] },
+    },
+    select: { id: true },
+  });
+
+  if (!inventory) {
+    throw new ApiError("VALIDATION_ERROR", "Repasse exige veiculo elegivel no estoque comum da loja.");
   }
 }
 
@@ -159,7 +174,7 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
       sensitiveArea: "general",
     });
     const input = createRepasseSchema.parse(request.body);
-    await ensureVehicleInStore(session.user.storeId, input.vehicleId);
+    await ensureVehicleEligibleForRepasse(session.user.storeId, input.vehicleId);
 
     const process = await prisma.$transaction(async (tx) => {
       const created = await tx.repasseProcess.create({

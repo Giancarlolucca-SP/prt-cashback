@@ -2456,6 +2456,24 @@ try {
   assert.equal(createRepasse.json().data.price, "76000");
   const repasseId = createRepasse.json().data.id as string;
 
+  const duplicateRepasseForSameVehicle = await app.inject({
+    method: "POST",
+    url: "/repasse",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicleId: repasseVehicleId,
+      status: "DRAFT",
+      price: 75900,
+      channelPlan: {
+        whatsapp: ["lista-repasse"],
+      },
+    },
+  });
+  assert.equal(duplicateRepasseForSameVehicle.statusCode, 400);
+  assert.equal(duplicateRepasseForSameVehicle.json().error.code, "VALIDATION_ERROR");
+
   const defaultInventoryWithoutRepasse = await app.inject({
     method: "GET",
     url: "/inventory?page=1&page_size=100",
