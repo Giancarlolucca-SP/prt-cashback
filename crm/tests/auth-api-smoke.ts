@@ -2645,6 +2645,22 @@ try {
   assert.ok(repasseCancelStatusHistory);
   assert.equal(repasseCancelStatusHistory.actorUserId, ownerBody.user.id);
 
+  const revenueForCancelledRepasse = await app.inject({
+    method: "POST",
+    url: `/repasse/${cancelableRepasseId}/revenues`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      amount: 1200,
+      snapshot: {
+        source: "qa-cancelled-repasse",
+      },
+    },
+  });
+  assert.equal(revenueForCancelledRepasse.statusCode, 400);
+  assert.equal(revenueForCancelledRepasse.json().error.code, "VALIDATION_ERROR");
+
   const updateRepasse = await app.inject({
     method: "PATCH",
     url: `/repasse/${repasseId}`,

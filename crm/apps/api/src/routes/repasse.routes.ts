@@ -335,6 +335,9 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
     const params = repasseParamsSchema.parse(request.params);
     const input = recognizeRevenueSchema.parse(request.body);
     const process = await getRepasseOrThrow(session.user.storeId, params.id);
+    if (process.status === "CANCELLED") {
+      throw new ApiError("VALIDATION_ERROR", "Repasse cancelado nao aceita reconhecimento de receita.");
+    }
     await ensureSaleInStore(session.user.storeId, input.saleId);
 
     const revenue = await prisma.$transaction(async (tx) => {
