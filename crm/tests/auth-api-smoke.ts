@@ -2613,6 +2613,18 @@ try {
   assert.equal(defaultInventoryAfterRepasseCancel.statusCode, 200);
   assert.ok(defaultInventoryAfterRepasseCancel.json().items.some((item: { id: string }) => item.id === cancelRepasseInventoryId));
 
+  const repasseCancelStatusHistory = await prisma.vehicleStatusHistory.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      vehicleId: cancelRepasseVehicleId,
+      fromStatus: "REPASSE",
+      toStatus: "IN_PREPARATION",
+      reason: "repasse_cancelled",
+    },
+  });
+  assert.ok(repasseCancelStatusHistory);
+  assert.equal(repasseCancelStatusHistory.actorUserId, ownerBody.user.id);
+
   const updateRepasse = await app.inject({
     method: "PATCH",
     url: `/repasse/${repasseId}`,

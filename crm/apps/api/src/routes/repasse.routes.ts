@@ -279,6 +279,17 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
         });
 
         if (restoredInventories.length > 0) {
+          await tx.vehicleStatusHistory.create({
+            data: {
+              storeId: session.user.storeId,
+              vehicleId: current.vehicleId,
+              fromStatus: "REPASSE",
+              toStatus: "IN_PREPARATION",
+              actorUserId: session.user.id,
+              reason: "repasse_cancelled",
+            },
+          });
+
           await tx.auditLog.createMany({
             data: restoredInventories.map((inventory) => ({
               storeId: session.user.storeId,
