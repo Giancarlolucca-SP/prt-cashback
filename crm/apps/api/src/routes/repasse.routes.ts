@@ -245,7 +245,6 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
           status: input.status,
           price: input.price,
           channelPlan: input.channelPlan as Prisma.InputJsonObject | undefined,
-          deletedAt: input.status === "CANCELLED" ? new Date() : null,
         },
       });
 

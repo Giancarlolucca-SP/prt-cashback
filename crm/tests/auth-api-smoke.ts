@@ -2593,6 +2593,26 @@ try {
   assert.equal(cancelRepasse.statusCode, 200);
   assert.equal(cancelRepasse.json().data.status, "CANCELLED");
 
+  const getCancelledRepasse = await app.inject({
+    method: "GET",
+    url: `/repasse/${cancelableRepasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(getCancelledRepasse.statusCode, 200);
+  assert.equal(getCancelledRepasse.json().data.status, "CANCELLED");
+
+  const listCancelledRepasse = await app.inject({
+    method: "GET",
+    url: "/repasse?page=1&page_size=20&status=CANCELLED",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listCancelledRepasse.statusCode, 200);
+  assert.ok(listCancelledRepasse.json().items.some((item: { id: string }) => item.id === cancelableRepasseId));
+
   const restoredInventory = await app.inject({
     method: "GET",
     url: `/inventory/${cancelRepasseInventoryId}`,
