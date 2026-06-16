@@ -54,6 +54,7 @@ const allowedLinkEntityTypes = [
   "sale",
   "service_order",
   "vehicle",
+  "vehicle_inventory",
   "vehicle_evaluation",
 ] as const;
 
@@ -165,45 +166,50 @@ async function ensureLinkedEntityAccess(input: {
                 where: { id: input.entityId, storeId: input.storeId, deletedAt: null, ...scopedSellerWhere },
                 select: { id: true },
               })
-            : input.entityType === "vehicle"
-              ? await prisma.vehicle.findFirst({
-                  where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
-                  select: { id: true },
-                })
-              : input.entityType === "listing"
-                ? await prisma.listing.findFirst({
-                    where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
-                    select: { id: true },
-                  })
-                : input.entityType === "service_order"
-                  ? await prisma.serviceOrder.findFirst({
+                : input.entityType === "vehicle"
+                  ? await prisma.vehicle.findFirst({
                       where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
                       select: { id: true },
                     })
-                  : input.entityType === "contract"
-                    ? await prisma.contract.findFirst({
-                        where: { id: input.entityId, storeId: input.storeId },
+                  : input.entityType === "vehicle_inventory"
+                    ? await prisma.vehicleInventoryRecord.findFirst({
+                        where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
                         select: { id: true },
                       })
-                    : input.entityType === "post_sale_customer"
-                      ? await prisma.postSaleCustomer.findFirst({
+                    : input.entityType === "listing"
+                      ? await prisma.listing.findFirst({
                           where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
                           select: { id: true },
                         })
-                      : input.entityType === "purchase_lead"
-                        ? await prisma.purchaseLead.findFirst({
+                      : input.entityType === "service_order"
+                        ? await prisma.serviceOrder.findFirst({
                             where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
                             select: { id: true },
                           })
-                        : input.entityType === "vehicle_evaluation"
-                          ? await prisma.vehicleEvaluation.findFirst({
+                        : input.entityType === "contract"
+                          ? await prisma.contract.findFirst({
                               where: { id: input.entityId, storeId: input.storeId },
                               select: { id: true },
                             })
-                          : await prisma.financialTransaction.findFirst({
-                              where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
-                              select: { id: true },
-                            });
+                          : input.entityType === "post_sale_customer"
+                            ? await prisma.postSaleCustomer.findFirst({
+                                where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                                select: { id: true },
+                              })
+                            : input.entityType === "purchase_lead"
+                              ? await prisma.purchaseLead.findFirst({
+                                  where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                                  select: { id: true },
+                                })
+                              : input.entityType === "vehicle_evaluation"
+                                ? await prisma.vehicleEvaluation.findFirst({
+                                    where: { id: input.entityId, storeId: input.storeId },
+                                    select: { id: true },
+                                  })
+                                : await prisma.financialTransaction.findFirst({
+                                    where: { id: input.entityId, storeId: input.storeId, deletedAt: null },
+                                    select: { id: true },
+                                  });
 
   if (!exists) {
     throw new ApiError("NOT_FOUND", "Recurso vinculado ao arquivo nao encontrado.");

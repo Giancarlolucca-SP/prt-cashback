@@ -154,6 +154,7 @@ Endpoints principais:
 - `POST /contracts/warranty-terms`
 - `POST /contracts/delivery-checklists`
 - `POST /files/prepare-upload`
+  - Aceita vinculo documental com `vehicle` e `vehicle_inventory`, permitindo anexar/referenciar contrato de consignacao diretamente na pasta do item de estoque.
 - `GET /files/:id/download`
 - `POST /files/:id/delete-customer-document`
 - `GET/POST /dispatch/processes`

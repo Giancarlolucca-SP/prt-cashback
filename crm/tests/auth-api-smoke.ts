@@ -1605,6 +1605,46 @@ try {
   assert.equal(createConsignedInventory.json().data.purchaseCost, "102000");
   const consignedInventoryId = createConsignedInventory.json().data.id as string;
 
+  const prepareConsignedContract = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      bucket: "vehicle-documents",
+      originalName: "Contrato Consignacao T-Cross.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 2048,
+      classification: "consignment_contract",
+      link: {
+        entityType: "vehicle_inventory",
+        entityId: consignedInventoryId,
+        purpose: "consignment_contract",
+      },
+    },
+  });
+  assert.equal(prepareConsignedContract.statusCode, 201);
+
+  const consignedInventoryDetail = await app.inject({
+    method: "GET",
+    url: `/inventory/${consignedInventoryId}/detail`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(consignedInventoryDetail.statusCode, 200);
+  assert.ok(
+    consignedInventoryDetail
+      .json()
+      .documents.some(
+        (document: { classification: string | null; entityType: string; purpose: string | null }) =>
+          document.classification === "consignment_contract" &&
+          document.entityType === "vehicle_inventory" &&
+          document.purpose === "consignment_contract",
+      ),
+  );
+
   const changeOwnershipType = await app.inject({
     method: "PATCH",
     url: `/inventory/${consignedInventoryId}`,

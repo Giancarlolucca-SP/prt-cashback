@@ -204,7 +204,7 @@ paths:
   /contracts/{id}/sign:
     post: { tags: [Contracts], summary: Assina contrato., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /files/prepare-upload:
-    post: { tags: [Files], summary: Prepara upload e persiste metadados., responses: { "201": { $ref: "#/components/responses/Created" } } }
+    post: { tags: [Files], summary: Prepara upload e persiste metadados., description: Permite vincular documentos a entidades do CRM, incluindo vehicle e vehicle_inventory para pasta documental do veiculo., responses: { "201": { $ref: "#/components/responses/Created" } } }
   /files/{id}/download:
     get: { tags: [Files], summary: Gera URL de download., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
 
