@@ -277,6 +277,8 @@ export function LiveRepasseWorkspace() {
   }
 
   const view = useMemo(() => {
+    const active = processes.filter((item) => !isTerminalRepasse(item.status)).length;
+    const cancelled = processes.filter((item) => item.status === "CANCELLED").length;
     const ready = processes.filter((item) => item.status === "READY" || item.status === "DRAFT").length;
     const sent = processes.filter((item) => item.status === "SENT").length;
     const interest = processes.filter((item) => item.status === "INTEREST").length;
@@ -284,7 +286,7 @@ export function LiveRepasseWorkspace() {
 
     return {
       metrics: [
-        { detail: "fora do estoque comum", label: "Veiculos repasse", tone: "teal", value: String(processes.length) },
+        { detail: `${cancelled} cancelados no historico`, label: "Repasses ativos", tone: "teal", value: String(active) },
         { detail: "rascunho ou pronto", label: "A anunciar", tone: "blue", value: String(ready) },
         { detail: "listas e grupos", label: "Enviados", tone: "amber", value: String(sent) },
         { detail: `${money(String(revenue))} em preco base`, label: "Receita", tone: "rose", value: String(interest) },
