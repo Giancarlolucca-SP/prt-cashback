@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BadgeCheck, Camera, CarFront, ClipboardList, Megaphone, Plus, Wrench, X } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Camera, CarFront, ClipboardList, FileText, Megaphone, Plus, Wrench, X } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "../auth/auth-client";
 import { useAuth } from "../auth/auth-provider";
 
@@ -64,6 +64,29 @@ type CustomerOption = {
   id: string;
   name: string;
   phone: string | null;
+};
+
+type InventoryDetailDocument = {
+  id: string;
+  originalName: string;
+  classification: string | null;
+  status: string;
+  purpose: string | null;
+  createdAt: string;
+};
+
+type InventoryDetailListing = {
+  id: string;
+  title: string;
+  askingPrice: string | null;
+  status: string;
+  updatedAt: string;
+};
+
+type InventoryDetailResponse = {
+  data: InventoryItem;
+  documents: InventoryDetailDocument[];
+  activeListings: InventoryDetailListing[];
 };
 
 const emptyForm: InventoryFormState = {
@@ -177,6 +200,8 @@ export function LiveInventoryWorkspace() {
   const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
   const [customerOptionsStatus, setCustomerOptionsStatus] = useState<"idle" | "loading" | "ready" | "error" | "locked">("idle");
   const [form, setForm] = useState<InventoryFormState>(emptyForm);
+  const [inventoryDetail, setInventoryDetail] = useState<InventoryDetailResponse | null>(null);
+  const [inventoryDetailStatus, setInventoryDetailStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [items, setItems] = useState(fallbackItems);
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -324,6 +349,21 @@ export function LiveInventoryWorkspace() {
     }
   }
 
+  async function openInventoryDetail(item: InventoryItem) {
+    if (!token || !canReadInventory) return;
+
+    setInventoryDetail({ data: item, documents: [], activeListings: [] });
+    setInventoryDetailStatus("loading");
+
+    try {
+      const detail = await apiGet<InventoryDetailResponse>(`/inventory/${item.id}/detail`, token);
+      setInventoryDetail(detail);
+      setInventoryDetailStatus("loaded");
+    } catch {
+      setInventoryDetailStatus("error");
+    }
+  }
+
   const view = useMemo(() => {
     const stockItems = items.filter((item) => item.ownershipType !== "REPASSE" && item.status !== "REPASSE");
     const own = stockItems.filter((item) => item.ownershipType === "OWN").length;
@@ -426,6 +466,12 @@ export function LiveInventoryWorkspace() {
               Lancar
             </button>
           </span>
+          <span>
+            <em>Detalhe</em>
+            <button disabled={!canReadInventory || inventoryDetailStatus === "loading"} onClick={() => void openInventoryDetail(item)} type="button">
+              Abrir
+            </button>
+          </span>
         </div>
       </article>
     );
@@ -504,6 +550,62 @@ export function LiveInventoryWorkspace() {
                 <button className="primary-action" disabled={saving || form.brand.trim().length < 2 || form.model.trim().length < 1 || !form.yearModel || !form.entryDate || (form.ownershipType === "CONSIGNED" && (!form.ownerCustomerId || Number(form.purchaseCost) <= 0))} type="submit">{saving ? "Salvando..." : "Criar entrada"}</button>
               </div>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {inventoryDetail ? (
+        <div className="dre-modal-backdrop" role="dialog" aria-modal="true" aria-label="Detalhe do veiculo">
+          <section className="dre-modal lead-modal inventory-detail-modal">
+            <header className="dre-modal-header">
+              <div>
+                <p className="eyebrow">Detalhe do veiculo</p>
+                <h3>{vehicleTitle(inventoryDetail.data)}</h3>
+              </div>
+              <button aria-label="Fechar detalhe" className="icon-button" onClick={() => { setInventoryDetail(null); setInventoryDetailStatus("idle"); }} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="inventory-detail-grid">
+              <section>
+                <strong>Pasta documental</strong>
+                {inventoryDetailStatus === "loading" ? <p>Carregando documentos...</p> : null}
+                {inventoryDetailStatus === "error" ? <p>Nao foi possivel carregar o detalhe.</p> : null}
+                {inventoryDetailStatus !== "loading" && inventoryDetail.documents.length === 0 ? (
+                  <p>Nenhum documento vinculado a este veiculo ainda.</p>
+                ) : (
+                  <ul>
+                    {inventoryDetail.documents.map((document) => (
+                      <li key={document.id}>
+                        <FileText aria-hidden="true" size={17} />
+                        <span>
+                          <strong>{document.originalName}</strong>
+                          <em>{document.classification ?? document.purpose ?? "Documento"} | {document.status}</em>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <section>
+                <strong>Anuncios ativos</strong>
+                {inventoryDetailStatus !== "loading" && inventoryDetail.activeListings.length === 0 ? (
+                  <p>Nenhum anuncio ativo para este veiculo.</p>
+                ) : (
+                  <ul>
+                    {inventoryDetail.activeListings.map((listing) => (
+                      <li key={listing.id}>
+                        <Megaphone aria-hidden="true" size={17} />
+                        <span>
+                          <strong>{listing.title}</strong>
+                          <em>{listing.status} | {money(listing.askingPrice)}</em>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
           </section>
         </div>
       ) : null}
