@@ -2725,6 +2725,35 @@ try {
   assert.equal(updateRepasse.json().data.status, "SENT");
   assert.equal(updateRepasse.json().data.price, "75500");
 
+  const revenueBeforeSoldRepasse = await app.inject({
+    method: "POST",
+    url: `/repasse/${repasseId}/revenues`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      amount: 2500,
+      snapshot: {
+        source: "qa-repasse-antes-venda",
+      },
+    },
+  });
+  assert.equal(revenueBeforeSoldRepasse.statusCode, 400);
+  assert.equal(revenueBeforeSoldRepasse.json().error.code, "VALIDATION_ERROR");
+
+  const markRepasseSold = await app.inject({
+    method: "PATCH",
+    url: `/repasse/${repasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "SOLD",
+    },
+  });
+  assert.equal(markRepasseSold.statusCode, 200);
+  assert.equal(markRepasseSold.json().data.status, "SOLD");
+
   const repasseRecognizedAt = new Date(Date.now() + 259200000).toISOString();
   const repasseRevenue = await app.inject({
     method: "POST",

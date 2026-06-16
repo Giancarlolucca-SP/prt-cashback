@@ -411,7 +411,7 @@ export function LiveRepasseWorkspace() {
                   <div className="blueprint-value">
                     <strong>{money(process.price)}</strong>
                     <button className="text-button" disabled={isTerminal || movingId === process.id} onClick={() => void updateProcess(process, { status: "SENT" })} type="button">Enviar</button>
-                    <button className="text-button" disabled={isTerminal || movingId === process.id} onClick={() => { setRevenueProcess(process); setRevenueForm({ amount: process.price ? String(Number(process.price)) : "", note: "" }); setSaveError(null); }} type="button">Receita</button>
+                    <button className="text-button" disabled={isTerminal || movingId === process.id || process.status !== "SOLD"} onClick={() => { setRevenueProcess(process); setRevenueForm({ amount: process.price ? String(Number(process.price)) : "", note: "" }); setSaveError(null); }} type="button">Receita</button>
                   </div>
                 </article>
               );
