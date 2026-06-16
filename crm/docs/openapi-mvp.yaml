@@ -165,6 +165,8 @@ paths:
   /inventory/{id}:
     get: { tags: [Inventory], summary: Detalha estoque., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
     patch: { tags: [Inventory], summary: Atualiza estoque/veiculo., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
+  /inventory/{id}/detail:
+    get: { tags: [Inventory], summary: Detalha estoque com pasta documental e anuncios ativos do veiculo., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "200": { $ref: "#/components/responses/Ok" } } }
   /inventory/{id}/costs:
     post: { tags: [Inventory], summary: Adiciona custo ao veiculo., parameters: [ { $ref: "#/components/parameters/Id" } ], responses: { "201": { $ref: "#/components/responses/Created" } } }
 

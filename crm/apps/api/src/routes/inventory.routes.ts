@@ -164,6 +164,56 @@ function sanitizeInventory(record: InventoryRecord, vehicle?: VehicleRecord) {
   };
 }
 
+function sanitizeInventoryDocument(input: {
+  attachment: {
+    id: string;
+    originalName: string;
+    mimeType: string | null;
+    sizeBytes: number | null;
+    classification: string | null;
+    status: string;
+    uploadedByUserId: string | null;
+    createdAt: Date;
+  };
+  link: {
+    entityType: string;
+    entityId: string;
+    purpose: string | null;
+  };
+}) {
+  return {
+    id: input.attachment.id,
+    originalName: input.attachment.originalName,
+    mimeType: input.attachment.mimeType,
+    sizeBytes: input.attachment.sizeBytes,
+    classification: input.attachment.classification,
+    status: input.attachment.status,
+    uploadedByUserId: input.attachment.uploadedByUserId,
+    entityType: input.link.entityType,
+    entityId: input.link.entityId,
+    purpose: input.link.purpose,
+    createdAt: input.attachment.createdAt.toISOString(),
+  };
+}
+
+function sanitizeActiveListing(listing: {
+  id: string;
+  title: string;
+  description: string | null;
+  askingPrice: { toString(): string } | null;
+  status: string;
+  updatedAt: Date;
+}) {
+  return {
+    id: listing.id,
+    title: listing.title,
+    description: listing.description,
+    askingPrice: listing.askingPrice?.toString() ?? null,
+    status: listing.status,
+    updatedAt: listing.updatedAt.toISOString(),
+  };
+}
+
 async function ensureCustomerInStore(storeId: string, customerId?: string | null) {
   if (!customerId) return;
 
@@ -279,6 +329,55 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       query,
       total,
     );
+  });
+
+  app.get("/:id/detail", async (request) => {
+    const session = await requirePermission(request, {
+      module: "inventory",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = inventoryParamsSchema.parse(request.params);
+    const { inventory, vehicle } = await getInventoryOrThrow(session.user.storeId, params.id);
+    const links = await prisma.fileAttachmentLink.findMany({
+      where: {
+        storeId: session.user.storeId,
+        OR: [
+          { entityType: "vehicle", entityId: vehicle.id },
+          { entityType: "vehicle_inventory", entityId: inventory.id },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const attachments = links.length
+      ? await prisma.fileAttachment.findMany({
+          where: {
+            id: { in: links.map((link) => link.attachmentId) },
+            storeId: session.user.storeId,
+            deletedAt: null,
+          },
+        })
+      : [];
+    const attachmentById = new Map(attachments.map((attachment) => [attachment.id, attachment]));
+    const activeListings = await prisma.listing.findMany({
+      where: {
+        storeId: session.user.storeId,
+        vehicleId: vehicle.id,
+        deletedAt: null,
+        status: { in: ["PENDING", "PUBLISHED"] },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return {
+      data: sanitizeInventory(inventory, vehicle),
+      documents: links.flatMap((link) => {
+        const attachment = attachmentById.get(link.attachmentId);
+        return attachment ? [sanitizeInventoryDocument({ attachment, link })] : [];
+      }),
+      activeListings: activeListings.map(sanitizeActiveListing),
+    };
   });
 
   app.get("/:id", async (request) => {

@@ -106,6 +106,8 @@ Endpoints principais:
 
 - `GET/POST /inventory`
 - `GET/PATCH /inventory/:id`
+- `GET /inventory/:id/detail`
+  - Retorna detalhe do estoque com pasta documental preparada e anuncios ativos do veiculo.
 - `POST /inventory/:id/costs`
 - `GET/POST /purchases/leads`
 - `GET /purchases/leads/:id`

@@ -72,9 +72,11 @@ function uniqueToken(prefix: string) {
 function uniquePlate(prefix: string) {
   uniqueCounter += 1;
   const letters = `${prefix}AAA`.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 3).padEnd(3, "A");
-  const number = String(uniqueCounter % 10);
-  const letter = String.fromCharCode(65 + (uniqueCounter % 26));
-  const suffix = String(uniqueCounter % 100).padStart(2, "0");
+  const seed = `${runToken}-${Date.now()}-${uniqueCounter}`;
+  const hash = seed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const number = String(hash % 10);
+  const letter = String.fromCharCode(65 + (hash % 26));
+  const suffix = String(Math.floor(hash / 26) % 100).padStart(2, "0");
   return `${letters}${number}${letter}${suffix}`;
 }
 
@@ -1642,6 +1644,18 @@ try {
   assert.equal(getInventory.statusCode, 200);
   assert.equal(getInventory.json().data.vehicle.model, "Civic");
 
+  const inventoryDetailWithoutListings = await app.inject({
+    method: "GET",
+    url: `/inventory/${inventoryId}/detail`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryDetailWithoutListings.statusCode, 200);
+  assert.equal(inventoryDetailWithoutListings.json().data.id, inventoryId);
+  assert.deepEqual(inventoryDetailWithoutListings.json().documents, []);
+  assert.deepEqual(inventoryDetailWithoutListings.json().activeListings, []);
+
   const updateInventory = await app.inject({
     method: "PATCH",
     url: `/inventory/${inventoryId}`,
@@ -2043,6 +2057,20 @@ try {
   assert.equal(getListing.statusCode, 200);
   assert.equal(getListing.json().data.status, "PUBLISHED");
   assert.ok(getListing.json().publications.some((publication: { channelId: string }) => publication.channelId === listingChannelId));
+
+  const inventoryDetailWithListing = await app.inject({
+    method: "GET",
+    url: `/inventory/${inventoryId}/detail`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryDetailWithListing.statusCode, 200);
+  assert.ok(
+    inventoryDetailWithListing
+      .json()
+      .activeListings.some((listing: { id: string; status: string; title: string }) => listing.id === listingId && listing.status === "PUBLISHED" && listing.title === "Honda Civic Touring QA"),
+  );
 
   const listingMetricDate = new Date(Date.now() + 172800000).toISOString();
   const listingMetric = await app.inject({
