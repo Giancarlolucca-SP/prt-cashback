@@ -162,6 +162,7 @@ const ownershipLabels: Record<OwnershipType, string> = {
   TRADE_IN: "Troca",
 };
 const stockOwnershipOptions: OwnershipType[] = ["OWN", "CONSIGNED", "TRADE_IN"];
+const stockStatusOptions: InventoryStatus[] = ["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REMOVED"];
 
 const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
 const percent = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1, style: "percent" });
@@ -453,7 +454,7 @@ export function LiveInventoryWorkspace() {
               onChange={(event) => void updateItem(item, { status: event.target.value as InventoryStatus })}
               value={item.status}
             >
-              {(Object.keys(statusLabels) as InventoryStatus[]).map((inventoryStatus) => (
+              {stockStatusOptions.map((inventoryStatus) => (
                 <option key={inventoryStatus} value={inventoryStatus}>
                   {statusLabels[inventoryStatus]}
                 </option>
@@ -546,7 +547,7 @@ export function LiveInventoryWorkspace() {
                   </select>
                 </label>
               ) : null}
-              <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as InventoryStatus }))}>{(Object.keys(statusLabels) as InventoryStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
+              <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as InventoryStatus }))}>{stockStatusOptions.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
               <label>Custo compra<input min="0" type="number" value={form.purchaseCost} onChange={(event) => setForm((current) => ({ ...current, purchaseCost: event.target.value }))} /></label>
               <label>Preco venda<input min="0" type="number" value={form.askingPrice} onChange={(event) => setForm((current) => ({ ...current, askingPrice: event.target.value }))} /></label>
               <label className="lead-modal-wide">Observacoes<input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></label>
@@ -706,7 +707,7 @@ export function LiveInventoryWorkspace() {
           </div>
           <div className="automation-status warning">
             <AlertTriangle aria-hidden="true" size={18} />
-            <span>Itens em preparacao ou repasse devem ser conferidos antes de proposta comercial.</span>
+            <span>Itens em preparacao devem ser conferidos antes de proposta comercial.</span>
           </div>
         </aside>
       </section>
