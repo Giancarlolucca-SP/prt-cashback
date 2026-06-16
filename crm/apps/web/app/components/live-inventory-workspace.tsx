@@ -201,6 +201,7 @@ export function LiveInventoryWorkspace() {
   const canReadInventory = hasPermission({ module: "inventory", action: "read" });
   const canReadInventoryCosts = hasPermission({ module: "inventory", action: "read_costs" });
   const canManageInventory = hasPermission({ module: "inventory", action: "manage" });
+  const canCreateInventory = canManageInventory || hasPermission({ module: "inventory", action: "create" });
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [costForm, setCostForm] = useState<CostFormState>(emptyCostForm);
   const [costItem, setCostItem] = useState<InventoryItem | null>(null);
@@ -277,7 +278,7 @@ export function LiveInventoryWorkspace() {
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token || !canManageInventory || saving) return;
+    if (!token || !canCreateInventory || saving) return;
 
     setSaving(true);
     setSaveError(null);
@@ -288,7 +289,7 @@ export function LiveInventoryWorkspace() {
         notes: form.notes.trim() || undefined,
         ownershipType: form.ownershipType,
         ownerCustomerId: form.ownershipType === "CONSIGNED" && form.ownerCustomerId ? form.ownerCustomerId : undefined,
-        purchaseCost: form.purchaseCost ? Number(form.purchaseCost) : undefined,
+        purchaseCost: canReadInventoryCosts && form.purchaseCost ? Number(form.purchaseCost) : undefined,
         status: form.status,
         vehicle: {
           brand: form.brand.trim(),
@@ -399,6 +400,8 @@ export function LiveInventoryWorkspace() {
       prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
     };
   }, [canReadInventoryCosts, items]);
+
+  const ownershipOptions = canReadInventoryCosts ? stockOwnershipOptions : stockOwnershipOptions.filter((item) => item !== "CONSIGNED");
 
   const statusLabel = {
     error: "Usando fallback",
@@ -517,7 +520,7 @@ export function LiveInventoryWorkspace() {
         <label className="search-box">
           <input aria-label="Buscar estoque" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo, placa, ano ou cor" value={search} />
         </label>
-        <button className="primary-action" disabled={!canManageInventory} onClick={() => setModalOpen(true)} type="button">
+        <button className="primary-action" disabled={!canCreateInventory} onClick={() => setModalOpen(true)} type="button">
           <Plus aria-hidden="true" size={17} />
           Nova entrada
         </button>
@@ -544,7 +547,7 @@ export function LiveInventoryWorkspace() {
               <label>Placa<input value={form.plate} onChange={(event) => setForm((current) => ({ ...current, plate: event.target.value }))} /></label>
               <label>Cor<input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} /></label>
               <label>Km<input min="0" type="number" value={form.mileage} onChange={(event) => setForm((current) => ({ ...current, mileage: event.target.value }))} /></label>
-              <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType, ownerCustomerId: event.target.value === "CONSIGNED" ? current.ownerCustomerId : "" }))}>{stockOwnershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
+              <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType, ownerCustomerId: event.target.value === "CONSIGNED" ? current.ownerCustomerId : "" }))}>{ownershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
               {form.ownershipType === "CONSIGNED" ? (
                 <label>
                   Consignante
@@ -557,7 +560,7 @@ export function LiveInventoryWorkspace() {
                 </label>
               ) : null}
               <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as InventoryStatus }))}>{stockStatusOptions.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
-              <label>Custo compra<input min="0" type="number" value={form.purchaseCost} onChange={(event) => setForm((current) => ({ ...current, purchaseCost: event.target.value }))} /></label>
+              {canReadInventoryCosts ? <label>Custo compra<input min="0" type="number" value={form.purchaseCost} onChange={(event) => setForm((current) => ({ ...current, purchaseCost: event.target.value }))} /></label> : null}
               <label>Preco venda<input min="0" type="number" value={form.askingPrice} onChange={(event) => setForm((current) => ({ ...current, askingPrice: event.target.value }))} /></label>
               <label className="lead-modal-wide">Opcionais relevantes<input value={form.relevantOptions} onChange={(event) => setForm((current) => ({ ...current, relevantOptions: event.target.value }))} /></label>
               <label className="lead-modal-wide">Observacoes<input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></label>

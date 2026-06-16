@@ -1493,14 +1493,39 @@ try {
       vehicle: {
         brand: "Honda",
         model: "Civic",
-        plate: uniquePlate("QA"),
+        yearModel: 2023,
+        plate: uniquePlate("SV"),
       },
       ownershipType: "OWN",
       askingPrice: 125000,
+      entryDate: "2026-06-06T12:00:00.000Z",
     },
   });
-  assert.equal(sellerInventoryCreate.statusCode, 403);
-  assert.equal(sellerInventoryCreate.json().error.code, "FORBIDDEN");
+  assert.equal(sellerInventoryCreate.statusCode, 201);
+  assert.equal(sellerInventoryCreate.json().data.purchaseCost, null);
+  assert.equal(sellerInventoryCreate.json().data.askingPrice, "125000");
+
+  const sellerInventoryCreateWithCost = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Honda",
+        model: "Fit",
+        yearModel: 2022,
+        plate: uniquePlate("SC"),
+      },
+      ownershipType: "OWN",
+      askingPrice: 89000,
+      purchaseCost: 76000,
+      entryDate: "2026-06-06T12:00:00.000Z",
+    },
+  });
+  assert.equal(sellerInventoryCreateWithCost.statusCode, 403);
+  assert.equal(sellerInventoryCreateWithCost.json().error.code, "FORBIDDEN");
 
   const invalidInventoryVehicle = await app.inject({
     method: "POST",

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ApiError } from "../api/errors.js";
-import { requirePermission } from "../api/auth-guards.js";
+import { requireAuth, requirePermission } from "../api/auth-guards.js";
 import { canUser } from "../auth/rbac.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
@@ -182,6 +182,48 @@ async function canReadInventoryCosts(user: Parameters<typeof canUser>[0]) {
   });
 
   return decision.allowed;
+}
+
+async function requireInventoryCreateAccess(request: Parameters<typeof requireAuth>[0]) {
+  const session = await requireAuth(request);
+  const [manageDecision, createDecision] = await Promise.all([
+    canUser(session.user, {
+      module: "inventory",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "general",
+    }),
+    canUser(session.user, {
+      module: "inventory",
+      action: "create",
+      scope: "STORE",
+      sensitiveArea: "general",
+    }),
+  ]);
+
+  if (!manageDecision.allowed && !createDecision.allowed) {
+    await prisma.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "inventory",
+        action: "api_forbidden",
+        entityType: "permission",
+        entityId: "inventory:create",
+        result: "DENIED",
+        metadata: {
+          method: request.method,
+          path: request.url,
+          permission: { module: "inventory", action: "create", scope: "STORE", sensitiveArea: "general" },
+          reason: createDecision.reason,
+        },
+      },
+    });
+    throw new ApiError("FORBIDDEN", "Usuario sem permissao para esta acao.", { reason: createDecision.reason });
+  }
+
+  return session;
 }
 
 function sanitizeInventoryDocument(input: {
@@ -425,15 +467,14 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
   });
 
   app.post("/", async (request, reply) => {
-    const session = await requirePermission(request, {
-      module: "inventory",
-      action: "manage",
-      scope: "STORE",
-      sensitiveArea: "general",
-    });
+    const session = await requireInventoryCreateAccess(request);
     const input = createInventorySchema.parse(request.body);
+    const includeCosts = await canReadInventoryCosts(session.user);
 
     enforceCommonInventoryScope(input);
+    if (input.purchaseCost !== undefined && !includeCosts) {
+      throw new ApiError("FORBIDDEN", "Usuario sem permissao para informar custo de compra.");
+    }
     enforceConsignedInventoryRules(input);
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
 
@@ -501,7 +542,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       payload: { vehicleId: result.vehicle.id, status: result.inventory.status },
     });
 
-    return reply.code(201).send({ data: sanitizeInventory(result.inventory, result.vehicle, { includeCosts: await canReadInventoryCosts(session.user) }) });
+    return reply.code(201).send({ data: sanitizeInventory(result.inventory, result.vehicle, { includeCosts }) });
   });
 
   app.patch("/:id", async (request) => {
