@@ -345,6 +345,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     });
     const includeCosts = await canReadInventoryCosts(session.user);
     const query = inventoryQuerySchema.parse(request.query);
+    enforceCommonInventoryScope({ ownershipType: query.ownership_type, status: query.status });
     const { skip, take } = getPagination(query);
     const searchYear = query.search && /^\d{4}$/.test(query.search) ? Number(query.search) : null;
 

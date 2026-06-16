@@ -2466,6 +2466,26 @@ try {
   assert.equal(defaultInventoryWithoutRepasse.statusCode, 200);
   assert.ok(!defaultInventoryWithoutRepasse.json().items.some((item: { id: string }) => item.id === repasseInventoryId));
 
+  const listInventoryByRepasseStatus = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100&status=REPASSE",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByRepasseStatus.statusCode, 400);
+  assert.equal(listInventoryByRepasseStatus.json().error.code, "VALIDATION_ERROR");
+
+  const listInventoryByRepasseOwnership = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100&ownership_type=REPASSE",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByRepasseOwnership.statusCode, 400);
+  assert.equal(listInventoryByRepasseOwnership.json().error.code, "VALIDATION_ERROR");
+
   const repasseInventory = await app.inject({
     method: "GET",
     url: `/inventory/${repasseInventoryId}`,
