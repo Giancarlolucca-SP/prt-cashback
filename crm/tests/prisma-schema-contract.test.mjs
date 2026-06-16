@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const schema = readFileSync("packages/db/prisma/schema.prisma", "utf8");
+const activeRepasseMigration = readFileSync(
+  "packages/db/prisma/migrations/20260616194000_unique_active_repasse_per_vehicle/migration.sql",
+  "utf8"
+);
 
 function modelBlock(modelName) {
   const match = schema.match(new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`, "m"));
@@ -54,4 +58,10 @@ test("preview-approved domains have persistent models", () => {
 test("repasse revenue is unique per process", () => {
   const repasseRevenue = modelBlock("RepasseRevenue");
   assert.match(repasseRevenue, /@@unique\(\[repasseProcessId\]\)/);
+});
+
+test("active repasse is unique per store vehicle pair", () => {
+  assert.match(activeRepasseMigration, /CREATE UNIQUE INDEX "repasse_processes_store_vehicle_active_key"/);
+  assert.match(activeRepasseMigration, /ON "repasse_processes"\("store_id", "vehicle_id"\)/);
+  assert.match(activeRepasseMigration, /WHERE "deleted_at" IS NULL/);
 });
