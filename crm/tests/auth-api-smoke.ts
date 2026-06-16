@@ -1603,6 +1603,37 @@ try {
   assert.equal(createConsignedInventory.statusCode, 201);
   assert.equal(createConsignedInventory.json().data.ownerCustomerId, createdCustomerId);
   assert.equal(createConsignedInventory.json().data.purchaseCost, "102000");
+  const consignedInventoryId = createConsignedInventory.json().data.id as string;
+
+  const changeOwnershipType = await app.inject({
+    method: "PATCH",
+    url: `/inventory/${consignedInventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      ownershipType: "TRADE_IN",
+    },
+  });
+  assert.equal(changeOwnershipType.statusCode, 200);
+  assert.equal(changeOwnershipType.json().data.ownershipType, "TRADE_IN");
+
+  const inventoryOwnershipAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=inventory&action=ownership_type_changed&entity_type=vehicle_inventory&entity_id=${consignedInventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryOwnershipAudit.statusCode, 200);
+  assert.ok(
+    inventoryOwnershipAudit
+      .json()
+      .items.some(
+        (log: { metadata: { fromOwnershipType?: string; toOwnershipType?: string } }) =>
+          log.metadata.fromOwnershipType === "CONSIGNED" && log.metadata.toOwnershipType === "TRADE_IN",
+      ),
+  );
 
   const duplicateInventory = await app.inject({
     method: "POST",
@@ -1673,6 +1704,31 @@ try {
   assert.equal(updateInventory.statusCode, 200);
   assert.equal(updateInventory.json().data.status, "AVAILABLE");
   assert.equal(updateInventory.json().data.askingPrice, "122900");
+
+  const inventoryStatusHistory = await prisma.vehicleStatusHistory.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      vehicleId: inventoryVehicleId,
+      fromStatus: "IN_PREPARATION",
+      toStatus: "AVAILABLE",
+    },
+  });
+  assert.ok(inventoryStatusHistory);
+  assert.equal(inventoryStatusHistory.actorUserId, ownerBody.user.id);
+
+  const inventoryStatusAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=inventory&action=status_changed&entity_type=vehicle_inventory&entity_id=${inventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryStatusAudit.statusCode, 200);
+  assert.ok(
+    inventoryStatusAudit
+      .json()
+      .items.some((log: { metadata: { fromStatus?: string; toStatus?: string } }) => log.metadata.fromStatus === "IN_PREPARATION" && log.metadata.toStatus === "AVAILABLE"),
+  );
 
   const addInventoryCost = await app.inject({
     method: "POST",

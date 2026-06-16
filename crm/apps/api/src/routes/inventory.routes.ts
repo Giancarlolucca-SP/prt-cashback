@@ -485,6 +485,8 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const nextOwnershipType = input.ownershipType ?? current.inventory.ownershipType;
     const nextOwnerCustomerId = input.ownerCustomerId === undefined ? current.inventory.ownerCustomerId : input.ownerCustomerId;
     const nextPurchaseCost = input.purchaseCost === undefined ? current.inventory.purchaseCost : input.purchaseCost;
+    const statusChanged = input.status !== undefined && input.status !== current.inventory.status;
+    const ownershipTypeChanged = input.ownershipType !== undefined && input.ownershipType !== current.inventory.ownershipType;
 
     enforceConsignedInventoryRules({
       ownerCustomerId: nextOwnerCustomerId,
@@ -528,6 +530,57 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
           metadata: { changedFields: Object.keys(input) },
         },
       });
+
+      if (statusChanged) {
+        await tx.vehicleStatusHistory.create({
+          data: {
+            storeId: session.user.storeId,
+            vehicleId: vehicle.id,
+            fromStatus: current.inventory.status,
+            toStatus: inventory.status,
+            actorUserId: session.user.id,
+            reason: "inventory_status_update",
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "inventory",
+            action: "status_changed",
+            entityType: "vehicle_inventory",
+            entityId: inventory.id,
+            result: "SUCCESS",
+            metadata: {
+              vehicleId: vehicle.id,
+              fromStatus: current.inventory.status,
+              toStatus: inventory.status,
+            },
+          },
+        });
+      }
+
+      if (ownershipTypeChanged) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "inventory",
+            action: "ownership_type_changed",
+            entityType: "vehicle_inventory",
+            entityId: inventory.id,
+            result: "SUCCESS",
+            metadata: {
+              vehicleId: vehicle.id,
+              fromOwnershipType: current.inventory.ownershipType,
+              toOwnershipType: inventory.ownershipType,
+            },
+          },
+        });
+      }
 
       return { inventory, vehicle };
     });
