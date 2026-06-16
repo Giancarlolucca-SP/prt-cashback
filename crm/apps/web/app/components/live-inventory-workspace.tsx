@@ -193,6 +193,7 @@ export function LiveInventoryWorkspace() {
   const { hasPermission, token } = useAuth();
   const canReadCustomers = hasPermission({ module: "customers", action: "read" });
   const canReadInventory = hasPermission({ module: "inventory", action: "read" });
+  const canReadInventoryCosts = hasPermission({ module: "inventory", action: "read_costs" });
   const canManageInventory = hasPermission({ module: "inventory", action: "manage" });
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [costForm, setCostForm] = useState<CostFormState>(emptyCostForm);
@@ -369,8 +370,8 @@ export function LiveInventoryWorkspace() {
     const own = stockItems.filter((item) => item.ownershipType === "OWN").length;
     const consigned = stockItems.filter((item) => item.ownershipType === "CONSIGNED").length;
     const totalStockValue = stockItems.reduce((sum, item) => sum + Number(item.askingPrice ?? 0), 0);
-    const projectedMargin = stockItems.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0);
-    const avgMargin = totalStockValue > 0 ? projectedMargin / totalStockValue : 0;
+    const projectedMargin = canReadInventoryCosts ? stockItems.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0) : null;
+    const avgMargin = projectedMargin !== null && totalStockValue > 0 ? projectedMargin / totalStockValue : null;
     const pending = stockItems.filter((item) => item.status === "IN_PREPARATION").length;
 
     return {
@@ -378,13 +379,18 @@ export function LiveInventoryWorkspace() {
       metrics: [
         { label: "Proprios", value: String(own), detail: "capital da loja em estoque", tone: "teal" },
         { label: "Consignados", value: String(consigned), detail: "terceiros sob contrato", tone: "blue" },
-        { label: "Margem media", value: percent.format(avgMargin), detail: `${currency.format(projectedMargin)} sobre ${currency.format(totalStockValue)}`, tone: "amber" },
+        {
+          label: "Margem media",
+          value: avgMargin === null ? "Restrito" : percent.format(avgMargin),
+          detail: projectedMargin === null ? "requer permissao de margem" : `${currency.format(projectedMargin)} sobre ${currency.format(totalStockValue)}`,
+          tone: "amber",
+        },
         { label: "Pendencias criticas", value: String(pending), detail: "preparacao ou remocao", tone: "rose" },
       ],
       ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => daysInStock(b.entryDate) - daysInStock(a.entryDate)),
       prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
     };
-  }, [items]);
+  }, [canReadInventoryCosts, items]);
 
   const statusLabel = {
     error: "Usando fallback",
@@ -396,8 +402,8 @@ export function LiveInventoryWorkspace() {
 
   const renderVehicleCard = (item: InventoryItem) => {
     const price = Number(item.askingPrice ?? 0);
-    const cost = Number(item.purchaseCost ?? 0);
-    const margin = price > 0 && cost > 0 ? price - cost : 0;
+    const cost = item.purchaseCost === null ? null : Number(item.purchaseCost);
+    const margin = cost !== null && price > 0 && cost > 0 ? price - cost : null;
 
     return (
       <article className={`stock-card ${toneFor(item)}`} key={item.id}>
@@ -433,11 +439,11 @@ export function LiveInventoryWorkspace() {
         <div className="vehicle-costs">
           <span>
             <em>Compra</em>
-            <strong>{money(item.purchaseCost)}</strong>
+            <strong>{canReadInventoryCosts ? money(item.purchaseCost) : "Restrito"}</strong>
           </span>
           <span>
             <em>Margem R$</em>
-            <strong>{margin > 0 ? currency.format(margin) : "A definir"}</strong>
+            <strong>{margin === null ? "Restrito" : margin > 0 ? currency.format(margin) : "A definir"}</strong>
           </span>
           <span>
             <em>Status</em>
