@@ -7,23 +7,25 @@ import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 
+const repasseStatusSchema = z.enum(["DRAFT", "READY", "SENT", "INTEREST", "SOLD", "REVENUE_RECOGNIZED", "CANCELLED"]);
+
 const repasseQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
-  status: z.string().trim().max(60).optional(),
+  status: repasseStatusSchema.optional(),
   vehicle_id: z.string().uuid().optional(),
 });
 
 const createRepasseSchema = z.object({
   vehicleId: z.string().uuid(),
-  status: z.string().trim().min(2).max(60).default("DRAFT"),
+  status: repasseStatusSchema.default("DRAFT"),
   price: z.number().nonnegative().optional(),
   channelPlan: z.record(z.unknown()).optional(),
 });
 
 const updateRepasseSchema = z
   .object({
-    status: z.string().trim().min(2).max(60).optional(),
+    status: repasseStatusSchema.optional(),
     price: z.number().nonnegative().nullable().optional(),
     channelPlan: z.record(z.unknown()).nullable().optional(),
   })

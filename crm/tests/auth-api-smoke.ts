@@ -2435,6 +2435,21 @@ try {
   assert.equal(sellerRepasseList.statusCode, 403);
   assert.equal(sellerRepasseList.json().error.code, "FORBIDDEN");
 
+  const invalidRepasseStatus = await app.inject({
+    method: "POST",
+    url: "/repasse",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicleId: repasseVehicleId,
+      status: "PENDING_AI_REVIEW",
+      price: 76000,
+    },
+  });
+  assert.equal(invalidRepasseStatus.statusCode, 400);
+  assert.equal(invalidRepasseStatus.json().error.code, "VALIDATION_ERROR");
+
   const createRepasse = await app.inject({
     method: "POST",
     url: "/repasse",
@@ -2513,6 +2528,19 @@ try {
   });
   assert.equal(repasseInventory.statusCode, 200);
   assert.equal(repasseInventory.json().data.status, "REPASSE");
+
+  const invalidRepasseTransition = await app.inject({
+    method: "PATCH",
+    url: `/repasse/${repasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "ARCHIVED_BY_AI",
+    },
+  });
+  assert.equal(invalidRepasseTransition.statusCode, 400);
+  assert.equal(invalidRepasseTransition.json().error.code, "VALIDATION_ERROR");
 
   const updateRepasse = await app.inject({
     method: "PATCH",
