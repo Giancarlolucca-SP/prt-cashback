@@ -84,6 +84,7 @@ const filters: Array<{ label: string; status?: RepasseStatus }> = [
   { label: "Interesse", status: "INTEREST" },
   { label: "Vendidos", status: "SOLD" },
   { label: "Receita", status: "REVENUE_RECOGNIZED" },
+  { label: "Cancelados", status: "CANCELLED" },
 ];
 
 const statusLabels: Record<RepasseStatus, string> = {
