@@ -281,15 +281,15 @@ export function LiveRepasseWorkspace() {
     const cancelled = processes.filter((item) => item.status === "CANCELLED").length;
     const ready = processes.filter((item) => item.status === "READY" || item.status === "DRAFT").length;
     const sent = processes.filter((item) => item.status === "SENT").length;
-    const interest = processes.filter((item) => item.status === "INTEREST").length;
-    const revenue = processes.filter((item) => item.status === "REVENUE_RECOGNIZED").reduce((sum, item) => sum + Number(item.price ?? 0), 0);
+    const recognized = processes.filter((item) => item.status === "REVENUE_RECOGNIZED");
+    const revenue = recognized.reduce((sum, item) => sum + Number(item.price ?? 0), 0);
 
     return {
       metrics: [
         { detail: `${cancelled} cancelados no historico`, label: "Repasses ativos", tone: "teal", value: String(active) },
         { detail: "rascunho ou pronto", label: "A anunciar", tone: "blue", value: String(ready) },
         { detail: "listas e grupos", label: "Enviados", tone: "amber", value: String(sent) },
-        { detail: `${money(String(revenue))} em preco base`, label: "Receita", tone: "rose", value: String(interest) },
+        { detail: `${recognized.length} reconhecidos`, label: "Receita", tone: "rose", value: money(String(revenue)) },
       ],
       selected: processes[0],
     };
