@@ -97,7 +97,7 @@ const statusLabels: Record<RepasseStatus, string> = {
   SOLD: "Vendido",
 };
 
-const initialRepasseStatuses: RepasseStatus[] = ["DRAFT", "READY", "SENT", "INTEREST", "SOLD"];
+const initialRepasseStatuses: RepasseStatus[] = ["DRAFT", "READY", "SENT", "INTEREST"];
 const terminalRepasseStatuses = new Set(["CANCELLED", "REVENUE_RECOGNIZED"]);
 const channelOptions = ["Site loja", "Lista Repasse SP", "Grupo Lojistas Premium", "Compradores SUV Campinas", "Lista Interior", "Instagram loja"];
 const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
@@ -128,6 +128,10 @@ function messageFrom(plan: unknown) {
 
 function isTerminalRepasse(status: string) {
   return terminalRepasseStatuses.has(status);
+}
+
+function hasPositivePrice(process: RepasseProcess) {
+  return Number(process.price ?? 0) > 0;
 }
 
 export function LiveRepasseWorkspace() {
@@ -399,13 +403,14 @@ export function LiveRepasseWorkspace() {
           <div className="blueprint-list">
             {processes.map((process) => {
               const isTerminal = isTerminalRepasse(process.status);
+              const canSell = hasPositivePrice(process);
               return (
                 <article className="blueprint-row" key={process.id}>
                   <div className="blueprint-main"><CarFront aria-hidden="true" /><div><strong>Repasse {process.id.slice(0, 8)}</strong><span>{process.vehicleId.slice(0, 8)} | {channelsFrom(process.channelPlan).join(", ") || "sem canais"}</span></div></div>
                   <div className="blueprint-tags">
                     <span>{statusLabels[process.status as RepasseStatus] ?? process.status}</span>
                     <select className="kanban-stage-select" disabled={isTerminal || movingId === process.id} onChange={(event) => void updateProcess(process, { status: event.target.value as RepasseStatus })} value={process.status}>
-                      {(Object.keys(statusLabels) as RepasseStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}
+                      {(Object.keys(statusLabels) as RepasseStatus[]).map((item) => <option disabled={item === "SOLD" && !canSell} key={item} value={item}>{statusLabels[item]}</option>)}
                     </select>
                   </div>
                   <div className="blueprint-value">
