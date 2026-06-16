@@ -4387,6 +4387,8 @@ try {
   });
   assert.equal(inventoryPerformance.statusCode, 200);
   assert.ok(inventoryPerformance.json().inventoryByStatus.SOLD >= 1);
+  assert.equal(inventoryPerformance.json().inventoryByStatus.REPASSE, undefined);
+  assert.equal(inventoryPerformance.json().inventoryByOwnership.REPASSE, undefined);
   assert.ok(inventoryPerformance.json().listingMetrics.views >= 100);
   assert.equal(inventoryPerformance.json().listingMetrics.ctr, "0.1200");
 

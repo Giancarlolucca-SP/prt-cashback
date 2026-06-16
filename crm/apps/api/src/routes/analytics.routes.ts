@@ -34,6 +34,14 @@ function countBy(rows: Array<Record<string, unknown> & { _count: { _all: number 
   }, {});
 }
 
+function commonInventoryWhere(storeId: string) {
+  return {
+    storeId,
+    deletedAt: null,
+    NOT: [{ status: "REPASSE" as const }, { ownershipType: "REPASSE" as const }],
+  };
+}
+
 const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function monthKey(date: Date) {
@@ -106,7 +114,7 @@ export async function registerAnalyticsRoutes(app: FastifyInstance) {
       prisma.customer.count({ where: { storeId: session.user.storeId, deletedAt: null, ...periodWhere("createdAt", query.from, query.to) } }),
       prisma.lead.count({ where: { storeId: session.user.storeId, deletedAt: null, ...periodWhere("createdAt", query.from, query.to) } }),
       prisma.appointment.count({ where: { storeId: session.user.storeId, deletedAt: null, ...periodWhere("createdAt", query.from, query.to) } }),
-      prisma.vehicleInventoryRecord.count({ where: { storeId: session.user.storeId, deletedAt: null } }),
+      prisma.vehicleInventoryRecord.count({ where: commonInventoryWhere(session.user.storeId) }),
       prisma.sale.count({ where: { storeId: session.user.storeId, deletedAt: null, status: { in: ["DRAFT", "PROPOSAL", "APPROVED", "DOCUMENTATION"] } } }),
       prisma.sale.count({ where: { storeId: session.user.storeId, deletedAt: null, status: "CLOSED", ...periodWhere("closedAt", query.from, query.to) } }),
       prisma.sale.aggregate({
@@ -217,16 +225,16 @@ export async function registerAnalyticsRoutes(app: FastifyInstance) {
     const [inventoryByStatus, inventoryByOwnership, inventoryValue, costs, listingMetrics] = await Promise.all([
       prisma.vehicleInventoryRecord.groupBy({
         by: ["status"],
-        where: { storeId: session.user.storeId, deletedAt: null },
+        where: commonInventoryWhere(session.user.storeId),
         _count: { _all: true },
       }),
       prisma.vehicleInventoryRecord.groupBy({
         by: ["ownershipType"],
-        where: { storeId: session.user.storeId, deletedAt: null },
+        where: commonInventoryWhere(session.user.storeId),
         _count: { _all: true },
       }),
       prisma.vehicleInventoryRecord.aggregate({
-        where: { storeId: session.user.storeId, deletedAt: null, status: { in: ["IN_PREPARATION", "AVAILABLE", "RESERVED", "REPASSE"] } },
+        where: { ...commonInventoryWhere(session.user.storeId), status: { in: ["IN_PREPARATION", "AVAILABLE", "RESERVED"] } },
         _sum: { askingPrice: true, purchaseCost: true },
       }),
       prisma.vehicleCost.aggregate({
