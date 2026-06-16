@@ -963,7 +963,7 @@ model RepasseRevenue {
   createdAt        DateTime @default(now()) @map("created_at")
 
   @@index([storeId])
-  @@index([repasseProcessId])
+  @@unique([repasseProcessId])
   @@map("repasse_revenues")
 }
 

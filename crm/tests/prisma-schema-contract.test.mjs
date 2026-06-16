@@ -50,3 +50,8 @@ test("preview-approved domains have persistent models", () => {
     modelBlock(model);
   }
 });
+
+test("repasse revenue is unique per process", () => {
+  const repasseRevenue = modelBlock("RepasseRevenue");
+  assert.match(repasseRevenue, /@@unique\(\[repasseProcessId\]\)/);
+});
