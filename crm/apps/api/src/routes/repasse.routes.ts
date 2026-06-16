@@ -250,6 +250,10 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
     const input = updateRepasseSchema.parse(request.body);
     const current = await getRepasseOrThrow(session.user.storeId, params.id);
     enforceRepasseIsEditable(current.status);
+    const nextPrice = input.price === undefined ? Number(current.price?.toString() ?? 0) : Number(input.price ?? 0);
+    if (input.status === "SOLD" && nextPrice <= 0) {
+      throw new ApiError("VALIDATION_ERROR", "Repasse vendido exige preco positivo.");
+    }
 
     const process = await prisma.$transaction(async (tx) => {
       const updated = await tx.repasseProcess.update({

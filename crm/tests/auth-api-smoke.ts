@@ -2571,6 +2571,55 @@ try {
   assert.equal(invalidRepasseTransition.statusCode, 400);
   assert.equal(invalidRepasseTransition.json().error.code, "VALIDATION_ERROR");
 
+  const noPriceRepasseInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Nissan",
+        model: "Kicks",
+        version: "Repasse sem preco",
+        yearModel: 2019,
+        plate: uniquePlate("NP"),
+      },
+      ownershipType: "TRADE_IN",
+      status: "IN_PREPARATION",
+      entryDate: "2026-06-06T13:20:00.000Z",
+    },
+  });
+  assert.equal(noPriceRepasseInventory.statusCode, 201);
+  const noPriceRepasseVehicleId = noPriceRepasseInventory.json().data.vehicle.id as string;
+
+  const createNoPriceRepasse = await app.inject({
+    method: "POST",
+    url: "/repasse",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicleId: noPriceRepasseVehicleId,
+      status: "READY",
+    },
+  });
+  assert.equal(createNoPriceRepasse.statusCode, 201);
+  const noPriceRepasseId = createNoPriceRepasse.json().data.id as string;
+
+  const sellNoPriceRepasse = await app.inject({
+    method: "PATCH",
+    url: `/repasse/${noPriceRepasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "SOLD",
+    },
+  });
+  assert.equal(sellNoPriceRepasse.statusCode, 400);
+  assert.equal(sellNoPriceRepasse.json().error.code, "VALIDATION_ERROR");
+
   const cancelRepasseInventory = await app.inject({
     method: "POST",
     url: "/inventory",
