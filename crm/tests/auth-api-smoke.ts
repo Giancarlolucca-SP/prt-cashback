@@ -1415,6 +1415,37 @@ try {
   assert.equal(finishAppointment.statusCode, 200);
   assert.equal(finishAppointment.json().data.status, "DONE");
 
+  const createCancellableAppointment = await app.inject({
+    method: "POST",
+    url: "/appointments",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      customerId: createdCustomerId,
+      type: "ligacao",
+      title: "Ligacao de confirmacao cancelavel",
+      startsAt: "2026-06-09T14:00:00.000Z",
+      notes: "Agenda criada para validar cancelamento no historico.",
+    },
+  });
+  assert.equal(createCancellableAppointment.statusCode, 201);
+  const cancellableAppointmentId = createCancellableAppointment.json().data.id as string;
+
+  const cancelAppointment = await app.inject({
+    method: "POST",
+    url: `/appointments/${cancellableAppointmentId}/status`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "CANCELLED",
+      reason: "Cliente pediu para cancelar a ligacao.",
+    },
+  });
+  assert.equal(cancelAppointment.statusCode, 200);
+  assert.equal(cancelAppointment.json().data.status, "CANCELLED");
+
   const listCustomersByVisit = await app.inject({
     method: "GET",
     url: "/customers?page=1&page_size=5&visit_done=true",
@@ -2349,6 +2380,15 @@ try {
         event.metadata?.appointmentId === createdAppointmentId &&
         event.metadata.fromStatus === "CONFIRMED" &&
         event.metadata.toStatus === "DONE",
+    ),
+  );
+  assert.ok(
+    customerHistory.json().events.some(
+      (event: { metadata: { appointmentId?: string; fromStatus?: string; toStatus?: string } | null; type: string }) =>
+        event.type === "customer.appointment_status_changed" &&
+        event.metadata?.appointmentId === cancellableAppointmentId &&
+        event.metadata.fromStatus === "SCHEDULED" &&
+        event.metadata.toStatus === "CANCELLED",
     ),
   );
   assert.ok(
