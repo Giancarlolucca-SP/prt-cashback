@@ -96,6 +96,7 @@ const statusLabels: Record<RepasseStatus, string> = {
   SOLD: "Vendido",
 };
 
+const terminalRepasseStatuses = new Set(["CANCELLED", "REVENUE_RECOGNIZED"]);
 const channelOptions = ["Site loja", "Lista Repasse SP", "Grupo Lojistas Premium", "Compradores SUV Campinas", "Lista Interior", "Instagram loja"];
 const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
 
@@ -121,6 +122,10 @@ function messageFrom(plan: unknown) {
   if (!plan || typeof plan !== "object" || !("message" in plan)) return "";
   const message = (plan as { message?: unknown }).message;
   return typeof message === "string" ? message : "";
+}
+
+function isTerminalRepasse(status: string) {
+  return terminalRepasseStatuses.has(status);
 }
 
 export function LiveRepasseWorkspace() {
@@ -229,7 +234,7 @@ export function LiveRepasseWorkspace() {
   }
 
   async function updateProcess(process: RepasseProcess, patch: { status?: RepasseStatus; price?: number | null; channelPlan?: unknown }) {
-    if (!token || !canManageRepasse || movingId) return;
+    if (!token || !canManageRepasse || movingId || isTerminalRepasse(process.status)) return;
 
     const previous = process;
     setMovingId(process.id);
@@ -388,30 +393,33 @@ export function LiveRepasseWorkspace() {
           </div>
 
           <div className="blueprint-list">
-            {processes.map((process) => (
-              <article className="blueprint-row" key={process.id}>
-                <div className="blueprint-main"><CarFront aria-hidden="true" /><div><strong>Repasse {process.id.slice(0, 8)}</strong><span>{process.vehicleId.slice(0, 8)} | {channelsFrom(process.channelPlan).join(", ") || "sem canais"}</span></div></div>
-                <div className="blueprint-tags">
-                  <span>{statusLabels[process.status as RepasseStatus] ?? process.status}</span>
-                  <select className="kanban-stage-select" disabled={movingId === process.id} onChange={(event) => void updateProcess(process, { status: event.target.value as RepasseStatus })} value={process.status}>
-                    {(Object.keys(statusLabels) as RepasseStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}
-                  </select>
-                </div>
-                <div className="blueprint-value">
-                  <strong>{money(process.price)}</strong>
-                  <button className="text-button" disabled={movingId === process.id} onClick={() => void updateProcess(process, { status: "SENT" })} type="button">Enviar</button>
-                  <button className="text-button" disabled={movingId === process.id} onClick={() => { setRevenueProcess(process); setRevenueForm({ amount: process.price ? String(Number(process.price)) : "", note: "" }); setSaveError(null); }} type="button">Receita</button>
-                </div>
-              </article>
-            ))}
+            {processes.map((process) => {
+              const isTerminal = isTerminalRepasse(process.status);
+              return (
+                <article className="blueprint-row" key={process.id}>
+                  <div className="blueprint-main"><CarFront aria-hidden="true" /><div><strong>Repasse {process.id.slice(0, 8)}</strong><span>{process.vehicleId.slice(0, 8)} | {channelsFrom(process.channelPlan).join(", ") || "sem canais"}</span></div></div>
+                  <div className="blueprint-tags">
+                    <span>{statusLabels[process.status as RepasseStatus] ?? process.status}</span>
+                    <select className="kanban-stage-select" disabled={isTerminal || movingId === process.id} onChange={(event) => void updateProcess(process, { status: event.target.value as RepasseStatus })} value={process.status}>
+                      {(Object.keys(statusLabels) as RepasseStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}
+                    </select>
+                  </div>
+                  <div className="blueprint-value">
+                    <strong>{money(process.price)}</strong>
+                    <button className="text-button" disabled={isTerminal || movingId === process.id} onClick={() => void updateProcess(process, { status: "SENT" })} type="button">Enviar</button>
+                    <button className="text-button" disabled={isTerminal || movingId === process.id} onClick={() => { setRevenueProcess(process); setRevenueForm({ amount: process.price ? String(Number(process.price)) : "", note: "" }); setSaveError(null); }} type="button">Receita</button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
 
           <div className="repasse-send-row">
-            <button className="primary-action" disabled={!view.selected} onClick={() => view.selected ? void updateProcess(view.selected, { status: "SENT" }) : undefined} type="button">
+            <button className="primary-action" disabled={!view.selected || isTerminalRepasse(view.selected.status)} onClick={() => view.selected ? void updateProcess(view.selected, { status: "SENT" }) : undefined} type="button">
               <Send aria-hidden="true" size={16} />
               Revisar e disparar
             </button>
-            <button className="text-button" disabled={!view.selected} onClick={() => view.selected ? void updateProcess(view.selected, { status: "READY" }) : undefined} type="button">
+            <button className="text-button" disabled={!view.selected || isTerminalRepasse(view.selected.status)} onClick={() => view.selected ? void updateProcess(view.selected, { status: "READY" }) : undefined} type="button">
               <CalendarClock aria-hidden="true" size={16} />
               Marcar pronto
             </button>
