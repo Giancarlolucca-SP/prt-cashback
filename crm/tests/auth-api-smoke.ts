@@ -2449,6 +2449,36 @@ try {
   assert.equal(invalidRepasseStatus.statusCode, 400);
   assert.equal(invalidRepasseStatus.json().error.code, "VALIDATION_ERROR");
 
+  const createCancelledRepasse = await app.inject({
+    method: "POST",
+    url: "/repasse",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicleId: repasseVehicleId,
+      status: "CANCELLED",
+      price: 76000,
+    },
+  });
+  assert.equal(createCancelledRepasse.statusCode, 400);
+  assert.equal(createCancelledRepasse.json().error.code, "VALIDATION_ERROR");
+
+  const createRecognizedRepasse = await app.inject({
+    method: "POST",
+    url: "/repasse",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicleId: repasseVehicleId,
+      status: "REVENUE_RECOGNIZED",
+      price: 76000,
+    },
+  });
+  assert.equal(createRecognizedRepasse.statusCode, 400);
+  assert.equal(createRecognizedRepasse.json().error.code, "VALIDATION_ERROR");
+
   const createRepasse = await app.inject({
     method: "POST",
     url: "/repasse",
