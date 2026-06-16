@@ -4,7 +4,7 @@ import test from "node:test";
 
 const schema = readFileSync("packages/db/prisma/schema.prisma", "utf8");
 const activeRepasseMigration = readFileSync(
-  "packages/db/prisma/migrations/20260616194000_unique_active_repasse_per_vehicle/migration.sql",
+  "packages/db/prisma/migrations/20260616195000_active_repasse_excludes_terminal_statuses/migration.sql",
   "utf8"
 );
 
@@ -64,4 +64,5 @@ test("active repasse is unique per store vehicle pair", () => {
   assert.match(activeRepasseMigration, /CREATE UNIQUE INDEX "repasse_processes_store_vehicle_active_key"/);
   assert.match(activeRepasseMigration, /ON "repasse_processes"\("store_id", "vehicle_id"\)/);
   assert.match(activeRepasseMigration, /WHERE "deleted_at" IS NULL/);
+  assert.match(activeRepasseMigration, /"status" NOT IN \('CANCELLED', 'REVENUE_RECOGNIZED'\)/);
 });
