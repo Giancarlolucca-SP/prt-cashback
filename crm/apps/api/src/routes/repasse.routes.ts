@@ -8,6 +8,7 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 
 const repasseStatusSchema = z.enum(["DRAFT", "READY", "SENT", "INTEREST", "SOLD", "REVENUE_RECOGNIZED", "CANCELLED"]);
+const terminalRepasseStatuses = new Set(["CANCELLED", "REVENUE_RECOGNIZED"]);
 
 const repasseQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -90,6 +91,16 @@ async function ensureVehicleEligibleForRepasse(storeId: string, vehicleId: strin
   if (!inventory) {
     throw new ApiError("VALIDATION_ERROR", "Repasse exige veiculo elegivel no estoque comum da loja.");
   }
+}
+
+function enforceRepasseIsEditable(status: string) {
+  if (!terminalRepasseStatuses.has(status)) return;
+
+  const reason =
+    status === "CANCELLED"
+      ? "Repasse cancelado nao aceita novas atualizacoes."
+      : "Repasse com receita reconhecida nao aceita novas atualizacoes.";
+  throw new ApiError("VALIDATION_ERROR", reason);
 }
 
 async function ensureSaleInStore(storeId: string, saleId?: string) {
@@ -237,12 +248,7 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
     const params = repasseParamsSchema.parse(request.params);
     const input = updateRepasseSchema.parse(request.body);
     const current = await getRepasseOrThrow(session.user.storeId, params.id);
-    if (current.status === "CANCELLED") {
-      throw new ApiError("VALIDATION_ERROR", "Repasse cancelado nao aceita novas atualizacoes.");
-    }
-    if (current.status === "REVENUE_RECOGNIZED") {
-      throw new ApiError("VALIDATION_ERROR", "Repasse com receita reconhecida nao aceita novas atualizacoes.");
-    }
+    enforceRepasseIsEditable(current.status);
 
     const process = await prisma.$transaction(async (tx) => {
       const updated = await tx.repasseProcess.update({
