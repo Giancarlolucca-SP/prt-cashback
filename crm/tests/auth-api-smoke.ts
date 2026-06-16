@@ -1555,7 +1555,7 @@ try {
         brand: "Honda",
         model: "Civic",
         version: "Touring",
-        yearModel: 2021,
+        yearModel: 2099,
         yearBuild: 2020,
         plate: inventoryPlate,
         color: "Prata",
@@ -1705,6 +1705,16 @@ try {
   });
   assert.equal(listInventory.statusCode, 200);
   assert.ok(listInventory.json().items.some((item: { id: string }) => item.id === inventoryId));
+
+  const listInventoryByYear = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100&search=2099",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByYear.statusCode, 200);
+  assert.ok(listInventoryByYear.json().items.some((item: { id: string }) => item.id === inventoryId));
 
   const getInventory = await app.inject({
     method: "GET",

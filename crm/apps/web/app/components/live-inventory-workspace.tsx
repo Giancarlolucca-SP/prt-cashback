@@ -507,7 +507,7 @@ export function LiveInventoryWorkspace() {
           ))}
         </div>
         <label className="search-box">
-          <input aria-label="Buscar estoque" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo, placa, cor" value={search} />
+          <input aria-label="Buscar estoque" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo, placa, ano ou cor" value={search} />
         </label>
         <button className="primary-action" disabled={!canManageInventory} onClick={() => setModalOpen(true)} type="button">
           <Plus aria-hidden="true" size={17} />

@@ -296,6 +296,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const includeCosts = await canReadInventoryCosts(session.user);
     const query = inventoryQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
+    const searchYear = query.search && /^\d{4}$/.test(query.search) ? Number(query.search) : null;
 
     const matchingVehicleIds = query.search
       ? (
@@ -309,6 +310,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
                 { version: { contains: query.search, mode: "insensitive" } },
                 { plate: { contains: query.search, mode: "insensitive" } },
                 { color: { contains: query.search, mode: "insensitive" } },
+                ...(searchYear ? [{ yearModel: searchYear }, { yearBuild: searchYear }] : []),
               ],
             },
             select: { id: true },
