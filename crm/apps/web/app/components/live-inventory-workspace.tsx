@@ -195,6 +195,10 @@ function toneFor(item: InventoryItem) {
   return "risk";
 }
 
+function isCommonStockItem(item: InventoryItem) {
+  return item.ownershipType !== "REPASSE" && item.status !== "REPASSE";
+}
+
 export function LiveInventoryWorkspace() {
   const { hasPermission, token } = useAuth();
   const canReadCustomers = hasPermission({ module: "customers", action: "read" });
@@ -236,7 +240,7 @@ export function LiveInventoryWorkspace() {
     apiGet<ListResponse<InventoryItem>>(`/inventory?${query.toString()}`, token)
       .then((list) => {
         if (!isCurrent) return;
-        setItems(list.items);
+        setItems(list.items.filter(isCommonStockItem));
         setStatus("live");
       })
       .catch(() => {
@@ -303,7 +307,10 @@ export function LiveInventoryWorkspace() {
         },
       });
 
-      setItems((current) => [response.data, ...current.filter((item) => item.id !== response.data.id)]);
+      setItems((current) => {
+        const withoutCurrent = current.filter((item) => item.id !== response.data.id);
+        return isCommonStockItem(response.data) ? [response.data, ...withoutCurrent] : withoutCurrent;
+      });
       setForm(emptyForm);
       setModalOpen(false);
       setRefreshKey((current) => current + 1);
@@ -325,7 +332,7 @@ export function LiveInventoryWorkspace() {
 
     try {
       const response = await apiPatch<{ data: InventoryItem }>(`/inventory/${item.id}`, token, patch);
-      setItems((current) => current.map((entry) => (entry.id === item.id ? response.data : entry)));
+      setItems((current) => current.map((entry) => (entry.id === item.id ? response.data : entry)).filter(isCommonStockItem));
       setRefreshKey((current) => current + 1);
     } catch {
       setItems((current) => current.map((entry) => (entry.id === item.id ? previous : entry)));
@@ -375,7 +382,7 @@ export function LiveInventoryWorkspace() {
   }
 
   const view = useMemo(() => {
-    const stockItems = items.filter((item) => item.ownershipType !== "REPASSE" && item.status !== "REPASSE");
+    const stockItems = items.filter(isCommonStockItem);
     const own = stockItems.filter((item) => item.ownershipType === "OWN").length;
     const consigned = stockItems.filter((item) => item.ownershipType === "CONSIGNED").length;
     const totalStockValue = stockItems.reduce((sum, item) => sum + Number(item.askingPrice ?? 0), 0);
