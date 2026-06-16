@@ -177,6 +177,26 @@ async function ensureCustomerInStore(storeId: string, customerId?: string | null
   }
 }
 
+function enforceConsignedInventoryRules(input: {
+  ownerCustomerId?: string | null;
+  ownershipType: string;
+  purchaseCost?: number | string | { toString(): string } | null;
+}) {
+  if (input.ownershipType !== "CONSIGNED") {
+    return;
+  }
+
+  const purchaseCost = Number(input.purchaseCost?.toString() ?? 0);
+
+  if (!input.ownerCustomerId) {
+    throw new ApiError("VALIDATION_ERROR", "Veiculo consignado exige consignante vinculado.");
+  }
+
+  if (purchaseCost <= 0) {
+    throw new ApiError("VALIDATION_ERROR", "Veiculo consignado exige valor acordado com o proprietario.");
+  }
+}
+
 async function getInventoryOrThrow(storeId: string, id: string) {
   const inventory = await prisma.vehicleInventoryRecord.findFirst({
     where: { id, storeId, deletedAt: null },
@@ -283,6 +303,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     });
     const input = createInventorySchema.parse(request.body);
 
+    enforceConsignedInventoryRules(input);
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
 
     if (input.vehicle.plate) {
@@ -362,7 +383,15 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const params = inventoryParamsSchema.parse(request.params);
     const input = updateInventorySchema.parse(request.body);
     const current = await getInventoryOrThrow(session.user.storeId, params.id);
+    const nextOwnershipType = input.ownershipType ?? current.inventory.ownershipType;
+    const nextOwnerCustomerId = input.ownerCustomerId === undefined ? current.inventory.ownerCustomerId : input.ownerCustomerId;
+    const nextPurchaseCost = input.purchaseCost === undefined ? current.inventory.purchaseCost : input.purchaseCost;
 
+    enforceConsignedInventoryRules({
+      ownerCustomerId: nextOwnerCustomerId,
+      ownershipType: nextOwnershipType,
+      purchaseCost: nextPurchaseCost,
+    });
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
 
     const result = await prisma.$transaction(async (tx) => {

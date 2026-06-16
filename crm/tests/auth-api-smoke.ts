@@ -1518,6 +1518,28 @@ try {
   assert.equal(invalidInventoryVehicle.statusCode, 400);
   assert.equal(invalidInventoryVehicle.json().error.code, "VALIDATION_ERROR");
 
+  const invalidConsignedInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Volkswagen",
+        model: "T-Cross",
+        yearModel: 2022,
+        plate: uniquePlate("CS"),
+      },
+      ownershipType: "CONSIGNED",
+      status: "IN_PREPARATION",
+      askingPrice: 118000,
+      entryDate: "2026-06-06T12:00:00.000Z",
+    },
+  });
+  assert.equal(invalidConsignedInventory.statusCode, 400);
+  assert.equal(invalidConsignedInventory.json().error.code, "VALIDATION_ERROR");
+
   const inventoryPlate = uniquePlate("QA");
   const createInventory = await app.inject({
     method: "POST",
@@ -1549,6 +1571,36 @@ try {
   assert.equal(createInventory.json().data.purchaseCost, "101000");
   const inventoryId = createInventory.json().data.id as string;
   const inventoryVehicleId = createInventory.json().data.vehicle.id as string;
+
+  const consignedPlate = uniquePlate("CS");
+  const createConsignedInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Volkswagen",
+        model: "T-Cross",
+        version: "Highline",
+        yearModel: 2022,
+        plate: consignedPlate,
+        color: "Branco",
+        mileage: 22000,
+      },
+      ownershipType: "CONSIGNED",
+      status: "IN_PREPARATION",
+      ownerCustomerId: createdCustomerId,
+      purchaseCost: 102000,
+      askingPrice: 119900,
+      entryDate: "2026-06-06T12:00:00.000Z",
+      notes: "Consignado com valor acordado em QA.",
+    },
+  });
+  assert.equal(createConsignedInventory.statusCode, 201);
+  assert.equal(createConsignedInventory.json().data.ownerCustomerId, createdCustomerId);
+  assert.equal(createConsignedInventory.json().data.purchaseCost, "102000");
 
   const duplicateInventory = await app.inject({
     method: "POST",

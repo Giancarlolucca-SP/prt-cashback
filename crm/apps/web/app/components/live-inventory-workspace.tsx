@@ -45,6 +45,7 @@ type InventoryFormState = {
   model: string;
   notes: string;
   ownershipType: OwnershipType;
+  ownerCustomerId: string;
   plate: string;
   purchaseCost: string;
   status: InventoryStatus;
@@ -59,6 +60,12 @@ type CostFormState = {
   description: string;
 };
 
+type CustomerOption = {
+  id: string;
+  name: string;
+  phone: string | null;
+};
+
 const emptyForm: InventoryFormState = {
   askingPrice: "",
   brand: "",
@@ -67,6 +74,7 @@ const emptyForm: InventoryFormState = {
   model: "",
   notes: "",
   ownershipType: "OWN",
+  ownerCustomerId: "",
   plate: "",
   purchaseCost: "",
   status: "IN_PREPARATION",
@@ -160,11 +168,14 @@ function toneFor(item: InventoryItem) {
 
 export function LiveInventoryWorkspace() {
   const { hasPermission, token } = useAuth();
+  const canReadCustomers = hasPermission({ module: "customers", action: "read" });
   const canReadInventory = hasPermission({ module: "inventory", action: "read" });
   const canManageInventory = hasPermission({ module: "inventory", action: "manage" });
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [costForm, setCostForm] = useState<CostFormState>(emptyCostForm);
   const [costItem, setCostItem] = useState<InventoryItem | null>(null);
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
+  const [customerOptionsStatus, setCustomerOptionsStatus] = useState<"idle" | "loading" | "ready" | "error" | "locked">("idle");
   const [form, setForm] = useState<InventoryFormState>(emptyForm);
   const [items, setItems] = useState(fallbackItems);
   const [modalOpen, setModalOpen] = useState(false);
@@ -204,6 +215,34 @@ export function LiveInventoryWorkspace() {
     };
   }, [activeFilter, canReadInventory, refreshKey, search, token]);
 
+  useEffect(() => {
+    if (!modalOpen || form.ownershipType !== "CONSIGNED") {
+      return;
+    }
+
+    if (!token || !canReadCustomers) {
+      setCustomerOptionsStatus("locked");
+      return;
+    }
+
+    let isCurrent = true;
+    setCustomerOptionsStatus("loading");
+
+    apiGet<ListResponse<CustomerOption>>("/customers?page=1&page_size=100&status=ACTIVE", token)
+      .then((list) => {
+        if (!isCurrent) return;
+        setCustomerOptions(list.items);
+        setCustomerOptionsStatus("ready");
+      })
+      .catch(() => {
+        if (isCurrent) setCustomerOptionsStatus("error");
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [canReadCustomers, form.ownershipType, modalOpen, token]);
+
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !canManageInventory || saving) return;
@@ -216,6 +255,7 @@ export function LiveInventoryWorkspace() {
         entryDate: form.entryDate ? new Date(`${form.entryDate}T12:00:00.000Z`).toISOString() : undefined,
         notes: form.notes.trim() || undefined,
         ownershipType: form.ownershipType,
+        ownerCustomerId: form.ownershipType === "CONSIGNED" && form.ownerCustomerId ? form.ownerCustomerId : undefined,
         purchaseCost: form.purchaseCost ? Number(form.purchaseCost) : undefined,
         status: form.status,
         vehicle: {
@@ -442,7 +482,18 @@ export function LiveInventoryWorkspace() {
               <label>Entrada<input required type="date" value={form.entryDate} onChange={(event) => setForm((current) => ({ ...current, entryDate: event.target.value }))} /></label>
               <label>Placa<input value={form.plate} onChange={(event) => setForm((current) => ({ ...current, plate: event.target.value }))} /></label>
               <label>Cor<input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} /></label>
-              <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType }))}>{stockOwnershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
+              <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType, ownerCustomerId: event.target.value === "CONSIGNED" ? current.ownerCustomerId : "" }))}>{stockOwnershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
+              {form.ownershipType === "CONSIGNED" ? (
+                <label>
+                  Consignante
+                  <select disabled={customerOptionsStatus === "loading" || customerOptionsStatus === "locked"} required value={form.ownerCustomerId} onChange={(event) => setForm((current) => ({ ...current, ownerCustomerId: event.target.value }))}>
+                    <option value="">Selecione o cliente</option>
+                    {customerOptions.map((customer) => (
+                      <option key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` | ${customer.phone}` : ""}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <label>Status<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as InventoryStatus }))}>{(Object.keys(statusLabels) as InventoryStatus[]).map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select></label>
               <label>Custo compra<input min="0" type="number" value={form.purchaseCost} onChange={(event) => setForm((current) => ({ ...current, purchaseCost: event.target.value }))} /></label>
               <label>Preco venda<input min="0" type="number" value={form.askingPrice} onChange={(event) => setForm((current) => ({ ...current, askingPrice: event.target.value }))} /></label>
@@ -450,7 +501,7 @@ export function LiveInventoryWorkspace() {
               {saveError ? <p className="lead-modal-error">{saveError}</p> : null}
               <div className="lead-modal-actions">
                 <button className="text-button" onClick={() => setModalOpen(false)} type="button">Cancelar</button>
-                <button className="primary-action" disabled={saving || form.brand.trim().length < 2 || form.model.trim().length < 1 || !form.yearModel || !form.entryDate} type="submit">{saving ? "Salvando..." : "Criar entrada"}</button>
+                <button className="primary-action" disabled={saving || form.brand.trim().length < 2 || form.model.trim().length < 1 || !form.yearModel || !form.entryDate || (form.ownershipType === "CONSIGNED" && (!form.ownerCustomerId || Number(form.purchaseCost) <= 0))} type="submit">{saving ? "Salvando..." : "Criar entrada"}</button>
               </div>
             </form>
           </section>
