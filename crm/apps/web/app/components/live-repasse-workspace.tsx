@@ -21,6 +21,7 @@ type InventoryOption = {
   id: string;
   askingPrice: string | null;
   status: string;
+  vehicleId: string;
   vehicle: {
     brand: string;
     model: string;
@@ -195,7 +196,7 @@ export function LiveRepasseWorkspace() {
   }
 
   function selectVehicle(vehicleId: string) {
-    const selected = inventory.find((item) => item.id === vehicleId);
+    const selected = inventory.find((item) => item.vehicleId === vehicleId);
     setForm((current) => ({
       ...current,
       price: selected?.askingPrice ? String(Number(selected.askingPrice)) : current.price,
@@ -287,7 +288,7 @@ export function LiveRepasseWorkspace() {
 
   const selectedChannels = view.selected ? channelsFrom(view.selected.channelPlan) : [];
   const selectedMessage = view.selected ? messageFrom(view.selected.channelPlan) : "";
-  const selectedVehicle = inventory.find((item) => item.id === view.selected?.vehicleId);
+  const selectedVehicle = inventory.find((item) => item.vehicleId === view.selected?.vehicleId);
   const statusLabel = {
     error: "Usando fallback",
     fallback: "Fallback visual",
@@ -332,7 +333,7 @@ export function LiveRepasseWorkspace() {
                 Veiculo
                 <select disabled={!canReadInventory || inventoryStatus === "loading"} onChange={(event) => selectVehicle(event.target.value)} required value={form.vehicleId}>
                   <option value="">Selecione um veiculo</option>
-                  {inventory.map((item) => <option key={item.id} value={item.id}>{vehicleLabel(item)} - {money(item.askingPrice)}</option>)}
+                  {inventory.map((item) => <option key={item.id} value={item.vehicleId}>{vehicleLabel(item)} - {money(item.askingPrice)}</option>)}
                 </select>
               </label>
               {!canReadInventory ? <p className="lead-modal-error">Sem permissao para listar estoque.</p> : null}
