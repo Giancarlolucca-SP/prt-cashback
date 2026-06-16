@@ -72,11 +72,10 @@ function uniqueToken(prefix: string) {
 function uniquePlate(prefix: string) {
   uniqueCounter += 1;
   const letters = `${prefix}AAA`.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 3).padEnd(3, "A");
-  const seed = `${runToken}-${Date.now()}-${uniqueCounter}`;
-  const hash = seed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const number = String(hash % 10);
-  const letter = String.fromCharCode(65 + (hash % 26));
-  const suffix = String(Math.floor(hash / 26) % 100).padStart(2, "0");
+  const seed = Date.now() + process.pid * 997 + uniqueCounter * 389 + Math.floor(Math.random() * 26000);
+  const number = String(seed % 10);
+  const letter = String.fromCharCode(65 + (Math.floor(seed / 10) % 26));
+  const suffix = String(Math.floor(seed / 260) % 100).padStart(2, "0");
   return `${letters}${number}${letter}${suffix}`;
 }
 
@@ -2541,6 +2540,78 @@ try {
   });
   assert.equal(invalidRepasseTransition.statusCode, 400);
   assert.equal(invalidRepasseTransition.json().error.code, "VALIDATION_ERROR");
+
+  const cancelRepasseInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Fiat",
+        model: "Pulse",
+        version: "Drive Repasse",
+        yearModel: 2020,
+        plate: uniquePlate("RC"),
+      },
+      ownershipType: "TRADE_IN",
+      status: "IN_PREPARATION",
+      askingPrice: 70500,
+      entryDate: "2026-06-06T13:30:00.000Z",
+    },
+  });
+  assert.equal(cancelRepasseInventory.statusCode, 201);
+  const cancelRepasseVehicleId = cancelRepasseInventory.json().data.vehicle.id as string;
+  const cancelRepasseInventoryId = cancelRepasseInventory.json().data.id as string;
+
+  const createCancelableRepasse = await app.inject({
+    method: "POST",
+    url: "/repasse",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicleId: cancelRepasseVehicleId,
+      status: "READY",
+      price: 70000,
+    },
+  });
+  assert.equal(createCancelableRepasse.statusCode, 201);
+  const cancelableRepasseId = createCancelableRepasse.json().data.id as string;
+
+  const cancelRepasse = await app.inject({
+    method: "PATCH",
+    url: `/repasse/${cancelableRepasseId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "CANCELLED",
+    },
+  });
+  assert.equal(cancelRepasse.statusCode, 200);
+  assert.equal(cancelRepasse.json().data.status, "CANCELLED");
+
+  const restoredInventory = await app.inject({
+    method: "GET",
+    url: `/inventory/${cancelRepasseInventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(restoredInventory.statusCode, 200);
+  assert.equal(restoredInventory.json().data.status, "IN_PREPARATION");
+
+  const defaultInventoryAfterRepasseCancel = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(defaultInventoryAfterRepasseCancel.statusCode, 200);
+  assert.ok(defaultInventoryAfterRepasseCancel.json().items.some((item: { id: string }) => item.id === cancelRepasseInventoryId));
 
   const updateRepasse = await app.inject({
     method: "PATCH",

@@ -267,6 +267,39 @@ export async function registerRepasseRoutes(app: FastifyInstance) {
         },
       });
 
+      if (input.status === "CANCELLED") {
+        const restoredInventories = await tx.vehicleInventoryRecord.findMany({
+          where: { storeId: session.user.storeId, vehicleId: current.vehicleId, deletedAt: null, status: "REPASSE" },
+          select: { id: true },
+        });
+
+        await tx.vehicleInventoryRecord.updateMany({
+          where: { storeId: session.user.storeId, vehicleId: current.vehicleId, deletedAt: null, status: "REPASSE" },
+          data: { status: "IN_PREPARATION" },
+        });
+
+        if (restoredInventories.length > 0) {
+          await tx.auditLog.createMany({
+            data: restoredInventories.map((inventory) => ({
+              storeId: session.user.storeId,
+              actorId: session.user.id,
+              actorRole: session.user.role,
+              module: "inventory",
+              action: "status_changed",
+              entityType: "vehicle_inventory",
+              entityId: inventory.id,
+              result: "SUCCESS",
+              metadata: {
+                vehicleId: current.vehicleId,
+                fromStatus: "REPASSE",
+                toStatus: "IN_PREPARATION",
+                reason: "repasse_cancelled",
+              },
+            })),
+          });
+        }
+      }
+
       return updated;
     });
 
