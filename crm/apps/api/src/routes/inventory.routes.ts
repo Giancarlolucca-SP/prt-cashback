@@ -12,7 +12,7 @@ import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../sec
 const ownershipTypeSchema = z.enum(["OWN", "CONSIGNED", "REPASSE", "TRADE_IN"]);
 const inventoryStatusSchema = z.enum(["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REPASSE", "REMOVED"]);
 const inventorySortSchema = z
-  .enum(["days_in_stock_desc", "days_in_stock_asc", "entry_date_desc", "updated_at_desc", "price_desc", "price_asc"])
+  .enum(["brand_model_asc", "days_in_stock_desc", "days_in_stock_asc", "entry_date_desc", "status_asc", "updated_at_desc", "price_desc", "price_asc"])
   .default("days_in_stock_desc");
 
 const inventoryQuerySchema = z.object({
@@ -169,14 +169,21 @@ function buildInventoryOperationalSummary(input: {
 
 function inventoryOrderBy(sort: z.infer<typeof inventorySortSchema>) {
   if (sort === "entry_date_desc") return { entryDate: "desc" as const };
+  if (sort === "status_asc") return { status: "asc" as const };
   if (sort === "updated_at_desc") return { updatedAt: "desc" as const };
   if (sort === "price_desc") return { askingPrice: "desc" as const };
   if (sort === "price_asc") return { askingPrice: "asc" as const };
   return { entryDate: "asc" as const };
 }
 
-function isDaysInStockSort(sort: z.infer<typeof inventorySortSchema>) {
-  return sort === "days_in_stock_desc" || sort === "days_in_stock_asc";
+function requiresInMemoryInventorySort(sort: z.infer<typeof inventorySortSchema>) {
+  return sort === "brand_model_asc" || sort === "days_in_stock_desc" || sort === "days_in_stock_asc";
+}
+
+function compareVehicleLabel(a: VehicleRecord | undefined, b: VehicleRecord | undefined) {
+  return [a?.brand ?? "", a?.model ?? "", a?.version ?? ""].join(" ").localeCompare([b?.brand ?? "", b?.model ?? "", b?.version ?? ""].join(" "), "pt-BR", {
+    sensitivity: "base",
+  });
 }
 
 function relevantPendingSummary(status: string) {
@@ -464,11 +471,12 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       ...(commonInventoryGuards.length ? { AND: commonInventoryGuards } : {}),
     };
 
+    const inMemorySort = requiresInMemoryInventorySort(query.sort);
     const [rawItems, total, byOwnership, byStatus] = await Promise.all([
       prisma.vehicleInventoryRecord.findMany({
         where,
         orderBy: inventoryOrderBy(query.sort),
-        ...(isDaysInStockSort(query.sort) ? {} : { skip, take }),
+        ...(inMemorySort ? {} : { skip, take }),
       }),
       prisma.vehicleInventoryRecord.count({ where }),
       prisma.vehicleInventoryRecord.groupBy({
@@ -482,17 +490,21 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         _count: { _all: true },
       }),
     ]);
-    const items = isDaysInStockSort(query.sort)
+    const rawVehicles = await prisma.vehicle.findMany({
+      where: { id: { in: rawItems.map((item) => item.vehicleId) }, storeId: session.user.storeId },
+    });
+    const rawVehicleById = new Map(rawVehicles.map((vehicle) => [vehicle.id, vehicle]));
+    const items = inMemorySort
       ? [...rawItems]
           .sort((a, b) => {
+            if (query.sort === "brand_model_asc") return compareVehicleLabel(rawVehicleById.get(a.vehicleId), rawVehicleById.get(b.vehicleId));
             const direction = query.sort === "days_in_stock_asc" ? 1 : -1;
             return (calculateDaysInStock(a) - calculateDaysInStock(b)) * direction;
           })
           .slice(skip, skip + take)
       : rawItems;
-    const vehicles = await prisma.vehicle.findMany({
-      where: { id: { in: items.map((item) => item.vehicleId) }, storeId: session.user.storeId },
-    });
+    const itemVehicleIds = new Set(items.map((item) => item.vehicleId));
+    const vehicles = rawVehicles.filter((vehicle) => itemVehicleIds.has(vehicle.id));
     const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
     const activeListingCounts = items.length
       ? await prisma.listing.groupBy({

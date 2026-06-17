@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-provider";
 
 type OwnershipType = "OWN" | "CONSIGNED" | "REPASSE" | "TRADE_IN";
 type InventoryStatus = "IN_PREPARATION" | "AVAILABLE" | "RESERVED" | "SOLD" | "REPASSE" | "REMOVED";
+type InventorySort = "brand_model_asc" | "days_in_stock_desc" | "days_in_stock_asc" | "entry_date_desc" | "status_asc" | "updated_at_desc" | "price_desc" | "price_asc";
 
 type Vehicle = {
   brand: string;
@@ -168,6 +169,17 @@ const filters: Array<{ hasActiveListing?: boolean; hasRelevantPending?: boolean;
   { hasRelevantPending: true, label: "Com pendencia" },
 ];
 
+const sortOptions: Array<{ label: string; value: InventorySort }> = [
+  { label: "Mais tempo em estoque", value: "days_in_stock_desc" },
+  { label: "Menos tempo em estoque", value: "days_in_stock_asc" },
+  { label: "Entrada recente", value: "entry_date_desc" },
+  { label: "Ultima atualizacao", value: "updated_at_desc" },
+  { label: "Maior preco", value: "price_desc" },
+  { label: "Menor preco", value: "price_asc" },
+  { label: "Marca/modelo", value: "brand_model_asc" },
+  { label: "Status", value: "status_asc" },
+];
+
 const statusLabels: Record<InventoryStatus, string> = {
   AVAILABLE: "Pronto venda",
   IN_PREPARATION: "Preparacao",
@@ -243,6 +255,7 @@ export function LiveInventoryWorkspace() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<InventorySort>("days_in_stock_desc");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
 
   useEffect(() => {
@@ -253,7 +266,7 @@ export function LiveInventoryWorkspace() {
     }
 
     let isCurrent = true;
-    const query = new URLSearchParams({ page: "1", page_size: "50", sort: "days_in_stock_desc" });
+    const query = new URLSearchParams({ page: "1", page_size: "50", sort });
     if (activeFilter.hasActiveListing !== undefined) query.set("has_active_listing", String(activeFilter.hasActiveListing));
     if (activeFilter.hasRelevantPending !== undefined) query.set("has_pending", String(activeFilter.hasRelevantPending));
     if (activeFilter.status) query.set("status", activeFilter.status);
@@ -275,7 +288,7 @@ export function LiveInventoryWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canReadInventory, refreshKey, search, token]);
+  }, [activeFilter, canReadInventory, refreshKey, search, sort, token]);
 
   useEffect(() => {
     if (!modalOpen || form.ownershipType !== "CONSIGNED") {
@@ -416,7 +429,7 @@ export function LiveInventoryWorkspace() {
     const pending = operationalSummary?.byStatus.IN_PREPARATION ?? stockItems.filter((item) => item.status === "IN_PREPARATION").length;
 
     return {
-      consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED").sort((a, b) => operationalDaysInStock(b) - operationalDaysInStock(a)),
+      consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED"),
       metrics: [
         { label: "Proprios", value: String(own), detail: operationalSummary ? percent.format(operationalSummary.ownPercent) : "capital da loja em estoque", tone: "teal" },
         { label: "Consignados", value: String(consigned), detail: operationalSummary ? percent.format(operationalSummary.consignedPercent) : "terceiros sob contrato", tone: "blue" },
@@ -428,7 +441,7 @@ export function LiveInventoryWorkspace() {
         },
         { label: "Pendencias criticas", value: String(pending), detail: "preparacao ou remocao", tone: "rose" },
       ],
-      ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED").sort((a, b) => operationalDaysInStock(b) - operationalDaysInStock(a)),
+      ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED"),
       prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
     };
   }, [canReadInventoryCosts, items, operationalSummary]);
@@ -553,6 +566,13 @@ export function LiveInventoryWorkspace() {
         </div>
         <label className="search-box">
           <input aria-label="Buscar estoque" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo, placa, ano ou cor" value={search} />
+        </label>
+        <label className="search-box">
+          <select aria-label="Ordenar estoque" onChange={(event) => setSort(event.target.value as InventorySort)} value={sort}>
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </label>
         <button className="primary-action" disabled={!canCreateInventory} onClick={() => setModalOpen(true)} type="button">
           <Plus aria-hidden="true" size={17} />
