@@ -48,6 +48,7 @@ const vehiclePayloadSchema = z.object({
   color: z.string().trim().max(40).optional(),
   mileage: z.number().int().min(0).optional(),
   fipeCode: z.string().trim().max(40).optional(),
+  primaryPhotoAttachmentId: z.string().uuid().nullable().optional(),
   relevantOptions: z
     .string()
     .trim()
@@ -56,7 +57,7 @@ const vehiclePayloadSchema = z.object({
     .optional(),
 });
 
-const createVehiclePayloadSchema = vehiclePayloadSchema.extend({
+const createVehiclePayloadSchema = vehiclePayloadSchema.omit({ primaryPhotoAttachmentId: true }).extend({
   yearModel: z.number().int().min(1900).max(2100),
 });
 
@@ -133,6 +134,7 @@ type VehicleRecord = {
   color: string | null;
   mileage: number | null;
   fipeCode: string | null;
+  primaryPhotoAttachmentId: string | null;
   relevantOptions: string | null;
   status: string;
   createdAt: Date;
@@ -236,6 +238,8 @@ function sanitizeVehicle(vehicle: VehicleRecord) {
     color: vehicle.color,
     mileage: vehicle.mileage,
     fipeCode: vehicle.fipeCode,
+    primaryPhotoAttachmentId: vehicle.primaryPhotoAttachmentId,
+    hasPrimaryPhoto: Boolean(vehicle.primaryPhotoAttachmentId),
     relevantOptions: vehicle.relevantOptions,
     status: vehicle.status,
     createdAt: vehicle.createdAt.toISOString(),
@@ -286,6 +290,46 @@ async function canReadInventoryCosts(user: Parameters<typeof canUser>[0]) {
   });
 
   return decision.allowed;
+}
+
+async function ensureVehiclePrimaryPhoto(input: {
+  attachmentId: string | null | undefined;
+  storeId: string;
+  vehicleId?: string;
+}) {
+  if (!input.attachmentId) return;
+
+  const attachment = await prisma.fileAttachment.findFirst({
+    where: {
+      id: input.attachmentId,
+      storeId: input.storeId,
+      status: "ACTIVE",
+      deletedAt: null,
+      mimeType: { in: ["image/jpeg", "image/jpg", "image/png"] },
+      bucket: { in: ["vehicle-documents", "listing-media"] },
+    },
+    select: { id: true },
+  });
+
+  if (!attachment) {
+    throw new ApiError("NOT_FOUND", "Foto principal do veiculo nao encontrada.");
+  }
+
+  if (!input.vehicleId) return;
+
+  const link = await prisma.fileAttachmentLink.findFirst({
+    where: {
+      attachmentId: input.attachmentId,
+      storeId: input.storeId,
+      entityId: input.vehicleId,
+      entityType: "vehicle",
+    },
+    select: { id: true },
+  });
+
+  if (!link) {
+    throw new ApiError("NOT_FOUND", "Foto principal do veiculo nao encontrada.");
+  }
 }
 
 async function requireInventoryCreateAccess(request: Parameters<typeof requireAuth>[0]) {
@@ -901,6 +945,11 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     });
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
     await ensureUserInStore(session.user.storeId, input.responsibleUserId);
+    await ensureVehiclePrimaryPhoto({
+      attachmentId: input.vehicle?.primaryPhotoAttachmentId,
+      storeId: session.user.storeId,
+      vehicleId: current.vehicle.id,
+    });
 
     const result = await prisma.$transaction(async (tx) => {
       const vehicle = input.vehicle

@@ -585,12 +585,14 @@ model Vehicle {
   mileage   Int?
   fipeCode  String?      @map("fipe_code")
   relevantOptions String? @map("relevant_options")
+  primaryPhotoAttachmentId String? @map("primary_photo_attachment_id")
   status    RecordStatus @default(ACTIVE)
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")
 
   @@unique([storeId, plate])
+  @@index([primaryPhotoAttachmentId])
   @@index([storeId])
   @@index([vin])
   @@map("vehicles")

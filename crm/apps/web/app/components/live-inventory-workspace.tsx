@@ -17,6 +17,8 @@ type Vehicle = {
   plate: string | null;
   color: string | null;
   mileage: number | null;
+  hasPrimaryPhoto?: boolean;
+  primaryPhotoAttachmentId?: string | null;
   relevantOptions: string | null;
 };
 
@@ -517,7 +519,7 @@ export function LiveInventoryWorkspace() {
         <div className="vehicle-summary">
           <div className="vehicle-main">
             <div className="vehicle-thumb">
-              <CarFront aria-hidden="true" size={24} />
+              {item.vehicle?.hasPrimaryPhoto ? <Camera aria-hidden="true" size={24} /> : <CarFront aria-hidden="true" size={24} />}
             </div>
             <div>
               <strong>{vehicleTitle(item)}</strong>
@@ -533,6 +535,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.stockOrigin ? `Origem: ${item.stockOrigin}` : "Origem n/d"}</span>
             <span>{item.stockLocation ? `Local: ${item.stockLocation}` : "Local n/d"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
+            <span>{item.vehicle?.hasPrimaryPhoto ? "Foto principal vinculada" : "Foto principal pendente"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
             <span>{item.hasActiveService ? `Servico: ${item.activeService?.type ?? "em andamento"}${item.activeService?.providerName ? ` | ${item.activeService.providerName}` : ""}` : "Sem servico ativo"}</span>
             <span>{item.activeService?.expectedReturnAt ? `Retorno: ${new Date(item.activeService.expectedReturnAt).toLocaleDateString("pt-BR")}` : "Retorno n/d"}</span>

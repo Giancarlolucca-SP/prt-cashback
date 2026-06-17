@@ -1,6 +1,6 @@
 # S1-US04 Inventory Operational Traceability
 
-Status: implemented baseline with remaining explicit deferred fields.
+Status: implemented baseline.
 
 ## Implemented Evidence
 
@@ -17,6 +17,7 @@ Status: implemented baseline with remaining explicit deferred fields.
 | Sorts cover days, update, entry date, price, brand/model, status | `sort` accepts `days_in_stock_desc`, `days_in_stock_asc`, `updated_at_desc`, `entry_date_desc`, `price_desc`, `price_asc`, `brand_model_asc`, and `status_asc`. |
 | Active listing indicator exists | List items return `hasActiveListing` and `activeListingsCount`; detail returns `activeListings`. |
 | Active service/preparation indicator exists | List/detail items return `hasActiveService` and `activeService` for non-terminal service orders, including expected return when available. |
+| Primary vehicle photo indicator exists | Vehicles store `primaryPhotoAttachmentId` as an internal file attachment reference; list/detail items return `hasPrimaryPhoto` without accepting arbitrary remote URLs. |
 | Relevant pending indicator exists | List items return `hasRelevantPending` and `pendingSummary`. |
 | Cost fields are permission-protected | `purchaseCost` is returned only when the user has `inventory:read_costs`. |
 | Status updates are audited | Inventory updates write `auditLog` entries and `vehicleStatusHistory` on status changes. |
@@ -36,6 +37,7 @@ Status: implemented baseline with remaining explicit deferred fields.
 - entry-period filter;
 - active listing indicator and detail;
 - active service indicator/detail with expected return;
+- primary photo attachment reference and list/detail indicators;
 - summary counts for ownership, statuses, active listings, and active services;
 - status-change audit log.
 
@@ -45,14 +47,6 @@ Project-wide validation commands used for this story:
 - `npm run build:web`
 - `npm test`
 
-## Explicit Deferred Fields
-
-The following S1-US04 fields are intentionally not implemented yet because the current schema does not store enough data for them:
-
-| Deferred field/filter | Current status | Next required work |
-|---|---|---|
-| primary photo URL | Not present on vehicle/inventory. Attachments exist as documents. | Add photo attachment classification or a primary media relation. |
-
 ## BMAP Note
 
-Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Service return forecast is complete after migration `20260617121000_add_service_expected_return`. Do not mark primary photo as complete until its data field exists in the model, API, UI, and smoke coverage.
+Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Service return forecast is complete after migration `20260617121000_add_service_expected_return`. Primary vehicle photo reference is complete after migration `20260617123000_add_vehicle_primary_photo`, using internal attachments instead of remote media URLs.

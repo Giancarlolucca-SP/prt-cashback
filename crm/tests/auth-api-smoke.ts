@@ -1611,6 +1611,44 @@ try {
   const inventoryId = createInventory.json().data.id as string;
   const inventoryVehicleId = createInventory.json().data.vehicle.id as string;
 
+  const prepareVehiclePrimaryPhoto = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      bucket: "listing-media",
+      originalName: "Foto Principal Civic.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4096,
+      classification: "vehicle_primary_photo",
+      link: {
+        entityType: "vehicle",
+        entityId: inventoryVehicleId,
+        purpose: "primary_photo",
+      },
+    },
+  });
+  assert.equal(prepareVehiclePrimaryPhoto.statusCode, 201);
+  const primaryPhotoAttachmentId = prepareVehiclePrimaryPhoto.json().data.id as string;
+
+  const updatePrimaryPhoto = await app.inject({
+    method: "PATCH",
+    url: `/inventory/${inventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        primaryPhotoAttachmentId,
+      },
+    },
+  });
+  assert.equal(updatePrimaryPhoto.statusCode, 200);
+  assert.equal(updatePrimaryPhoto.json().data.vehicle.primaryPhotoAttachmentId, primaryPhotoAttachmentId);
+  assert.equal(updatePrimaryPhoto.json().data.vehicle.hasPrimaryPhoto, true);
+
   const consignedPlate = uniquePlate("CS");
   const createConsignedInventory = await app.inject({
     method: "POST",
@@ -1767,6 +1805,8 @@ try {
   assert.ok(listedInventoryItem.daysInStock >= 0);
   assert.equal(listedInventoryItem.hasRelevantPending, true);
   assert.equal(listedInventoryItem.pendingSummary, "Veiculo em preparacao");
+  assert.equal(listedInventoryItem.vehicle.primaryPhotoAttachmentId, primaryPhotoAttachmentId);
+  assert.equal(listedInventoryItem.vehicle.hasPrimaryPhoto, true);
   assert.ok(listInventory.json().summary.total >= 1);
   assert.ok(listInventory.json().summary.own >= 1);
   assert.equal(typeof listInventory.json().summary.ownPercent, "number");
@@ -1935,7 +1975,18 @@ try {
   });
   assert.equal(inventoryDetailWithoutListings.statusCode, 200);
   assert.equal(inventoryDetailWithoutListings.json().data.id, inventoryId);
-  assert.deepEqual(inventoryDetailWithoutListings.json().documents, []);
+  assert.equal(inventoryDetailWithoutListings.json().data.vehicle.primaryPhotoAttachmentId, primaryPhotoAttachmentId);
+  assert.ok(
+    inventoryDetailWithoutListings
+      .json()
+      .documents.some(
+        (document: { id: string; classification: string | null; entityType: string; purpose: string | null }) =>
+          document.id === primaryPhotoAttachmentId &&
+          document.classification === "vehicle_primary_photo" &&
+          document.entityType === "vehicle" &&
+          document.purpose === "primary_photo",
+      ),
+  );
   assert.deepEqual(inventoryDetailWithoutListings.json().activeListings, []);
 
   const sellerInventoryDetail = await app.inject({
