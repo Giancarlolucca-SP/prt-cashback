@@ -247,7 +247,7 @@ export function LiveInventoryWorkspace() {
     }
 
     let isCurrent = true;
-    const query = new URLSearchParams({ page: "1", page_size: "50" });
+    const query = new URLSearchParams({ page: "1", page_size: "50", sort: "days_in_stock_desc" });
     if (activeFilter.status) query.set("status", activeFilter.status);
     if (activeFilter.ownershipType) query.set("ownership_type", activeFilter.ownershipType);
     if (search.trim()) query.set("search", search.trim());

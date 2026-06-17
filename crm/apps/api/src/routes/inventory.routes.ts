@@ -10,11 +10,15 @@ import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../sec
 
 const ownershipTypeSchema = z.enum(["OWN", "CONSIGNED", "REPASSE", "TRADE_IN"]);
 const inventoryStatusSchema = z.enum(["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REPASSE", "REMOVED"]);
+const inventorySortSchema = z
+  .enum(["days_in_stock_desc", "days_in_stock_asc", "entry_date_desc", "updated_at_desc", "price_desc", "price_asc"])
+  .default("days_in_stock_desc");
 
 const inventoryQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().trim().max(120).optional(),
+  sort: inventorySortSchema,
   status: inventoryStatusSchema.optional(),
   ownership_type: ownershipTypeSchema.optional(),
 });
@@ -158,6 +162,18 @@ function buildInventoryOperationalSummary(input: {
     consignedPercent: input.total > 0 ? consigned / input.total : 0,
     byStatus: countByStatus,
   };
+}
+
+function inventoryOrderBy(sort: z.infer<typeof inventorySortSchema>) {
+  if (sort === "entry_date_desc") return { entryDate: "desc" as const };
+  if (sort === "updated_at_desc") return { updatedAt: "desc" as const };
+  if (sort === "price_desc") return { askingPrice: "desc" as const };
+  if (sort === "price_asc") return { askingPrice: "asc" as const };
+  return { entryDate: "asc" as const };
+}
+
+function isDaysInStockSort(sort: z.infer<typeof inventorySortSchema>) {
+  return sort === "days_in_stock_desc" || sort === "days_in_stock_asc";
 }
 
 function sanitizeVehicle(vehicle: VehicleRecord) {
@@ -408,12 +424,11 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       ...(matchingVehicleIds ? { vehicleId: { in: matchingVehicleIds } } : {}),
     };
 
-    const [items, total, byOwnership, byStatus] = await Promise.all([
+    const [rawItems, total, byOwnership, byStatus] = await Promise.all([
       prisma.vehicleInventoryRecord.findMany({
         where,
-        orderBy: { entryDate: "desc" },
-        skip,
-        take,
+        orderBy: inventoryOrderBy(query.sort),
+        ...(isDaysInStockSort(query.sort) ? {} : { skip, take }),
       }),
       prisma.vehicleInventoryRecord.count({ where }),
       prisma.vehicleInventoryRecord.groupBy({
@@ -427,6 +442,14 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         _count: { _all: true },
       }),
     ]);
+    const items = isDaysInStockSort(query.sort)
+      ? [...rawItems]
+          .sort((a, b) => {
+            const direction = query.sort === "days_in_stock_asc" ? 1 : -1;
+            return (calculateDaysInStock(a) - calculateDaysInStock(b)) * direction;
+          })
+          .slice(skip, skip + take)
+      : rawItems;
     const vehicles = await prisma.vehicle.findMany({
       where: { id: { in: items.map((item) => item.vehicleId) }, storeId: session.user.storeId },
     });

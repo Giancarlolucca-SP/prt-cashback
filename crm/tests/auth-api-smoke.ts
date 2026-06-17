@@ -1739,6 +1739,17 @@ try {
   assert.equal(typeof listInventory.json().summary.ownPercent, "number");
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
 
+  const listInventoryByDaysInStock = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100&sort=days_in_stock_desc",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByDaysInStock.statusCode, 200);
+  const daysInStockOrder = listInventoryByDaysInStock.json().items.map((item: { daysInStock: number }) => item.daysInStock);
+  assert.deepEqual(daysInStockOrder, [...daysInStockOrder].sort((a, b) => b - a));
+
   const listInventoryByYear = await app.inject({
     method: "GET",
     url: "/inventory?page=1&page_size=100&search=2099",
