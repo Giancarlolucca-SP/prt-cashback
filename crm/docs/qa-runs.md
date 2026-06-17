@@ -2271,3 +2271,28 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada para fechar a S1-US05: adicionar seletor de veiculo na tela `/leads` e no fluxo de lead minimo, usando apenas estoque permitido.
+
+## 2026-06-17 - S1-US05 seletor visual de veiculo no lead
+
+Contexto:
+
+- Etapa BMAP: continuar S1-US05 levando o vinculo `Lead.vehicleId` para a experiencia de criacao de lead.
+- Foco: o vendedor/SDR consegue escolher o veiculo principal de interesse a partir do estoque permitido sem criar fluxo paralelo.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+
+Resultado:
+
+- Modal `Novo lead manual` em `/leads` carrega estoque permitido via `/inventory` e exibe seletor opcional de veiculo.
+- A lista visual filtra `REPASSE`, `REMOVED` e `SOLD`; o backend continua sendo a barreira definitiva.
+- Leads criados pela vitrine/site da loja passam a enviar `vehicleId` do anuncio selecionado.
+- Leads com veiculo vinculado ganham indicacao visual na fila priorizada.
+
+Observacoes:
+
+- Proxima melhoria recomendada: refletir o nome do veiculo vinculado no historico do lead/cliente e no card do Kanban, em vez de apenas indicar que existe vinculo.

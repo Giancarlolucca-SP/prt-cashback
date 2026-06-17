@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CalendarClock, MessageCircle, PhoneCall, Plus, Sparkles, X } from "lucide-react";
+import { AlertCircle, CalendarClock, CarFront, MessageCircle, PhoneCall, Plus, Sparkles, X } from "lucide-react";
 import { apiGet, apiPost } from "../auth/auth-client";
 import { useAuth } from "../auth/auth-provider";
 
@@ -9,6 +9,7 @@ type LeadStatus = "NEW" | "CONTACTED" | "SCHEDULED" | "NEGOTIATION" | "WON" | "L
 
 type Lead = {
   id: string;
+  vehicleId: string | null;
   source: string | null;
   title: string;
   status: LeadStatus;
@@ -90,6 +91,7 @@ type LeadHistoryResponse = {
 
 type LeadFormState = {
   title: string;
+  vehicleId: string;
   source: string;
   interest: string;
   temperature: string;
@@ -114,12 +116,27 @@ type PendingLeadOutcome = {
   toStage: LeadStatus;
 };
 
+type InventoryOption = {
+  id: string;
+  askingPrice: string | null;
+  status: string;
+  vehicleId: string;
+  vehicle: {
+    brand: string;
+    model: string;
+    version: string | null;
+    yearModel: number | null;
+    plate: string | null;
+  } | null;
+};
+
 const emptyLeadForm: LeadFormState = {
   interest: "",
   nextActionAt: "",
   source: "WhatsApp",
   temperature: "70",
   title: "",
+  vehicleId: "",
 };
 
 const emptyLeadOutcomeForm: LeadOutcomeFormState = {
@@ -136,6 +153,7 @@ const emptyLeadFollowUpForm: LeadFollowUpFormState = {
 const fallbackLeads: Lead[] = [
   {
     id: "fallback-1",
+    vehicleId: null,
     source: "WhatsApp",
     title: "Marina Souza",
     status: "NEW",
@@ -147,6 +165,7 @@ const fallbackLeads: Lead[] = [
   },
   {
     id: "fallback-2",
+    vehicleId: null,
     source: "Ligacao loja",
     title: "Paulo Lima",
     status: "SCHEDULED",
@@ -158,6 +177,7 @@ const fallbackLeads: Lead[] = [
   },
   {
     id: "fallback-3",
+    vehicleId: null,
     source: "Marketplace",
     title: "Renata Alves",
     status: "NEGOTIATION",
@@ -169,6 +189,7 @@ const fallbackLeads: Lead[] = [
   },
   {
     id: "fallback-4",
+    vehicleId: null,
     source: "Site",
     title: "Carlos Mendes",
     status: "COLD",
@@ -223,6 +244,23 @@ const defaultLeadOutcomeReasons: Record<LeadStatus, string[]> = {
   SCHEDULED: [],
   WON: ["Venda concluida", "Proposta aceita", "Cliente reservou veiculo"],
 };
+
+const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
+
+function money(value: string | null | undefined) {
+  const amount = Number(value ?? 0);
+  return amount > 0 ? currency.format(amount) : "Preco a definir";
+}
+
+function vehicleLabel(option: InventoryOption) {
+  if (!option.vehicle) {
+    return `Estoque ${option.id.slice(0, 8)}`;
+  }
+
+  return [option.vehicle.brand, option.vehicle.model, option.vehicle.version, option.vehicle.yearModel, option.vehicle.plate ? `| ${option.vehicle.plate}` : null]
+    .filter(Boolean)
+    .join(" ");
+}
 
 function humanizeSource(source: string | null) {
   return source?.trim() || "Sem origem";
@@ -308,6 +346,7 @@ export function LiveLeadsWorkspace() {
   const canReadLeads = hasPermission({ module: "leads", action: "read" });
   const canCreateLeads = hasPermission({ module: "leads", action: "create" });
   const canUpdateLeads = hasPermission({ module: "leads", action: "update" });
+  const canReadInventory = hasPermission({ module: "inventory", action: "read" });
   const canReadDashboard = hasPermission({ module: "dashboard", action: "read" });
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [leads, setLeads] = useState(fallbackLeads);
@@ -326,6 +365,8 @@ export function LiveLeadsWorkspace() {
   const [followUps, setFollowUps] = useState(fallbackFollowUps);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [inventoryOptions, setInventoryOptions] = useState<InventoryOption[]>([]);
+  const [inventoryStatus, setInventoryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [pendingOutcome, setPendingOutcome] = useState<PendingLeadOutcome | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<LeadHistoryResponse | null>(null);
   const [completingFollowUpId, setCompletingFollowUpId] = useState<string | null>(null);
@@ -392,6 +433,34 @@ export function LiveLeadsWorkspace() {
     };
   }, [activeFilter, canReadDashboard, canReadLeads, followUpPeriod, refreshKey, token]);
 
+  useEffect(() => {
+    if (!modalOpen || !token || !canReadInventory) {
+      return;
+    }
+
+    let isCurrent = true;
+    setInventoryStatus("loading");
+
+    apiGet<ListResponse<InventoryOption>>("/inventory?page=1&page_size=100", token)
+      .then((list) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setInventoryOptions(list.items.filter((item) => !["REPASSE", "REMOVED", "SOLD"].includes(item.status)));
+        setInventoryStatus("ready");
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setInventoryStatus("error");
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [canReadInventory, modalOpen, token]);
+
   async function handleCreateLead(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -409,6 +478,7 @@ export function LiveLeadsWorkspace() {
         source: form.source.trim() || undefined,
         temperature: form.temperature ? Number(form.temperature) : undefined,
         title: form.title.trim(),
+        vehicleId: form.vehicleId || undefined,
       });
 
       setLeads((current) => [response.data, ...current.filter((lead) => lead.id !== response.data.id)]);
@@ -739,6 +809,25 @@ export function LiveLeadsWorkspace() {
                   value={form.interest}
                 />
               </label>
+
+              <label className="lead-modal-wide">
+                Veiculo de interesse
+                <select
+                  disabled={!canReadInventory || inventoryStatus === "loading"}
+                  onChange={(event) => setForm((current) => ({ ...current, vehicleId: event.target.value }))}
+                  value={form.vehicleId}
+                >
+                  <option value="">{inventoryStatus === "loading" ? "Carregando estoque..." : "Sem veiculo vinculado"}</option>
+                  {inventoryOptions.map((item) => (
+                    <option key={item.id} value={item.vehicleId}>
+                      {vehicleLabel(item)} - {money(item.askingPrice)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {!canReadInventory ? <p className="lead-modal-error lead-modal-wide">Sem permissao para listar estoque; o lead sera criado sem veiculo vinculado.</p> : null}
+              {canReadInventory && inventoryStatus === "error" ? <p className="lead-modal-error lead-modal-wide">Nao foi possivel carregar o estoque permitido.</p> : null}
 
               <label>
                 Origem
@@ -1075,7 +1164,7 @@ export function LiveLeadsWorkspace() {
                 </div>
 
                 <div className="lead-next">
-                  <CalendarClock aria-hidden="true" size={16} />
+                  {lead.vehicleId ? <CarFront aria-hidden="true" size={16} /> : <CalendarClock aria-hidden="true" size={16} />}
                   <span>{nextAction(lead)}</span>
                 </div>
 

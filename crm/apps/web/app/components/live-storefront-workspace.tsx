@@ -151,6 +151,7 @@ export function LiveStorefrontWorkspace() {
         status: "NEW",
         temperature: 82,
         title: form.name.trim() ? `${form.name.trim()} interessado em ${leadModalListing.title}` : `Interessado site | ${leadModalListing.title}`,
+        vehicleId: leadModalListing.vehicleId,
       });
       setLeads((current) => [response.data, ...current.filter((lead) => lead.id !== response.data.id)]);
       setForm(emptyLeadForm);
