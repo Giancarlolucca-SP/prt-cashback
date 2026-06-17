@@ -34,6 +34,9 @@ type InventoryItem = {
   ownershipType: OwnershipType;
   status: InventoryStatus;
   ownerCustomerId: string | null;
+  responsibleUserId: string | null;
+  stockLocation: string | null;
+  stockOrigin: string | null;
   purchaseCost: string | null;
   askingPrice: string | null;
   entryDate: string;
@@ -78,7 +81,10 @@ type InventoryFormState = {
   plate: string;
   purchaseCost: string;
   relevantOptions: string;
+  responsibleUserId: string;
   status: InventoryStatus;
+  stockLocation: string;
+  stockOrigin: string;
   version: string;
   yearModel: string;
 };
@@ -132,7 +138,10 @@ const emptyForm: InventoryFormState = {
   plate: "",
   purchaseCost: "",
   relevantOptions: "",
+  responsibleUserId: "",
   status: "IN_PREPARATION",
+  stockLocation: "",
+  stockOrigin: "",
   version: "",
   yearModel: "",
 };
@@ -151,6 +160,9 @@ const fallbackItems: InventoryItem[] = [
     ownershipType: "OWN",
     status: "AVAILABLE",
     ownerCustomerId: null,
+    responsibleUserId: null,
+    stockLocation: "Showroom",
+    stockOrigin: "Compra direta",
     purchaseCost: "94000.00",
     askingPrice: "119900.00",
     entryDate: new Date(Date.now() - 47 * 86400000).toISOString(),
@@ -162,6 +174,9 @@ const fallbackItems: InventoryItem[] = [
     ownershipType: "OWN",
     status: "IN_PREPARATION",
     ownerCustomerId: null,
+    responsibleUserId: null,
+    stockLocation: "Preparacao",
+    stockOrigin: "Troca",
     purchaseCost: "108500.00",
     askingPrice: "132900.00",
     entryDate: new Date(Date.now() - 31 * 86400000).toISOString(),
@@ -268,6 +283,8 @@ export function LiveInventoryWorkspace() {
   const [saving, setSaving] = useState(false);
   const [entryDateFrom, setEntryDateFrom] = useState("");
   const [entryDateTo, setEntryDateTo] = useState("");
+  const [stockLocationFilter, setStockLocationFilter] = useState("");
+  const [stockOriginFilter, setStockOriginFilter] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<InventorySort>("days_in_stock_desc");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
@@ -286,6 +303,8 @@ export function LiveInventoryWorkspace() {
     if (activeFilter.hasRelevantPending !== undefined) query.set("has_pending", String(activeFilter.hasRelevantPending));
     if (entryDateFrom) query.set("entry_date_from", new Date(`${entryDateFrom}T00:00:00.000Z`).toISOString());
     if (entryDateTo) query.set("entry_date_to", new Date(`${entryDateTo}T23:59:59.999Z`).toISOString());
+    if (stockLocationFilter.trim()) query.set("stock_location", stockLocationFilter.trim());
+    if (stockOriginFilter.trim()) query.set("stock_origin", stockOriginFilter.trim());
     if (activeFilter.status) query.set("status", activeFilter.status);
     if (activeFilter.ownershipType) query.set("ownership_type", activeFilter.ownershipType);
     if (search.trim()) query.set("search", search.trim());
@@ -305,7 +324,7 @@ export function LiveInventoryWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canReadInventory, entryDateFrom, entryDateTo, refreshKey, search, sort, token]);
+  }, [activeFilter, canReadInventory, entryDateFrom, entryDateTo, refreshKey, search, sort, stockLocationFilter, stockOriginFilter, token]);
 
   useEffect(() => {
     if (!modalOpen || form.ownershipType !== "CONSIGNED") {
@@ -349,7 +368,10 @@ export function LiveInventoryWorkspace() {
         ownershipType: form.ownershipType,
         ownerCustomerId: form.ownershipType === "CONSIGNED" && form.ownerCustomerId ? form.ownerCustomerId : undefined,
         purchaseCost: canReadInventoryCosts && form.purchaseCost ? Number(form.purchaseCost) : undefined,
+        responsibleUserId: form.responsibleUserId || undefined,
         status: form.status,
+        stockLocation: form.stockLocation.trim() || undefined,
+        stockOrigin: form.stockOrigin.trim() || undefined,
         vehicle: {
           brand: form.brand.trim(),
           color: form.color.trim() || undefined,
@@ -507,6 +529,8 @@ export function LiveInventoryWorkspace() {
             <span className={item.ownershipType === "CONSIGNED" ? "ownership-chip consigned" : "ownership-chip"}>{ownershipLabels[item.ownershipType]}</span>
             <span>{statusLabels[item.status]}</span>
             <span>{item.notes ?? "Sem observacoes"}</span>
+            <span>{item.stockOrigin ? `Origem: ${item.stockOrigin}` : "Origem n/d"}</span>
+            <span>{item.stockLocation ? `Local: ${item.stockLocation}` : "Local n/d"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
             <span>{item.hasActiveService ? `Servico: ${item.activeService?.type ?? "em andamento"}${item.activeService?.providerName ? ` | ${item.activeService.providerName}` : ""}` : "Sem servico ativo"}</span>
@@ -521,7 +545,7 @@ export function LiveInventoryWorkspace() {
 
         <div className="vehicle-owner-row">
           <span>{item.ownershipType === "CONSIGNED" ? "Consignante" : "Proprietario"}</span>
-          <strong>{item.ownerCustomerId ? "Cliente vinculado" : item.ownershipType === "OWN" ? "GT3 Veiculos" : "Terceiro nao vinculado"}</strong>
+          <strong>{item.ownerCustomerId ? "Cliente vinculado" : item.ownershipType === "OWN" ? "GT3 Veiculos" : "Terceiro nao vinculado"}{item.responsibleUserId ? " | Responsavel vinculado" : ""}</strong>
         </div>
 
         <div className="vehicle-costs">
@@ -603,6 +627,12 @@ export function LiveInventoryWorkspace() {
           <input aria-label="Entrada final" onChange={(event) => setEntryDateTo(event.target.value)} type="date" value={entryDateTo} />
         </label>
         <label className="search-box">
+          <input aria-label="Filtrar origem do estoque" onChange={(event) => setStockOriginFilter(event.target.value)} placeholder="Origem" value={stockOriginFilter} />
+        </label>
+        <label className="search-box">
+          <input aria-label="Filtrar local do estoque" onChange={(event) => setStockLocationFilter(event.target.value)} placeholder="Patio/local" value={stockLocationFilter} />
+        </label>
+        <label className="search-box">
           <select aria-label="Ordenar estoque" onChange={(event) => setSort(event.target.value as InventorySort)} value={sort}>
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -636,6 +666,8 @@ export function LiveInventoryWorkspace() {
               <label>Placa<input value={form.plate} onChange={(event) => setForm((current) => ({ ...current, plate: event.target.value }))} /></label>
               <label>Cor<input value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} /></label>
               <label>Km<input min="0" type="number" value={form.mileage} onChange={(event) => setForm((current) => ({ ...current, mileage: event.target.value }))} /></label>
+              <label>Origem<input maxLength={80} value={form.stockOrigin} onChange={(event) => setForm((current) => ({ ...current, stockOrigin: event.target.value }))} /></label>
+              <label>Patio/local<input maxLength={80} value={form.stockLocation} onChange={(event) => setForm((current) => ({ ...current, stockLocation: event.target.value }))} /></label>
               <label>Tipo<select value={form.ownershipType} onChange={(event) => setForm((current) => ({ ...current, ownershipType: event.target.value as OwnershipType, ownerCustomerId: event.target.value === "CONSIGNED" ? current.ownerCustomerId : "" }))}>{ownershipOptions.map((item) => <option key={item} value={item}>{ownershipLabels[item]}</option>)}</select></label>
               {form.ownershipType === "CONSIGNED" ? (
                 <label>

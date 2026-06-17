@@ -23,9 +23,12 @@ const inventoryQuerySchema = z.object({
   has_pending: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
+  responsible_user_id: z.string().uuid().optional(),
   search: z.string().trim().max(120).optional(),
   sort: inventorySortSchema,
   status: inventoryStatusSchema.optional(),
+  stock_location: z.string().trim().max(80).optional(),
+  stock_origin: z.string().trim().max(80).optional(),
   ownership_type: ownershipTypeSchema.optional(),
 });
 
@@ -62,6 +65,9 @@ const createInventorySchema = z.object({
   ownershipType: ownershipTypeSchema,
   status: inventoryStatusSchema.default("IN_PREPARATION"),
   ownerCustomerId: z.string().uuid().optional(),
+  responsibleUserId: z.string().uuid().optional(),
+  stockLocation: z.string().trim().max(80).optional(),
+  stockOrigin: z.string().trim().max(80).optional(),
   purchaseCost: z.number().nonnegative().optional(),
   askingPrice: z.number().nonnegative().optional(),
   entryDate: z.coerce.date(),
@@ -79,6 +85,9 @@ const updateInventorySchema = z
     ownershipType: ownershipTypeSchema.optional(),
     status: inventoryStatusSchema.optional(),
     ownerCustomerId: z.string().uuid().nullable().optional(),
+    responsibleUserId: z.string().uuid().nullable().optional(),
+    stockLocation: z.string().trim().max(80).nullable().optional(),
+    stockOrigin: z.string().trim().max(80).nullable().optional(),
     purchaseCost: z.number().nonnegative().nullable().optional(),
     askingPrice: z.number().nonnegative().nullable().optional(),
     entryDate: z.coerce.date().optional(),
@@ -136,6 +145,9 @@ type InventoryRecord = {
   ownershipType: string;
   status: string;
   ownerCustomerId: string | null;
+  responsibleUserId: string | null;
+  stockLocation: string | null;
+  stockOrigin: string | null;
   purchaseCost: { toString(): string } | null;
   askingPrice: { toString(): string } | null;
   entryDate: Date;
@@ -244,6 +256,9 @@ function sanitizeInventory(
     ownershipType: record.ownershipType,
     status: record.status,
     ownerCustomerId: record.ownerCustomerId,
+    responsibleUserId: record.responsibleUserId,
+    stockLocation: record.stockLocation,
+    stockOrigin: record.stockOrigin,
     purchaseCost: options.includeCosts ? (record.purchaseCost?.toString() ?? null) : null,
     askingPrice: record.askingPrice?.toString() ?? null,
     entryDate: record.entryDate.toISOString(),
@@ -377,6 +392,19 @@ async function ensureCustomerInStore(storeId: string, customerId?: string | null
   }
 }
 
+async function ensureUserInStore(storeId: string, userId?: string | null) {
+  if (!userId) return;
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, storeId, deletedAt: null, isActive: true },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new ApiError("NOT_FOUND", "Responsavel do estoque nao encontrado.");
+  }
+}
+
 function enforceConsignedInventoryRules(input: {
   ownerCustomerId?: string | null;
   ownershipType: string;
@@ -492,6 +520,9 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const commonInventoryGuards: Prisma.VehicleInventoryRecordWhereInput[] = [];
     if (!query.status) commonInventoryGuards.push({ status: { notIn: ["REPASSE", "REMOVED"] } });
     if (!query.ownership_type) commonInventoryGuards.push({ ownershipType: { not: "REPASSE" } });
+    if (query.responsible_user_id) commonInventoryGuards.push({ responsibleUserId: query.responsible_user_id });
+    if (query.stock_origin) commonInventoryGuards.push({ stockOrigin: { contains: query.stock_origin, mode: "insensitive" } });
+    if (query.stock_location) commonInventoryGuards.push({ stockLocation: { contains: query.stock_location, mode: "insensitive" } });
     if (query.has_pending === true) commonInventoryGuards.push({ status: { in: relevantPendingStatuses } });
     if (query.has_pending === false) commonInventoryGuards.push({ status: { notIn: relevantPendingStatuses } });
     if (query.has_active_listing === true && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeListingVehicleIds } });
@@ -769,6 +800,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     }
     enforceConsignedInventoryRules(input);
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
+    await ensureUserInStore(session.user.storeId, input.responsibleUserId);
 
     if (input.vehicle.plate) {
       const existing = await prisma.vehicle.findFirst({
@@ -796,6 +828,9 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
           ownershipType: input.ownershipType,
           status: input.status,
           ownerCustomerId: input.ownerCustomerId,
+          responsibleUserId: input.responsibleUserId,
+          stockLocation: input.stockLocation,
+          stockOrigin: input.stockOrigin,
           purchaseCost: input.purchaseCost,
           askingPrice: input.askingPrice,
           entryDate: input.entryDate,
@@ -860,6 +895,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       purchaseCost: nextPurchaseCost,
     });
     await ensureCustomerInStore(session.user.storeId, input.ownerCustomerId);
+    await ensureUserInStore(session.user.storeId, input.responsibleUserId);
 
     const result = await prisma.$transaction(async (tx) => {
       const vehicle = input.vehicle
@@ -875,6 +911,9 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
           ownershipType: input.ownershipType,
           status: input.status,
           ownerCustomerId: input.ownerCustomerId,
+          responsibleUserId: input.responsibleUserId,
+          stockLocation: input.stockLocation,
+          stockOrigin: input.stockOrigin,
           purchaseCost: input.purchaseCost,
           askingPrice: input.askingPrice,
           entryDate: input.entryDate,

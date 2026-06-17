@@ -603,6 +603,9 @@ model VehicleInventoryRecord {
   ownershipType   VehicleOwnershipType @map("ownership_type")
   status          InventoryStatus      @default(IN_PREPARATION)
   ownerCustomerId String?              @map("owner_customer_id")
+  responsibleUserId String?            @map("responsible_user_id")
+  stockOrigin     String?              @map("stock_origin")
+  stockLocation   String?              @map("stock_location")
   purchaseCost    Decimal?             @map("purchase_cost") @db.Decimal(14, 2)
   askingPrice     Decimal?             @map("asking_price") @db.Decimal(14, 2)
   entryDate       DateTime             @default(now()) @map("entry_date")
@@ -615,6 +618,9 @@ model VehicleInventoryRecord {
   @@index([storeId, status])
   @@index([vehicleId])
   @@index([ownershipType])
+  @@index([responsibleUserId])
+  @@index([stockOrigin])
+  @@index([stockLocation])
   @@map("vehicle_inventory_records")
 }
 

@@ -1592,6 +1592,9 @@ try {
       },
       ownershipType: "OWN",
       status: "IN_PREPARATION",
+      responsibleUserId: sellerUserId,
+      stockLocation: "Patio QA",
+      stockOrigin: "Compra direta QA",
       purchaseCost: 101000,
       askingPrice: 124900,
       entryDate: "2026-06-06T12:00:00.000Z",
@@ -1601,6 +1604,9 @@ try {
   assert.equal(createInventory.statusCode, 201);
   assert.equal(createInventory.json().data.vehicle.plate, inventoryPlate);
   assert.equal(createInventory.json().data.vehicle.relevantOptions, "Teto solar, multimidia e bancos em couro");
+  assert.equal(createInventory.json().data.responsibleUserId, sellerUserId);
+  assert.equal(createInventory.json().data.stockLocation, "Patio QA");
+  assert.equal(createInventory.json().data.stockOrigin, "Compra direta QA");
   assert.equal(createInventory.json().data.purchaseCost, "101000");
   const inventoryId = createInventory.json().data.id as string;
   const inventoryVehicleId = createInventory.json().data.vehicle.id as string;
@@ -1767,6 +1773,26 @@ try {
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
   assert.equal(typeof listInventory.json().summary.activeListings, "number");
   assert.equal(typeof listInventory.json().summary.activeServices, "number");
+
+  const listInventoryByResponsible = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&responsible_user_id=${sellerUserId}&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByResponsible.statusCode, 200);
+  assert.ok(listInventoryByResponsible.json().items.some((item: { id: string }) => item.id === inventoryId));
+
+  const listInventoryByOriginLocation = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&stock_origin=${encodeURIComponent("compra direta")}&stock_location=${encodeURIComponent("patio")}&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByOriginLocation.statusCode, 200);
+  assert.ok(listInventoryByOriginLocation.json().items.some((item: { id: string }) => item.id === inventoryId));
 
   const listInventoryWithPending = await app.inject({
     method: "GET",

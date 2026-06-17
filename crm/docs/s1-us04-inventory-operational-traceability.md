@@ -1,6 +1,6 @@
 # S1-US04 Inventory Operational Traceability
 
-Status: implemented baseline with explicit deferred fields.
+Status: implemented baseline with remaining explicit deferred fields.
 
 ## Implemented Evidence
 
@@ -13,7 +13,7 @@ Status: implemented baseline with explicit deferred fields.
 | Days in stock is API-calculated | `sanitizeInventory` returns `daysInStock` from `entryDate`/`exitDate`. |
 | Summary shows total, own, consigned, status counts | `GET /inventory` returns `summary.total`, `own`, `consigned`, percentages, and `byStatus`. |
 | Summary shows active services and listings | `summary.activeServices` and `summary.activeListings` count distinct vehicles matching current filters. |
-| Filters cover status, ownership, brand/model search, period, pending, listing, service | `GET /inventory` accepts `status`, `ownership_type`, `search`, `entry_date_from`, `entry_date_to`, `has_pending`, `has_active_listing`, and `has_active_service`. |
+| Filters cover status, ownership, brand/model search, responsible user, origin, location, period, pending, listing, service | `GET /inventory` accepts `status`, `ownership_type`, `search`, `responsible_user_id`, `stock_origin`, `stock_location`, `entry_date_from`, `entry_date_to`, `has_pending`, `has_active_listing`, and `has_active_service`. |
 | Sorts cover days, update, entry date, price, brand/model, status | `sort` accepts `days_in_stock_desc`, `days_in_stock_asc`, `updated_at_desc`, `entry_date_desc`, `price_desc`, `price_asc`, `brand_model_asc`, and `status_asc`. |
 | Active listing indicator exists | List items return `hasActiveListing` and `activeListingsCount`; detail returns `activeListings`. |
 | Active service/preparation indicator exists | List/detail items return `hasActiveService` and `activeService` for non-terminal service orders. |
@@ -32,7 +32,7 @@ Status: implemented baseline with explicit deferred fields.
 - removed inventory default exclusion;
 - days-in-stock sort;
 - brand/model and status sorting;
-- pending/listing/service filters;
+- responsible/origin/location/pending/listing/service filters;
 - entry-period filter;
 - active listing indicator and detail;
 - active service indicator and detail;
@@ -47,16 +47,13 @@ Project-wide validation commands used for this story:
 
 ## Explicit Deferred Fields
 
-The following S1-US04 fields are intentionally not implemented yet because the current inventory schema does not store them on `VehicleInventoryRecord` or `Vehicle`:
+The following S1-US04 fields are intentionally not implemented yet because the current schema does not store enough data for them:
 
 | Deferred field/filter | Current status | Next required work |
 |---|---|---|
-| responsible user | Not present on inventory record. Similar `assignedUserId` fields exist in leads/appointments/evaluations, but not stock. | Add a nullable responsible user field or an assignment relation for stock. |
-| stock origin | Not present on inventory record. `origin`/`source` exist in other domains. | Add a stock-origin field or normalize origin through a configurable dictionary. |
-| yard/location | Not present on inventory record or vehicle. | Add a stock location/yard field and decide whether it belongs to inventory movement or current vehicle state. |
 | service return forecast | Not present on `ServiceOrder`. Current detail exposes `startedAt`, status, type, and provider. | Add expected return/deadline field to service orders if required by operations. |
 | primary photo URL | Not present on vehicle/inventory. Attachments exist as documents. | Add photo attachment classification or a primary media relation. |
 
 ## BMAP Note
 
-Do not mark responsible/origin/location filters as complete until their data fields exist in the model, API, UI, and smoke coverage. This avoids adding CRM scope that is not backed by the PRD/data model.
+Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Do not mark service return forecast or primary photo as complete until their data fields exist in the model, API, UI, and smoke coverage.
