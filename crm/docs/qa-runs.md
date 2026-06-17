@@ -2397,3 +2397,28 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: consolidar helper compartilhado de auditoria para evitar duplicacao entre clientes e estoque.
+
+## 2026-06-17 - S1-US06 auditoria explicita de veiculo
+
+Contexto:
+
+- Etapa BMAP: cobrir criterios de aceite de criacao e edicao de veiculo com log proprio.
+- Foco: cadastro de estoque cria/edita `vehicle`, mas a auditoria precisa permitir busca direta por `entity_type=vehicle`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Criacao de inventario agora tambem grava `audit_logs` com `entityType=vehicle` e `action=create`.
+- Edicoes de campos do veiculo dentro de `PATCH /inventory/:id` gravam `audit_logs` com `entityType=vehicle` e `action=update`.
+- O log de update de veiculo inclui `changedFields`, `changes` e `inventoryId` para rastrear o contexto do estoque.
+- Smoke cobre criacao de veiculo e edicao de quilometragem via filtros de auditoria por entidade.
+
+Observacoes:
+
+- Proxima melhoria recomendada: revisar se anexos/documentos de veiculo ja possuem o mesmo nivel de rastreabilidade em smoke dedicado.

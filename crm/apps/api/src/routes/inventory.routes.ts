@@ -972,6 +972,25 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "inventory",
+          action: "create",
+          entityType: "vehicle",
+          entityId: vehicle.id,
+          result: "SUCCESS",
+          metadata: {
+            brand: vehicle.brand,
+            inventoryId: inventory.id,
+            model: vehicle.model,
+            plate: vehicle.plate,
+          },
+        },
+      });
+
       return { inventory, vehicle };
     });
 
@@ -1005,6 +1024,12 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const ownershipTypeChanged = input.ownershipType !== undefined && input.ownershipType !== current.inventory.ownershipType;
     const changes = inventoryAuditChanges(current, input);
     const changedFields = changes.map((change) => change.field);
+    const vehicleChanges = changes
+      .filter((change) => change.field.startsWith("vehicle."))
+      .map((change) => ({
+        ...change,
+        field: change.field.replace(/^vehicle\./, ""),
+      }));
 
     enforceConsignedInventoryRules({
       ownerCustomerId: nextOwnerCustomerId,
@@ -1105,6 +1130,26 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
               fromOwnershipType: current.inventory.ownershipType,
               toOwnershipType: inventory.ownershipType,
             },
+          },
+        });
+      }
+
+      if (vehicleChanges.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "inventory",
+            action: "update",
+            entityType: "vehicle",
+            entityId: vehicle.id,
+            result: "SUCCESS",
+            metadata: {
+              changedFields: vehicleChanges.map((change) => change.field),
+              changes: vehicleChanges,
+              inventoryId: inventory.id,
+            } as Prisma.InputJsonObject,
           },
         });
       }

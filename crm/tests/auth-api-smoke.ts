@@ -1625,6 +1625,20 @@ try {
   const inventoryId = createInventory.json().data.id as string;
   const inventoryVehicleId = createInventory.json().data.vehicle.id as string;
 
+  const vehicleCreateAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=inventory&action=create&entity_type=vehicle&entity_id=${inventoryVehicleId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(vehicleCreateAudit.statusCode, 200);
+  assert.ok(
+    vehicleCreateAudit
+      .json()
+      .items.some((log: { metadata: { inventoryId?: string; plate?: string } }) => log.metadata.inventoryId === inventoryId && log.metadata.plate === inventoryPlate),
+  );
+
   const createVehicleInterestLead = await app.inject({
     method: "POST",
     url: "/leads",
@@ -2203,6 +2217,23 @@ try {
       (change: { field: string; newValue: string; oldValue: string }) =>
         change.field === "vehicle.mileage" && change.oldValue === "42000" && change.newValue === "42100",
     ),
+  );
+
+  const vehicleUpdateAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=inventory&action=update&entity_type=vehicle&entity_id=${inventoryVehicleId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(vehicleUpdateAudit.statusCode, 200);
+  assert.ok(
+    vehicleUpdateAudit
+      .json()
+      .items.some((log: { metadata: { changes?: Array<{ field: string; newValue: string; oldValue: string }>; inventoryId?: string } }) =>
+        log.metadata.inventoryId === inventoryId &&
+        log.metadata.changes?.some((change) => change.field === "mileage" && change.oldValue === "42000" && change.newValue === "42100"),
+      ),
   );
 
   const moveInventoryToNegotiation = await app.inject({
