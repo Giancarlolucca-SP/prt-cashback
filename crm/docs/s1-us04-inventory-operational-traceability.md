@@ -1,6 +1,6 @@
 # S1-US04 Inventory Operational Traceability
 
-Status: implemented baseline.
+Status: implemented baseline complete for in-scope S1-US04 criteria.
 
 ## Implemented Evidence
 
