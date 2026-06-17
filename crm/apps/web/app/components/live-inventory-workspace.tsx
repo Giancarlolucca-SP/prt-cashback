@@ -548,6 +548,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.stockOrigin ? `Origem: ${item.stockOrigin}` : "Origem n/d"}</span>
             <span>{item.stockLocation ? `Local: ${item.stockLocation}` : "Local n/d"}</span>
             <span>Entrada: {formatInventoryDate(item.entryDate)}</span>
+            <span>{item.vehicle?.color ? `Cor: ${item.vehicle.color}` : "Cor n/d"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{item.vehicle?.hasPrimaryPhoto ? "Foto principal vinculada" : "Foto principal pendente"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
