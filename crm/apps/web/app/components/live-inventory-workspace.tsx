@@ -470,6 +470,13 @@ export function LiveInventoryWorkspace() {
     loading: "Sincronizando",
     locked: "Sem permissao",
   }[status];
+  const statusMessage = {
+    error: "Nao foi possivel sincronizar o estoque agora. Mantivemos a ultima leitura local para a operacao nao parar.",
+    fallback: "Exibindo dados demonstrativos ate conectar com a API autenticada.",
+    live: null,
+    loading: "Carregando estoque operacional com filtros aplicados.",
+    locked: "Seu usuario nao possui permissao para acessar o estoque interno.",
+  }[status];
 
   const renderVehicleCard = (item: InventoryItem) => {
     const price = Number(item.askingPrice ?? 0);
@@ -766,13 +773,29 @@ export function LiveInventoryWorkspace() {
             <span><strong>{view.ownItems.length}</strong>Proprios</span>
             <span className="consigned"><strong>{view.consignedItems.length}</strong>Consignados</span>
           </div>
+          {statusMessage ? (
+            <div className={`automation-status ${status === "error" || status === "locked" ? "warning" : ""}`}>
+              <AlertTriangle aria-hidden="true" size={18} />
+              <span>{statusMessage}</span>
+            </div>
+          ) : null}
+          {status === "live" && view.ownItems.length === 0 && view.consignedItems.length === 0 ? (
+            <div className="empty-state">
+              <CarFront aria-hidden="true" size={22} />
+              Nenhum veiculo encontrado para os filtros atuais.
+            </div>
+          ) : null}
           <div className="stock-section-block">
             <header><div><p className="eyebrow">Estoque proprio</p><h4>Capital da loja em veiculos</h4></div><span>{view.ownItems.length} unidades</span></header>
-            <div className="stock-list">{view.ownItems.map(renderVehicleCard)}</div>
+            <div className="stock-list">
+              {view.ownItems.length > 0 ? view.ownItems.map(renderVehicleCard) : <div className="empty-state"><CarFront aria-hidden="true" size={22} />Nenhum veiculo proprio nesta selecao.</div>}
+            </div>
           </div>
           <div className="stock-section-block consigned">
             <header><div><p className="eyebrow">Estoque consignado</p><h4>Veiculos de terceiros sob contrato</h4></div><span>{view.consignedItems.length} unidades</span></header>
-            <div className="stock-list">{view.consignedItems.map(renderVehicleCard)}</div>
+            <div className="stock-list">
+              {view.consignedItems.length > 0 ? view.consignedItems.map(renderVehicleCard) : <div className="empty-state"><CarFront aria-hidden="true" size={22} />Nenhum consignado nesta selecao.</div>}
+            </div>
           </div>
         </section>
 
@@ -782,12 +805,19 @@ export function LiveInventoryWorkspace() {
             <Wrench aria-hidden="true" size={20} />
           </div>
           <ul className="prep-list">
-            {view.prepQueue.map((item) => (
-              <li key={item.id}>
+            {view.prepQueue.length > 0 ? (
+              view.prepQueue.map((item) => (
+                <li key={item.id}>
+                  <ClipboardList aria-hidden="true" size={18} />
+                  <div><strong>{statusLabels[item.status]}</strong><span>{vehicleTitle(item)}</span><em>Estoque | {daysInStock(item.entryDate)} dias</em></div>
+                </li>
+              ))
+            ) : (
+              <li>
                 <ClipboardList aria-hidden="true" size={18} />
-                <div><strong>{statusLabels[item.status]}</strong><span>{vehicleTitle(item)}</span><em>Estoque | {daysInStock(item.entryDate)} dias</em></div>
+                <div><strong>Sem fila de preparacao</strong><span>Nenhum veiculo em preparacao nos filtros atuais.</span><em>Estoque operacional</em></div>
               </li>
-            ))}
+            )}
           </ul>
           <div className="stock-actions">
             <button type="button"><Camera aria-hidden="true" size={17} />Fotos pendentes</button>
