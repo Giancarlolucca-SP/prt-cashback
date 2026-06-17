@@ -160,6 +160,8 @@ function calculateDaysInStock(record: Pick<InventoryRecord, "entryDate" | "exitD
 }
 
 function buildInventoryOperationalSummary(input: {
+  activeListings: number;
+  activeServices: number;
   byOwnership: Array<{ ownershipType: string; _count?: { _all?: number } }>;
   byStatus: Array<{ status: string; _count?: { _all?: number } }>;
   total: number;
@@ -171,6 +173,8 @@ function buildInventoryOperationalSummary(input: {
 
   return {
     total: input.total,
+    activeListings: input.activeListings,
+    activeServices: input.activeServices,
     own,
     consigned,
     ownPercent: input.total > 0 ? own / input.total : 0,
@@ -513,7 +517,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     };
 
     const inMemorySort = requiresInMemoryInventorySort(query.sort);
-    const [rawItems, total, byOwnership, byStatus] = await Promise.all([
+    const [rawItems, total, byOwnership, byStatus, allMatchingInventoryVehicles] = await Promise.all([
       prisma.vehicleInventoryRecord.findMany({
         where,
         orderBy: inventoryOrderBy(query.sort),
@@ -530,7 +534,36 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         where,
         _count: { _all: true },
       }),
+      prisma.vehicleInventoryRecord.findMany({
+        where,
+        select: { vehicleId: true },
+      }),
     ]);
+    const allMatchingVehicleIds = [...new Set(allMatchingInventoryVehicles.map((item) => item.vehicleId))];
+    const [summaryActiveListings, summaryActiveServices] = allMatchingVehicleIds.length
+      ? await Promise.all([
+          prisma.listing.findMany({
+            where: {
+              storeId: session.user.storeId,
+              vehicleId: { in: allMatchingVehicleIds },
+              deletedAt: null,
+              status: { in: ["PENDING", "PUBLISHED"] },
+            },
+            distinct: ["vehicleId"],
+            select: { vehicleId: true },
+          }),
+          prisma.serviceOrder.findMany({
+            where: {
+              storeId: session.user.storeId,
+              vehicleId: { in: allMatchingVehicleIds },
+              deletedAt: null,
+              status: { notIn: ["DONE", "CANCELLED"] },
+            },
+            distinct: ["vehicleId"],
+            select: { vehicleId: true },
+          }),
+        ])
+      : [[], []];
     const rawVehicles = await prisma.vehicle.findMany({
       where: { id: { in: rawItems.map((item) => item.vehicleId) }, storeId: session.user.storeId },
     });
@@ -616,7 +649,13 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         query,
         total,
       ),
-      summary: buildInventoryOperationalSummary({ byOwnership, byStatus, total }),
+      summary: buildInventoryOperationalSummary({
+        activeListings: summaryActiveListings.length,
+        activeServices: summaryActiveServices.length,
+        byOwnership,
+        byStatus,
+        total,
+      }),
     };
   });
 

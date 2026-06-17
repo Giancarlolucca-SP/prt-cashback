@@ -1765,6 +1765,8 @@ try {
   assert.ok(listInventory.json().summary.own >= 1);
   assert.equal(typeof listInventory.json().summary.ownPercent, "number");
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
+  assert.equal(typeof listInventory.json().summary.activeListings, "number");
+  assert.equal(typeof listInventory.json().summary.activeServices, "number");
 
   const listInventoryWithPending = await app.inject({
     method: "GET",
@@ -2070,6 +2072,7 @@ try {
   assert.equal(inventoryItemWithActiveService.hasActiveService, true);
   assert.equal(inventoryItemWithActiveService.activeService.id, serviceOrderId);
   assert.equal(inventoryItemWithActiveService.activeService.providerName, providerName);
+  assert.equal(listInventoryWithActiveService.json().summary.activeServices, 1);
 
   const filteredInventoryWithActiveService = await app.inject({
     method: "GET",
@@ -2397,6 +2400,7 @@ try {
   assert.ok(inventoryItemWithActiveListing);
   assert.equal(inventoryItemWithActiveListing.hasActiveListing, true);
   assert.equal(inventoryItemWithActiveListing.activeListingsCount, 1);
+  assert.equal(inventoryListWithActiveListing.json().summary.activeListings, 1);
 
   const filteredInventoryWithActiveListing = await app.inject({
     method: "GET",

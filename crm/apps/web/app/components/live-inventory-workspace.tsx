@@ -55,6 +55,8 @@ type ListResponse<T> = {
 };
 
 type InventoryOperationalSummary = {
+  activeListings?: number;
+  activeServices?: number;
   total: number;
   own: number;
   consigned: number;
@@ -442,6 +444,8 @@ export function LiveInventoryWorkspace() {
     const projectedMargin = canReadInventoryCosts ? stockItems.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0) : null;
     const avgMargin = projectedMargin !== null && totalStockValue > 0 ? projectedMargin / totalStockValue : null;
     const pending = operationalSummary?.byStatus.IN_PREPARATION ?? stockItems.filter((item) => item.status === "IN_PREPARATION").length;
+    const activeServices = operationalSummary?.activeServices ?? stockItems.filter((item) => item.hasActiveService).length;
+    const activeListings = operationalSummary?.activeListings ?? stockItems.filter((item) => item.hasActiveListing).length;
 
     return {
       consignedItems: stockItems.filter((item) => item.ownershipType === "CONSIGNED"),
@@ -455,6 +459,8 @@ export function LiveInventoryWorkspace() {
           tone: "amber",
         },
         { label: "Pendencias criticas", value: String(pending), detail: "preparacao ou remocao", tone: "rose" },
+        { label: "Em servico", value: String(activeServices), detail: "OS abertas no estoque", tone: "blue" },
+        { label: "Com anuncio", value: String(activeListings), detail: "pendente ou publicado", tone: "teal" },
       ],
       ownItems: stockItems.filter((item) => item.ownershipType !== "CONSIGNED"),
       prepQueue: stockItems.filter((item) => item.status === "IN_PREPARATION").slice(0, 4),
