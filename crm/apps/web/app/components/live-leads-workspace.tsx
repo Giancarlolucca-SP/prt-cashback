@@ -10,6 +10,14 @@ type LeadStatus = "NEW" | "CONTACTED" | "SCHEDULED" | "NEGOTIATION" | "WON" | "L
 type Lead = {
   id: string;
   vehicleId: string | null;
+  vehicle: {
+    id: string;
+    brand: string;
+    model: string;
+    version: string | null;
+    yearModel: number | null;
+    plate: string | null;
+  } | null;
   source: string | null;
   title: string;
   status: LeadStatus;
@@ -154,6 +162,7 @@ const fallbackLeads: Lead[] = [
   {
     id: "fallback-1",
     vehicleId: null,
+    vehicle: null,
     source: "WhatsApp",
     title: "Marina Souza",
     status: "NEW",
@@ -166,6 +175,7 @@ const fallbackLeads: Lead[] = [
   {
     id: "fallback-2",
     vehicleId: null,
+    vehicle: null,
     source: "Ligacao loja",
     title: "Paulo Lima",
     status: "SCHEDULED",
@@ -178,6 +188,7 @@ const fallbackLeads: Lead[] = [
   {
     id: "fallback-3",
     vehicleId: null,
+    vehicle: null,
     source: "Marketplace",
     title: "Renata Alves",
     status: "NEGOTIATION",
@@ -190,6 +201,7 @@ const fallbackLeads: Lead[] = [
   {
     id: "fallback-4",
     vehicleId: null,
+    vehicle: null,
     source: "Site",
     title: "Carlos Mendes",
     status: "COLD",
@@ -258,6 +270,16 @@ function vehicleLabel(option: InventoryOption) {
   }
 
   return [option.vehicle.brand, option.vehicle.model, option.vehicle.version, option.vehicle.yearModel, option.vehicle.plate ? `| ${option.vehicle.plate}` : null]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function leadVehicleLabel(lead: Lead) {
+  if (!lead.vehicle) {
+    return lead.vehicleId ? "Veiculo vinculado" : "Sem veiculo vinculado";
+  }
+
+  return [lead.vehicle.brand, lead.vehicle.model, lead.vehicle.version, lead.vehicle.yearModel, lead.vehicle.plate ? `| ${lead.vehicle.plate}` : null]
     .filter(Boolean)
     .join(" ");
 }
@@ -696,7 +718,7 @@ export function LiveLeadsWorkspace() {
           cards: columnLeads.map((lead) => ({
             id: lead.id,
             name: lead.title,
-            meta: `${humanizeSource(lead.source)} | ${lead.interest ?? "interesse nao informado"}`,
+            meta: `${humanizeSource(lead.source)} | ${leadVehicleLabel(lead)}`,
             status: lead.status,
             tag: lead.temperature ? `${lead.temperature}` : statusLabels[lead.status],
           })),
@@ -718,6 +740,16 @@ export function LiveLeadsWorkspace() {
   const followUpPeriodDetails = dateRangeForFollowUpPeriod(followUpPeriod);
   const leadHistoryItems = selectedHistory
     ? [
+        ...(selectedHistory.lead.vehicleId
+          ? [
+              {
+                detail: selectedHistory.lead.interest ?? "Interesse comercial vinculado ao estoque.",
+                id: `vehicle-${selectedHistory.lead.vehicleId}`,
+                meta: "Veiculo de interesse",
+                title: leadVehicleLabel(selectedHistory.lead),
+              },
+            ]
+          : []),
         ...selectedHistory.stageHistory.slice(0, 8).map((item) => ({
           detail: item.reason ?? "Sem motivo registrado",
           id: `stage-${item.id}`,
@@ -892,7 +924,7 @@ export function LiveLeadsWorkspace() {
             <form className="lead-modal-form" onSubmit={handleConfirmOutcome}>
               <div className="lead-modal-wide lead-outcome-summary">
                 <strong>{pendingOutcome.lead.title}</strong>
-                <span>{pendingOutcome.lead.interest ?? "Interesse nao informado"} | {humanizeSource(pendingOutcome.lead.source)}</span>
+                <span>{leadVehicleLabel(pendingOutcome.lead)} | {humanizeSource(pendingOutcome.lead.source)}</span>
               </div>
 
               <label className="lead-modal-wide">
@@ -952,7 +984,7 @@ export function LiveLeadsWorkspace() {
             <form className="lead-modal-form" onSubmit={handleScheduleFollowUp}>
               <div className="lead-modal-wide lead-outcome-summary">
                 <strong>{followUpLead.title}</strong>
-                <span>{followUpLead.interest ?? "Interesse nao informado"} | {humanizeSource(followUpLead.source)}</span>
+                <span>{leadVehicleLabel(followUpLead)} | {humanizeSource(followUpLead.source)}</span>
               </div>
               <label>
                 Tipo
@@ -1154,7 +1186,7 @@ export function LiveLeadsWorkspace() {
               <article className="lead-row" key={lead.id}>
                 <div className="lead-identity">
                   <strong>{lead.title}</strong>
-                  <span>{lead.interest ?? "Interesse nao informado"}</span>
+                  <span>{leadVehicleLabel(lead)} | {lead.interest ?? "Interesse nao informado"}</span>
                 </div>
 
                 <div className="lead-meta">

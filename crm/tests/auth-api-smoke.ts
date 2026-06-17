@@ -1627,6 +1627,8 @@ try {
   });
   assert.equal(createVehicleInterestLead.statusCode, 201);
   assert.equal(createVehicleInterestLead.json().data.vehicleId, inventoryVehicleId);
+  assert.equal(createVehicleInterestLead.json().data.vehicle.brand, "Honda");
+  assert.equal(createVehicleInterestLead.json().data.vehicle.model, "Civic");
 
   const prepareVehiclePrimaryPhoto = await app.inject({
     method: "POST",

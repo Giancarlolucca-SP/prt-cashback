@@ -71,6 +71,7 @@ Endpoints principais:
 - `POST /customers/:id/kanban-status`
 - `GET/POST /leads`
   - `POST/PATCH` aceitam `vehicleId` opcional para vincular o card comercial a um veiculo principal de interesse; a API valida estoque operacional permitido e bloqueia repasse, removido ou vendido com `404`.
+  - Respostas de leitura de leads incluem `vehicle` resumido quando ha `vehicleId` vinculado.
 - `GET /leads/outcome-reasons`
 - `GET /leads/follow-ups`
 - `POST /leads/follow-ups/:id/complete`

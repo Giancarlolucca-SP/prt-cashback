@@ -2296,3 +2296,29 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: refletir o nome do veiculo vinculado no historico do lead/cliente e no card do Kanban, em vez de apenas indicar que existe vinculo.
+
+## 2026-06-17 - S1-US05 resumo do veiculo no lead
+
+Contexto:
+
+- Etapa BMAP: tornar o vinculo lead x veiculo visivel no uso diario do vendedor.
+- Foco: `GET /leads`, detalhe e historico passam a carregar resumo do veiculo vinculado.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- API de leads inclui `vehicle` resumido quando existe `vehicleId`.
+- Retornos de create/update/movimentacao/follow-up tambem preservam o resumo para atualizacao imediata da UI.
+- Kanban, fila priorizada, modal de follow-up/desfecho e historico do lead exibem o nome do veiculo vinculado.
+- Smoke confirma que lead criado com veiculo retorna marca/modelo do veiculo.
+
+Observacoes:
+
+- Proxima melhoria recomendada: estender o mesmo seletor para o fluxo de lead minimo em `/clientes`.

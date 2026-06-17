@@ -181,12 +181,35 @@ type AuditLogRecord = {
   createdAt: Date;
 };
 
-function sanitizeLead(lead: LeadRecord) {
+type LeadVehicleSummary = {
+  id: string;
+  brand: string;
+  model: string;
+  version: string | null;
+  yearModel: number | null;
+  plate: string | null;
+};
+
+function sanitizeLeadVehicle(vehicle: LeadVehicleSummary | null | undefined) {
+  return vehicle
+    ? {
+        id: vehicle.id,
+        brand: vehicle.brand,
+        model: vehicle.model,
+        version: vehicle.version,
+        yearModel: vehicle.yearModel,
+        plate: vehicle.plate,
+      }
+    : null;
+}
+
+function sanitizeLead(lead: LeadRecord, vehicle?: LeadVehicleSummary | null) {
   return {
     id: lead.id,
     customerId: lead.customerId,
     assignedUserId: lead.assignedUserId,
     vehicleId: lead.vehicleId,
+    vehicle: sanitizeLeadVehicle(vehicle),
     source: lead.source,
     title: lead.title,
     status: lead.status,
@@ -337,6 +360,36 @@ async function ensureUserInStore(storeId: string, userId?: string) {
   }
 }
 
+async function vehicleSummariesById(storeId: string, vehicleIds: Array<string | null>) {
+  const ids = [...new Set(vehicleIds.filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) {
+    return new Map<string, LeadVehicleSummary>();
+  }
+
+  const vehicles = await prisma.vehicle.findMany({
+    where: {
+      id: { in: ids },
+      storeId,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      brand: true,
+      model: true,
+      version: true,
+      yearModel: true,
+      plate: true,
+    },
+  });
+
+  return new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+}
+
+async function sanitizeLeadWithVehicle(storeId: string, lead: LeadRecord) {
+  const vehiclesById = await vehicleSummariesById(storeId, [lead.vehicleId]);
+  return sanitizeLead(lead, lead.vehicleId ? vehiclesById.get(lead.vehicleId) : null);
+}
+
 async function ensureVehicleInterestAllowed(storeId: string, vehicleId?: string) {
   if (!vehicleId) {
     return;
@@ -410,8 +463,12 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       }),
       prisma.lead.count({ where }),
     ]);
+    const vehiclesById = await vehicleSummariesById(
+      session.user.storeId,
+      items.map((lead) => lead.vehicleId),
+    );
 
-    return listResponse(items.map(sanitizeLead), query, total);
+    return listResponse(items.map((lead) => sanitizeLead(lead, lead.vehicleId ? vehiclesById.get(lead.vehicleId) : null)), query, total);
   });
 
   app.get("/outcome-reasons", async (request) => {
@@ -818,8 +875,10 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       }),
     ]);
 
+    const vehiclesById = await vehicleSummariesById(session.user.storeId, [lead.vehicleId]);
+
     return {
-      lead: sanitizeLead(lead),
+      lead: sanitizeLead(lead, lead.vehicleId ? vehiclesById.get(lead.vehicleId) : null),
       stageHistory: stageHistory.map(sanitizeLeadStageHistory),
       followUps: followUps.map(sanitizeFollowUp),
       appointments: appointments.map(sanitizeAppointment),
@@ -849,7 +908,9 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Lead nao encontrado.");
     }
 
-    return { data: sanitizeLead(lead) };
+    const vehiclesById = await vehicleSummariesById(session.user.storeId, [lead.vehicleId]);
+
+    return { data: sanitizeLead(lead, lead.vehicleId ? vehiclesById.get(lead.vehicleId) : null) };
   });
 
   app.post("/", async (request, reply) => {
@@ -935,7 +996,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       payload: { customerId: lead.customerId, status: lead.status, vehicleId: lead.vehicleId },
     });
 
-    return reply.code(201).send({ data: sanitizeLead(lead) });
+    return reply.code(201).send({ data: await sanitizeLeadWithVehicle(session.user.storeId, lead) });
   });
 
   app.patch("/:id", async (request) => {
@@ -998,7 +1059,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       return updated;
     });
 
-    return { data: sanitizeLead(lead) };
+    return { data: await sanitizeLeadWithVehicle(session.user.storeId, lead) };
   });
 
   app.post("/:id/stage", async (request) => {
@@ -1033,7 +1094,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
     }
 
     if (current.status === input.toStage) {
-      return { data: sanitizeLead(current), unchanged: true };
+      return { data: await sanitizeLeadWithVehicle(session.user.storeId, current), unchanged: true };
     }
 
     const lead = await prisma.$transaction(async (tx) => {
@@ -1117,7 +1178,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       },
     });
 
-    return { data: sanitizeLead(lead), unchanged: false };
+    return { data: await sanitizeLeadWithVehicle(session.user.storeId, lead), unchanged: false };
   });
 
   app.post("/:id/follow-ups", async (request, reply) => {
@@ -1203,6 +1264,6 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       },
     });
 
-    return reply.code(201).send({ data: sanitizeLead(result.lead), followUp: sanitizeFollowUp(result.followUp) });
+    return reply.code(201).send({ data: await sanitizeLeadWithVehicle(session.user.storeId, result.lead), followUp: sanitizeFollowUp(result.followUp) });
   });
 }
