@@ -70,6 +70,7 @@ Endpoints principais:
   - Registra observacao manual, atendimento, follow-up ou outro evento operacional na timeline do cliente, respeitando escopo/carteira.
 - `POST /customers/:id/kanban-status`
 - `GET/POST /leads`
+  - `POST/PATCH` aceitam `vehicleId` opcional para vincular o card comercial a um veiculo principal de interesse; a API valida estoque operacional permitido e bloqueia repasse, removido ou vendido com `404`.
 - `GET /leads/outcome-reasons`
 - `GET /leads/follow-ups`
 - `POST /leads/follow-ups/:id/complete`

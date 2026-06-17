@@ -2242,3 +2242,32 @@ Observacoes:
 
 - O smoke de auth/API passou apos as mudancas nos schemas.
 - Proxima melhoria recomendada: adicionar casos negativos de API para pelo menos um endpoint novo protegido fora de mensagens, por exemplo follow-up ou estoque.
+
+## 2026-06-17 - S1-US05 vinculo lead x veiculo de interesse
+
+Contexto:
+
+- Etapa BMAP: iniciar a historia S1-US05 pelo contrato backend, reaproveitando `Lead` e `LeadCard` como card comercial.
+- Foco: permitir um veiculo principal de interesse por lead sem misturar com reserva formal, venda/documentacao ou modulo de repasse.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npx prisma validate --schema packages/db/prisma/schema.prisma` | Passou |
+| `npm run db:generate` | Passou |
+| `npm run db:deploy` | Passou |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+| `npm run build:web` | Passou |
+
+Resultado:
+
+- `Lead` ganhou `vehicleId` opcional e indice dedicado.
+- `POST/PATCH /leads` validam que o veiculo pertence a loja, esta ativo e possui inventario operacional permitido.
+- Veiculos `REPASSE`, `REMOVED` ou `SOLD` sao bloqueados como interesse comercial via `404`.
+- Smoke cobre criacao de lead com veiculo valido e tentativa de selecionar veiculo de repasse.
+
+Observacoes:
+
+- Proxima melhoria recomendada para fechar a S1-US05: adicionar seletor de veiculo na tela `/leads` e no fluxo de lead minimo, usando apenas estoque permitido.

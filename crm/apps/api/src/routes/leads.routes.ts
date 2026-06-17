@@ -36,6 +36,7 @@ const followUpsQuerySchema = z.object({
 const createLeadSchema = z.object({
   customerId: z.string().uuid().optional(),
   assignedUserId: z.string().uuid().optional(),
+  vehicleId: z.string().uuid().optional(),
   source: z.string().trim().max(80).optional(),
   title: z.string().trim().min(2).max(180),
   status: leadStatusSchema.default("NEW"),
@@ -117,6 +118,7 @@ type LeadRecord = {
   id: string;
   customerId: string | null;
   assignedUserId: string | null;
+  vehicleId: string | null;
   source: string | null;
   title: string;
   status: string;
@@ -184,6 +186,7 @@ function sanitizeLead(lead: LeadRecord) {
     id: lead.id,
     customerId: lead.customerId,
     assignedUserId: lead.assignedUserId,
+    vehicleId: lead.vehicleId,
     source: lead.source,
     title: lead.title,
     status: lead.status,
@@ -331,6 +334,41 @@ async function ensureUserInStore(storeId: string, userId?: string) {
 
   if (!user) {
     throw new ApiError("NOT_FOUND", "Responsavel do lead nao encontrado.");
+  }
+}
+
+async function ensureVehicleInterestAllowed(storeId: string, vehicleId?: string) {
+  if (!vehicleId) {
+    return;
+  }
+
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: vehicleId,
+      storeId,
+      deletedAt: null,
+      status: "ACTIVE",
+    },
+    select: { id: true },
+  });
+
+  if (!vehicle) {
+    throw new ApiError("NOT_FOUND", "Veiculo de interesse nao encontrado no estoque comercial permitido.");
+  }
+
+  const inventory = await prisma.vehicleInventoryRecord.findFirst({
+    where: {
+      storeId,
+      vehicleId,
+      deletedAt: null,
+      ownershipType: { not: "REPASSE" },
+      status: { notIn: ["REPASSE", "REMOVED", "SOLD"] },
+    },
+    select: { id: true },
+  });
+
+  if (!inventory) {
+    throw new ApiError("NOT_FOUND", "Veiculo de interesse nao encontrado no estoque comercial permitido.");
   }
 }
 
@@ -826,6 +864,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
 
     await ensureCustomerInStore(session.user.storeId, input.customerId);
     await ensureUserInStore(session.user.storeId, assignedUserId);
+    await ensureVehicleInterestAllowed(session.user.storeId, input.vehicleId);
 
     const lead = await prisma.$transaction(async (tx) => {
       const created = await tx.lead.create({
@@ -833,6 +872,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
           storeId: session.user.storeId,
           customerId: input.customerId,
           assignedUserId,
+          vehicleId: input.vehicleId,
           source: input.source,
           title: input.title,
           status: input.status,
@@ -876,6 +916,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
           metadata: {
             customerId: created.customerId,
             assignedUserId: created.assignedUserId,
+            vehicleId: created.vehicleId,
             source: created.source,
             status: created.status,
           },
@@ -891,7 +932,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
       actorId: session.user.id,
       entityType: "lead",
       entityId: lead.id,
-      payload: { customerId: lead.customerId, status: lead.status },
+      payload: { customerId: lead.customerId, status: lead.status, vehicleId: lead.vehicleId },
     });
 
     return reply.code(201).send({ data: sanitizeLead(lead) });
@@ -930,6 +971,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
 
     await ensureCustomerInStore(session.user.storeId, input.customerId);
     await ensureUserInStore(session.user.storeId, input.assignedUserId);
+    await ensureVehicleInterestAllowed(session.user.storeId, input.vehicleId);
 
     const lead = await prisma.$transaction(async (tx) => {
       const updated = await tx.lead.update({

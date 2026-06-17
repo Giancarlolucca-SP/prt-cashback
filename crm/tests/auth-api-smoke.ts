@@ -1611,6 +1611,23 @@ try {
   const inventoryId = createInventory.json().data.id as string;
   const inventoryVehicleId = createInventory.json().data.vehicle.id as string;
 
+  const createVehicleInterestLead = await app.inject({
+    method: "POST",
+    url: "/leads",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      customerId: createdCustomerId,
+      title: "Interesse em veiculo do estoque QA",
+      source: "showroom",
+      interest: "Honda Civic Touring em estoque",
+      vehicleId: inventoryVehicleId,
+    },
+  });
+  assert.equal(createVehicleInterestLead.statusCode, 201);
+  assert.equal(createVehicleInterestLead.json().data.vehicleId, inventoryVehicleId);
+
   const prepareVehiclePrimaryPhoto = await app.inject({
     method: "POST",
     url: "/files/prepare-upload",
@@ -2959,6 +2976,23 @@ try {
   });
   assert.equal(repasseInventory.statusCode, 200);
   assert.equal(repasseInventory.json().data.status, "REPASSE");
+
+  const createRepasseInterestLead = await app.inject({
+    method: "POST",
+    url: "/leads",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      customerId: createdCustomerId,
+      title: "Interesse bloqueado em repasse QA",
+      source: "showroom",
+      interest: "Toyota Corolla repasse",
+      vehicleId: repasseVehicleId,
+    },
+  });
+  assert.equal(createRepasseInterestLead.statusCode, 404);
+  assert.equal(createRepasseInterestLead.json().error.code, "NOT_FOUND");
 
   const invalidRepasseTransition = await app.inject({
     method: "PATCH",
