@@ -555,7 +555,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.hasActiveService ? `Servico: ${item.activeService?.type ?? "em andamento"}${item.activeService?.providerName ? ` | ${item.activeService.providerName}` : ""}` : "Sem servico ativo"}</span>
             <span>{item.activeService?.expectedReturnAt ? `Retorno: ${new Date(item.activeService.expectedReturnAt).toLocaleDateString("pt-BR")}` : "Retorno n/d"}</span>
             <span>{item.hasRelevantPending ? item.pendingSummary ?? "Pendencia relevante" : "Sem pendencia relevante"}</span>
-            <span>{operationalDaysInStock(item)} dias</span>
+            <span>Estoque: {operationalDaysInStock(item)} dias</span>
           </div>
           <div className="vehicle-price">
             <strong>{money(item.askingPrice)}</strong>

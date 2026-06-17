@@ -14,6 +14,7 @@ Status: implemented baseline.
 | Stock cards show vehicle color | `LiveInventoryWorkspace` renders `vehicle.color` as a `Cor` chip when available. |
 | Negotiation status exists in stock flow | `InventoryStatus.NEGOTIATION` is accepted by API filters/updates and rendered as `Em negociacao`. |
 | Days in stock is API-calculated | `sanitizeInventory` returns `daysInStock` from `entryDate`/`exitDate`. |
+| Stock cards show days in stock label | `LiveInventoryWorkspace` renders `Estoque: N dias` on each stock card. |
 | Summary shows total, own, consigned, status counts and pending count | `GET /inventory` returns `summary.total`, `own`, `consigned`, percentages, `byStatus`, and `relevantPending`. |
 | Summary shows active services and listings | `summary.activeServices` and `summary.activeListings` count distinct vehicles matching current filters. |
 | Filters cover status, ownership, brand/model search, responsible user, origin, location, period, pending, listing, service | `GET /inventory` accepts `status`, `ownership_type`, `search`, `responsible_user_id`, `stock_origin`, `stock_location`, `entry_date_from`, `entry_date_to`, `has_pending`, `has_active_listing`, and `has_active_service`. |
