@@ -1755,6 +1755,8 @@ try {
   assert.ok(listedInventoryItem);
   assert.equal(typeof listedInventoryItem.daysInStock, "number");
   assert.ok(listedInventoryItem.daysInStock >= 0);
+  assert.equal(listedInventoryItem.hasRelevantPending, true);
+  assert.equal(listedInventoryItem.pendingSummary, "Veiculo em preparacao");
   assert.ok(listInventory.json().summary.total >= 1);
   assert.ok(listInventory.json().summary.own >= 1);
   assert.equal(typeof listInventory.json().summary.ownPercent, "number");

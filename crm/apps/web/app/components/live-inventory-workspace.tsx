@@ -31,7 +31,9 @@ type InventoryItem = {
   activeListingsCount?: number;
   daysInStock?: number;
   hasActiveListing?: boolean;
+  hasRelevantPending?: boolean;
   notes: string | null;
+  pendingSummary?: string | null;
 };
 
 type ListResponse<T> = {
@@ -462,6 +464,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.notes ?? "Sem observacoes"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
+            <span>{item.hasRelevantPending ? item.pendingSummary ?? "Pendencia relevante" : "Sem pendencia relevante"}</span>
             <span>{operationalDaysInStock(item)} dias</span>
           </div>
           <div className="vehicle-price">

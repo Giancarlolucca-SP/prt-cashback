@@ -176,6 +176,12 @@ function isDaysInStockSort(sort: z.infer<typeof inventorySortSchema>) {
   return sort === "days_in_stock_desc" || sort === "days_in_stock_asc";
 }
 
+function relevantPendingSummary(status: string) {
+  if (status === "IN_PREPARATION") return "Veiculo em preparacao";
+  if (status === "REMOVED") return "Veiculo removido/inativo";
+  return null;
+}
+
 function sanitizeVehicle(vehicle: VehicleRecord) {
   return {
     id: vehicle.id,
@@ -202,6 +208,7 @@ function sanitizeInventory(
   options: { activeListingsCount?: number; includeCosts: boolean },
 ) {
   const activeListingsCount = options.activeListingsCount ?? 0;
+  const pendingSummary = relevantPendingSummary(record.status);
   return {
     id: record.id,
     vehicleId: record.vehicleId,
@@ -216,7 +223,9 @@ function sanitizeInventory(
     daysInStock: calculateDaysInStock(record),
     activeListingsCount,
     hasActiveListing: activeListingsCount > 0,
+    hasRelevantPending: pendingSummary !== null,
     notes: record.notes,
+    pendingSummary,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
