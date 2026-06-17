@@ -179,6 +179,7 @@ function buildInventoryOperationalSummary(input: {
   activeServices: number;
   byOwnership: Array<{ ownershipType: string; _count?: { _all?: number } }>;
   byStatus: Array<{ status: string; _count?: { _all?: number } }>;
+  relevantPending: number;
   total: number;
 }) {
   const countByOwnership = Object.fromEntries(input.byOwnership.map((item) => [item.ownershipType, item._count?._all ?? 0]));
@@ -190,7 +191,7 @@ function buildInventoryOperationalSummary(input: {
     total: input.total,
     activeListings: input.activeListings,
     activeServices: input.activeServices,
-    relevantPending: relevantPendingStatuses.reduce((sum, status) => sum + (countByStatus[status] ?? 0), 0),
+    relevantPending: input.relevantPending,
     own,
     consigned,
     ownPercent: input.total > 0 ? own / input.total : 0,
@@ -225,6 +226,12 @@ function relevantPendingSummary(status: string) {
 }
 
 const relevantPendingStatuses: PrismaInventoryStatus[] = ["IN_PREPARATION", "REMOVED"];
+const relevantPendingWhere: Prisma.VehicleInventoryRecordWhereInput = {
+  OR: [{ status: { in: relevantPendingStatuses } }, { askingPrice: null }, { askingPrice: { lte: 0 } }],
+};
+const withoutRelevantPendingWhere: Prisma.VehicleInventoryRecordWhereInput = {
+  AND: [{ status: { notIn: relevantPendingStatuses } }, { askingPrice: { not: null } }, { askingPrice: { gt: 0 } }],
+};
 
 function sanitizeVehicle(vehicle: VehicleRecord) {
   return {
@@ -254,7 +261,7 @@ function sanitizeInventory(
   options: { activeListingsCount?: number; activeService?: InventoryServiceSummary; includeCosts: boolean },
 ) {
   const activeListingsCount = options.activeListingsCount ?? 0;
-  const pendingSummary = relevantPendingSummary(record.status);
+  const pendingSummary = relevantPendingSummary(record.status) ?? (Number(record.askingPrice ?? 0) <= 0 ? "Preco anunciado pendente" : null);
   return {
     id: record.id,
     vehicleId: record.vehicleId,
@@ -569,8 +576,8 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     if (query.responsible_user_id) commonInventoryGuards.push({ responsibleUserId: query.responsible_user_id });
     if (query.stock_origin) commonInventoryGuards.push({ stockOrigin: { contains: query.stock_origin, mode: "insensitive" } });
     if (query.stock_location) commonInventoryGuards.push({ stockLocation: { contains: query.stock_location, mode: "insensitive" } });
-    if (query.has_pending === true) commonInventoryGuards.push({ status: { in: relevantPendingStatuses } });
-    if (query.has_pending === false) commonInventoryGuards.push({ status: { notIn: relevantPendingStatuses } });
+    if (query.has_pending === true) commonInventoryGuards.push(relevantPendingWhere);
+    if (query.has_pending === false) commonInventoryGuards.push(withoutRelevantPendingWhere);
     if (query.has_active_listing === true && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeListingVehicleIds } });
     if (query.has_active_listing === false && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { notIn: activeListingVehicleIds } });
     if (query.has_active_service === true && activeServiceVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeServiceVehicleIds } });
@@ -617,8 +624,14 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       }),
     ]);
     const allMatchingVehicleIds = [...new Set(allMatchingInventoryVehicles.map((item) => item.vehicleId))];
-    const [summaryActiveListings, summaryActiveServices] = allMatchingVehicleIds.length
+    const [summaryRelevantPending, summaryActiveListings, summaryActiveServices] = allMatchingVehicleIds.length
       ? await Promise.all([
+          prisma.vehicleInventoryRecord.count({
+            where: {
+              ...where,
+              AND: [...(Array.isArray(where.AND) ? where.AND : []), relevantPendingWhere],
+            },
+          }),
           prisma.listing.findMany({
             where: {
               storeId: session.user.storeId,
@@ -640,7 +653,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
             select: { vehicleId: true },
           }),
         ])
-      : [[], []];
+      : [0, [], []];
     const rawVehicles = await prisma.vehicle.findMany({
       where: { id: { in: rawItems.map((item) => item.vehicleId) }, storeId: session.user.storeId },
     });
@@ -733,6 +746,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         activeServices: summaryActiveServices.length,
         byOwnership,
         byStatus,
+        relevantPending: summaryRelevantPending,
         total,
       }),
     };

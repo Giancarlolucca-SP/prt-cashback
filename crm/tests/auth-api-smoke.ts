@@ -1841,6 +1841,42 @@ try {
   assert.equal(soldDaysItem.exitDate, "2026-06-11T12:00:00.000Z");
   assert.equal(soldDaysItem.daysInStock, 10);
 
+  const pricePendingPlate = uniquePlate("PP");
+  const createPricePendingInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Hyundai",
+        model: "HB20",
+        yearModel: 2024,
+        plate: pricePendingPlate,
+      },
+      ownershipType: "OWN",
+      status: "AVAILABLE",
+      entryDate: "2026-06-06T12:00:00.000Z",
+    },
+  });
+  assert.equal(createPricePendingInventory.statusCode, 201);
+  const pricePendingInventoryId = createPricePendingInventory.json().data.id as string;
+
+  const listPricePendingInventory = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&has_pending=true&search=${encodeURIComponent(pricePendingPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listPricePendingInventory.statusCode, 200);
+  const pricePendingItem = listPricePendingInventory.json().items.find((item: { id: string }) => item.id === pricePendingInventoryId);
+  assert.ok(pricePendingItem);
+  assert.equal(pricePendingItem.hasRelevantPending, true);
+  assert.equal(pricePendingItem.pendingSummary, "Preco anunciado pendente");
+  assert.equal(listPricePendingInventory.json().summary.relevantPending, 1);
+
   const listInventory = await app.inject({
     method: "GET",
     url: `/inventory?page=1&page_size=5&search=${encodeURIComponent(inventoryPlate)}`,
@@ -1863,7 +1899,7 @@ try {
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
   assert.equal(typeof listInventory.json().summary.activeListings, "number");
   assert.equal(typeof listInventory.json().summary.activeServices, "number");
-  assert.equal(listInventory.json().summary.relevantPending, listInventory.json().summary.byStatus.IN_PREPARATION);
+  assert.ok(listInventory.json().summary.relevantPending >= listInventory.json().summary.byStatus.IN_PREPARATION);
 
   const listInventoryByResponsible = await app.inject({
     method: "GET",

@@ -22,7 +22,7 @@ Status: implemented baseline.
 | Active listing indicator exists | List items return `hasActiveListing` and `activeListingsCount`; detail returns `activeListings`. |
 | Active service/preparation indicator exists | List/detail items return `hasActiveService` and `activeService` for non-terminal service orders, including expected return when available. |
 | Primary vehicle photo indicator exists | Vehicles store `primaryPhotoAttachmentId` as an internal file attachment reference; list/detail items return `hasPrimaryPhoto` without accepting arbitrary remote URLs. |
-| Relevant pending indicator exists | List items return `hasRelevantPending` and `pendingSummary`. |
+| Relevant pending indicator exists | List items return `hasRelevantPending` and `pendingSummary` for preparation/removal status and missing advertised price. |
 | Cost fields are permission-protected | `purchaseCost` is returned only when the user has `inventory:read_costs`. |
 | Status updates are audited | Inventory updates write `auditLog` entries and `vehicleStatusHistory` on status changes. |
 | Screen states exist | The stock workspace shows loading, fallback, error, locked, and empty states. |
@@ -42,6 +42,7 @@ Status: implemented baseline.
 - brand/model and status sorting;
 - negotiation status update and filtering;
 - responsible/origin/location/pending/listing/service filters;
+- commercial pending indicator for missing advertised price;
 - entry-period filter;
 - active listing indicator and detail;
 - active service indicator/detail with expected return;
