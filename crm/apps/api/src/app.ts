@@ -32,6 +32,7 @@ import { registerSecurityHoneypotRoutes } from "./routes/security-honeypot.route
 import { registerServiceRoutes } from "./routes/services.routes.js";
 import { registerSettingRoutes } from "./routes/settings.routes.js";
 import { registerUserRoutes } from "./routes/users.routes.js";
+import { registerTechnicalDeliveryRoutes } from "./routes/technical-deliveries.routes.js";
 import { registerWebhookRoutes } from "./routes/webhooks.routes.js";
 import { registerRateLimit } from "./security/rate-limit.js";
 
@@ -82,6 +83,7 @@ export function buildApp() {
   app.register(registerRepasseRoutes, { prefix: "/repasse" });
   app.register(registerServiceRoutes, { prefix: "/services" });
   app.register(registerSettingRoutes, { prefix: "/settings" });
+  app.register(registerTechnicalDeliveryRoutes, { prefix: "/technical-deliveries" });
   app.register(registerUserRoutes, { prefix: "/users" });
   app.register(registerFileRoutes, { prefix: "/files" });
   app.register(registerJobRoutes, { prefix: "/jobs" });

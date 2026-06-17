@@ -841,6 +841,36 @@ model DeliveryChecklist {
   @@map("delivery_checklists")
 }
 
+model TechnicalDelivery {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  saleId              String    @map("sale_id")
+  vehicleId           String    @map("vehicle_id")
+  customerId          String    @map("customer_id")
+  sellerUserId        String?   @map("seller_user_id")
+  scheduledByUserId   String    @map("scheduled_by_user_id")
+  responsibleUserId   String?   @map("responsible_user_id")
+  scheduledAt         DateTime  @map("scheduled_at")
+  status              String    @default("SCHEDULED") @map("delivery_status")
+  checklistSnapshot   Json?     @map("checklist_snapshot")
+  documentGeneratedAt DateTime? @map("document_generated_at")
+  documentFileId      String?   @map("document_file_id")
+  printStatus         String    @default("PENDING") @map("print_status")
+  printedAt           DateTime? @map("printed_at")
+  signedCopyStatus    String    @default("PENDING") @map("signed_copy_status")
+  signedCopyFileId    String?   @map("signed_copy_file_id")
+  completedAt         DateTime? @map("completed_at")
+  cancelReason        String?   @map("cancel_reason")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@unique([storeId, saleId])
+  @@index([storeId, scheduledAt])
+  @@index([storeId, status])
+  @@index([sellerUserId])
+  @@map("technical_deliveries")
+}
+
 model DispatcherProcess {
   id         String   @id @default(uuid())
   storeId    String   @map("store_id")

@@ -2496,3 +2496,33 @@ Resultado:
 Observacoes:
 
 - S1-US06 fica concluida para o MVP: auditoria minima cobre clientes, leads, veiculos, estoque, documentos, cards comerciais, Kanban, permissao e mascaramento sensivel.
+
+## 2026-06-17 - S2-US06 base de entrega tecnica
+
+Contexto:
+
+- Etapa BMAP: iniciar Sprint 2 pela entrega tecnica aberta no editor.
+- Foco: criar entidade transacional e agendamento bloqueado por pre-requisitos.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npx prisma validate --schema packages/db/prisma/schema.prisma` | Passou |
+| `npm run db:generate` | Passou |
+| `npm run db:deploy` | Passou |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Criada tabela `technical_deliveries` vinculada a venda, veiculo, cliente, vendedor, agendador e responsavel.
+- Criada rota `/technical-deliveries` com listagem, detalhe e agendamento.
+- Agendamento exige contrato assinado, documentos do comprador entregues/conferidos e recebimento financeiro pago vinculado a venda.
+- Vendedor nao agenda entrega tecnica; Administrativo/Gestao/Admin agenda.
+- Vendedor visualiza entregas tecnicas das proprias vendas.
+- Reagendamento atualiza data/status e grava auditoria com data anterior e nova.
+
+Observacoes:
+
+- Proxima melhoria recomendada: gerar o documento/PDF de entrega tecnica preenchido automaticamente com checklist manual.

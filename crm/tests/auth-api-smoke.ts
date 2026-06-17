@@ -4024,6 +4024,21 @@ try {
   assert.equal(signContract.json().data.status, "SIGNED");
   assert.equal(signContract.json().data.signedAt, financeDueAt);
 
+  const blockedTechnicalDeliverySchedule = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      saleId,
+      scheduledAt: new Date(new Date(financeDueAt).getTime() + 3600000).toISOString(),
+    },
+  });
+  assert.equal(blockedTechnicalDeliverySchedule.statusCode, 422);
+  assert.equal(blockedTechnicalDeliverySchedule.json().error.code, "BUSINESS_RULE_ERROR");
+  assert.ok(blockedTechnicalDeliverySchedule.json().error.details.pendingPrerequisites.includes("buyer_documents_checked"));
+
   const warrantyTerm = await app.inject({
     method: "POST",
     url: "/contracts/warranty-terms",
@@ -4060,6 +4075,117 @@ try {
   assert.equal(deliveryChecklist.statusCode, 201);
   assert.equal(deliveryChecklist.json().data.status, "DELIVERED");
   assert.equal(deliveryChecklist.json().data.deliveredAt, financeDueAt);
+
+  await prisma.saleDocumentChecklist.createMany({
+    data: [
+      {
+        storeId: ownerBody.user.storeId,
+        saleId,
+        itemKey: "buyer_document_delivered",
+        label: "Documentos do comprador entregues",
+        isDone: true,
+        completedAt: new Date(financeDueAt),
+      },
+      {
+        storeId: ownerBody.user.storeId,
+        saleId,
+        itemKey: "buyer_document_checked",
+        label: "Documentos do comprador conferidos",
+        isDone: true,
+        completedAt: new Date(financeDueAt),
+      },
+    ],
+  });
+
+  const administrativeLogin = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: {
+      email: "administrativo@gt3.local",
+      password: "Gt3@2026dev",
+    },
+  });
+  assert.equal(administrativeLogin.statusCode, 200);
+  const administrativeBody = administrativeLogin.json() as { token: string; user: { id: string } };
+  const technicalDeliveryAt = new Date(new Date(financeDueAt).getTime() + 7200000).toISOString();
+
+  const sellerScheduleTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+    payload: {
+      saleId,
+      scheduledAt: technicalDeliveryAt,
+    },
+  });
+  assert.equal(sellerScheduleTechnicalDelivery.statusCode, 403);
+
+  const scheduleTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: {
+      authorization: `Bearer ${administrativeBody.token}`,
+    },
+    payload: {
+      saleId,
+      scheduledAt: technicalDeliveryAt,
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(scheduleTechnicalDelivery.statusCode, 201);
+  assert.equal(scheduleTechnicalDelivery.json().data.saleId, saleId);
+  assert.equal(scheduleTechnicalDelivery.json().data.status, "SCHEDULED");
+  assert.equal(scheduleTechnicalDelivery.json().data.vehicleId, inventoryVehicleId);
+  assert.equal(scheduleTechnicalDelivery.json().data.customerId, createdCustomerId);
+  const technicalDeliveryId = scheduleTechnicalDelivery.json().data.id as string;
+
+  const sellerTechnicalDeliveries = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries?sale_id=${saleId}`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerTechnicalDeliveries.statusCode, 200);
+  assert.ok(sellerTechnicalDeliveries.json().items.some((delivery: { id: string }) => delivery.id === technicalDeliveryId));
+
+  const rescheduledTechnicalDeliveryAt = new Date(new Date(financeDueAt).getTime() + 10800000).toISOString();
+  const rescheduleTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: {
+      authorization: `Bearer ${administrativeBody.token}`,
+    },
+    payload: {
+      saleId,
+      scheduledAt: rescheduledTechnicalDeliveryAt,
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(rescheduleTechnicalDelivery.statusCode, 200);
+  assert.equal(rescheduleTechnicalDelivery.json().data.status, "RESCHEDULED");
+  assert.equal(rescheduleTechnicalDelivery.json().data.scheduledAt, rescheduledTechnicalDeliveryAt);
+
+  const technicalDeliveryAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=technical_deliveries&action=technical_delivery_rescheduled&entity_type=technical_delivery&entity_id=${technicalDeliveryId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(technicalDeliveryAudit.statusCode, 200);
+  assert.ok(
+    technicalDeliveryAudit
+      .json()
+      .items.some(
+        (log: { metadata: { saleId?: string; previousScheduledAt?: string | null; scheduledAt?: string } }) =>
+          log.metadata.saleId === saleId &&
+          log.metadata.previousScheduledAt === technicalDeliveryAt &&
+          log.metadata.scheduledAt === rescheduledTechnicalDeliveryAt,
+      ),
+  );
 
   const sellerDispatch = await app.inject({
     method: "GET",
