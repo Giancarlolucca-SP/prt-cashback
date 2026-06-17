@@ -12,6 +12,12 @@ import {
   technicalDeliveryDocumentNumber,
   type TechnicalDeliveryChecklistItem,
 } from "../services/technical-delivery-document.js";
+import {
+  canCancel,
+  canMarkPrinted,
+  canRegisterSignedCopy,
+  type TechnicalDeliveryStatus,
+} from "../services/technical-delivery-status.js";
 
 const deliveryStatusSchema = z.enum([
   "AWAITING_PREREQUISITES",
@@ -46,6 +52,22 @@ const scheduleTechnicalDeliverySchema = z.object({
   saleId: z.string().uuid(),
   scheduledAt: z.coerce.date(),
   responsibleUserId: z.string().uuid().optional(),
+});
+
+const printTechnicalDeliverySchema = z
+  .object({
+    // Optional hint for environments with a configured printer. With no printer the
+    // system falls back to a print-ready PDF/HTML document (manual print).
+    printerConfigured: z.coerce.boolean().default(false),
+  })
+  .default({ printerConfigured: false });
+
+const registerSignedCopySchema = z.object({
+  signedCopyFileId: z.string().uuid(),
+});
+
+const cancelTechnicalDeliverySchema = z.object({
+  reason: z.string().trim().min(8).max(300),
 });
 
 const allowedSchedulerRoles = new Set(["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"]);
@@ -625,5 +647,80 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       document,
       html,
     };
+  });
+
+  app.post("/:id/print", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "sales",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    assertCanScheduleTechnicalDelivery(session.user.role);
+    const params = technicalDeliveryParamsSchema.parse(request.params);
+    const input = printTechnicalDeliverySchema.parse(request.body ?? {});
+
+    const delivery = await prisma.technicalDelivery.findFirst({
+      where: { id: params.id, storeId: session.user.storeId },
+    });
+
+    if (!delivery) {
+      throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
+    }
+
+    if (!delivery.documentFileId) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Documento de entrega tecnica ainda nao gerado.");
+    }
+
+    if (!canMarkPrinted(delivery.status as TechnicalDeliveryStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica nao pode ser impressa no status atual.", {
+        status: delivery.status,
+      });
+    }
+
+    const printedAt = new Date();
+    // No advanced printer integration in this sprint: with a configured printer the
+    // document is sent to print; otherwise the system provides a print-ready PDF/HTML.
+    const printMode = input.printerConfigured ? "printer" : "manual_pdf";
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.technicalDelivery.update({
+        where: { id: delivery.id },
+        data: { status: "PRINTED_PENDING_SIGNATURE", printStatus: "PRINTED", printedAt },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "technical_deliveries",
+          action: "technical_delivery_printed",
+          entityType: "technical_delivery",
+          entityId: delivery.id,
+          result: "SUCCESS",
+          metadata: {
+            previousStatus: delivery.status,
+            status: next.status,
+            printMode,
+            printerConfigured: input.printerConfigured,
+            documentFileId: delivery.documentFileId,
+            printedAt: printedAt.toISOString(),
+          },
+        },
+      });
+
+      return next;
+    });
+
+    return reply.code(200).send({
+      data: sanitizeTechnicalDelivery(updated),
+      print: {
+        mode: printMode,
+        printedAt: printedAt.toISOString(),
+        documentFileId: delivery.documentFileId,
+        printableDocumentUrl: `/technical-deliveries/${delivery.id}/document?format=html`,
+      },
+    });
   });
 }
