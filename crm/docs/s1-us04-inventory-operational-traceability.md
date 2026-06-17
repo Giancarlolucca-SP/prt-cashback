@@ -22,6 +22,7 @@ Status: implemented baseline.
 | Cost fields are permission-protected | `purchaseCost` is returned only when the user has `inventory:read_costs`. |
 | Status updates are audited | Inventory updates write `auditLog` entries and `vehicleStatusHistory` on status changes. |
 | Screen states exist | The stock workspace shows loading, fallback, error, locked, and empty states. |
+| Clicking a vehicle opens its operational detail | Each stock card vehicle header is an accessible button that calls `GET /inventory/:id/detail`. |
 
 ## Automated Coverage
 

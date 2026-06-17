@@ -1483,6 +1483,27 @@ input:focus-visible {
   min-width: 0;
 }
 
+.vehicle-main-button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.vehicle-main-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.vehicle-main-button:focus-visible .vehicle-thumb,
+.vehicle-main-button:hover .vehicle-thumb {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+}
+
 .vehicle-thumb {
   align-items: center;
   background: var(--surface);

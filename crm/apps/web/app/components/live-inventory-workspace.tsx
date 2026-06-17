@@ -518,7 +518,13 @@ export function LiveInventoryWorkspace() {
     return (
       <article className={`stock-card ${toneFor(item)}`} key={item.id}>
         <div className="vehicle-summary">
-          <div className="vehicle-main">
+          <button
+            aria-label={`Abrir detalhe de ${vehicleTitle(item)}`}
+            className="vehicle-main vehicle-main-button"
+            disabled={!canReadInventory || inventoryDetailStatus === "loading"}
+            onClick={() => void openInventoryDetail(item)}
+            type="button"
+          >
             <div className="vehicle-thumb">
               {item.vehicle?.hasPrimaryPhoto ? <Camera aria-hidden="true" size={24} /> : <CarFront aria-hidden="true" size={24} />}
             </div>
@@ -528,7 +534,7 @@ export function LiveInventoryWorkspace() {
                 {item.vehicle?.yearModel ?? "Ano n/d"} | {item.vehicle?.plate ?? "Sem placa"} | {item.vehicle?.mileage != null ? `${item.vehicle.mileage.toLocaleString("pt-BR")} km` : "Km n/d"}
               </span>
             </div>
-          </div>
+          </button>
           <div className="vehicle-tags">
             <span className={item.ownershipType === "CONSIGNED" ? "ownership-chip consigned" : "ownership-chip"}>{ownershipLabels[item.ownershipType]}</span>
             <span>{statusLabels[item.status]}</span>
