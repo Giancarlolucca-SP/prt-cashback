@@ -190,6 +190,7 @@ function buildInventoryOperationalSummary(input: {
     total: input.total,
     activeListings: input.activeListings,
     activeServices: input.activeServices,
+    relevantPending: relevantPendingStatuses.reduce((sum, status) => sum + (countByStatus[status] ?? 0), 0),
     own,
     consigned,
     ownPercent: input.total > 0 ? own / input.total : 0,

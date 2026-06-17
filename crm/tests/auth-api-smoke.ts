@@ -1813,6 +1813,7 @@ try {
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
   assert.equal(typeof listInventory.json().summary.activeListings, "number");
   assert.equal(typeof listInventory.json().summary.activeServices, "number");
+  assert.equal(listInventory.json().summary.relevantPending, listInventory.json().summary.byStatus.IN_PREPARATION);
 
   const listInventoryByResponsible = await app.inject({
     method: "GET",

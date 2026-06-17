@@ -63,6 +63,7 @@ type ListResponse<T> = {
 type InventoryOperationalSummary = {
   activeListings?: number;
   activeServices?: number;
+  relevantPending?: number;
   total: number;
   own: number;
   consigned: number;
@@ -468,7 +469,7 @@ export function LiveInventoryWorkspace() {
     const totalStockValue = stockItems.reduce((sum, item) => sum + Number(item.askingPrice ?? 0), 0);
     const projectedMargin = canReadInventoryCosts ? stockItems.reduce((sum, item) => sum + Math.max(0, Number(item.askingPrice ?? 0) - Number(item.purchaseCost ?? 0)), 0) : null;
     const avgMargin = projectedMargin !== null && totalStockValue > 0 ? projectedMargin / totalStockValue : null;
-    const pending = operationalSummary?.byStatus.IN_PREPARATION ?? stockItems.filter((item) => item.status === "IN_PREPARATION").length;
+    const pending = operationalSummary?.relevantPending ?? stockItems.filter((item) => item.hasRelevantPending).length;
     const activeServices = operationalSummary?.activeServices ?? stockItems.filter((item) => item.hasActiveService).length;
     const activeListings = operationalSummary?.activeListings ?? stockItems.filter((item) => item.hasActiveListing).length;
 

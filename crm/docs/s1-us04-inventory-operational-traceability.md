@@ -11,7 +11,7 @@ Status: implemented baseline.
 | Removed inventory is hidden by default | `GET /inventory` excludes `REMOVED` unless `status=REMOVED` is sent. |
 | Stock cards show ownership and status | `LiveInventoryWorkspace` renders ownership/status chips from API data. |
 | Days in stock is API-calculated | `sanitizeInventory` returns `daysInStock` from `entryDate`/`exitDate`. |
-| Summary shows total, own, consigned, status counts | `GET /inventory` returns `summary.total`, `own`, `consigned`, percentages, and `byStatus`. |
+| Summary shows total, own, consigned, status counts and pending count | `GET /inventory` returns `summary.total`, `own`, `consigned`, percentages, `byStatus`, and `relevantPending`. |
 | Summary shows active services and listings | `summary.activeServices` and `summary.activeListings` count distinct vehicles matching current filters. |
 | Filters cover status, ownership, brand/model search, responsible user, origin, location, period, pending, listing, service | `GET /inventory` accepts `status`, `ownership_type`, `search`, `responsible_user_id`, `stock_origin`, `stock_location`, `entry_date_from`, `entry_date_to`, `has_pending`, `has_active_listing`, and `has_active_service`. |
 | Sorts cover days, update, entry date, price, brand/model, status | `sort` accepts `days_in_stock_desc`, `days_in_stock_asc`, `updated_at_desc`, `entry_date_desc`, `price_desc`, `price_asc`, `brand_model_asc`, and `status_asc`. |
@@ -38,7 +38,7 @@ Status: implemented baseline.
 - active listing indicator and detail;
 - active service indicator/detail with expected return;
 - primary photo attachment reference and list/detail indicators;
-- summary counts for ownership, statuses, active listings, and active services;
+- summary counts for ownership, statuses, relevant pending, active listings, and active services;
 - status-change audit log.
 
 Project-wide validation commands used for this story:
