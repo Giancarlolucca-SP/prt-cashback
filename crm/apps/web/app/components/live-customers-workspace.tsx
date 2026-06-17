@@ -151,6 +151,21 @@ type MinimalLeadFormState = {
   notes: string;
   origin: string;
   phone: string;
+  vehicleId: string;
+};
+
+type InventoryOption = {
+  id: string;
+  askingPrice: string | null;
+  status: string;
+  vehicleId: string;
+  vehicle: {
+    brand: string;
+    model: string;
+    version: string | null;
+    yearModel: number | null;
+    plate: string | null;
+  } | null;
 };
 
 const emptyCustomerForm: CustomerFormState = {
@@ -171,6 +186,7 @@ const emptyMinimalLeadForm: MinimalLeadFormState = {
   notes: "",
   origin: "WhatsApp",
   phone: "",
+  vehicleId: "",
 };
 
 const customerHistoryTimelineFilters: Array<{ key: CustomerHistoryTimelineFilter; label: string }> = [
@@ -305,6 +321,16 @@ function money(value: string | null | undefined) {
   return Number(value).toLocaleString("pt-BR", { currency: "BRL", style: "currency" });
 }
 
+function vehicleLabel(option: InventoryOption) {
+  if (!option.vehicle) {
+    return `Estoque ${option.id.slice(0, 8)}`;
+  }
+
+  return [option.vehicle.brand, option.vehicle.model, option.vehicle.version, option.vehicle.yearModel, option.vehicle.plate ? `| ${option.vehicle.plate}` : null]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function dateInputValue(dateIso: string | null) {
   return dateIso ? dateIso.slice(0, 10) : "";
 }
@@ -410,6 +436,7 @@ export function LiveCustomersWorkspace() {
   const canReadCustomers = hasPermission({ module: "customers", action: "read" });
   const canCreateCustomers = hasPermission({ module: "customers", action: "create" });
   const canCreateLeads = hasPermission({ module: "leads", action: "create" });
+  const canReadInventory = hasPermission({ module: "inventory", action: "read" });
   const canUpdateCustomers = hasPermission({ module: "customers", action: "update" });
   const canMoveCustomers = hasPermission({ module: "customers", action: "update_status" });
   const canDeleteCustomers = hasPermission({ module: "customers", action: "delete" });
@@ -434,6 +461,8 @@ export function LiveCustomersWorkspace() {
   const [historyNoteDescription, setHistoryNoteDescription] = useState("");
   const [historyNoteError, setHistoryNoteError] = useState<string | null>(null);
   const [historyNoteType, setHistoryNoteType] = useState<CustomerHistoryNoteType>("OBSERVATION");
+  const [inventoryOptions, setInventoryOptions] = useState<InventoryOption[]>([]);
+  const [inventoryStatus, setInventoryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [modalOpen, setModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [purchaseFilter, setPurchaseFilter] = useState("");
@@ -504,6 +533,34 @@ export function LiveCustomersWorkspace() {
       isCurrent = false;
     };
   }, [activeFilter, birthMonthFilter, canReadCustomers, purchaseFilter, refreshKey, search, token, visitFilter]);
+
+  useEffect(() => {
+    if (!leadModalOpen || !token || !canReadInventory) {
+      return;
+    }
+
+    let isCurrent = true;
+    setInventoryStatus("loading");
+
+    apiGet<ListResponse<InventoryOption>>("/inventory?page=1&page_size=100", token)
+      .then((list) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setInventoryOptions(list.items.filter((item) => !["REPASSE", "REMOVED", "SOLD"].includes(item.status)));
+        setInventoryStatus("ready");
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setInventoryStatus("error");
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [canReadInventory, leadModalOpen, token]);
 
   useEffect(() => {
     if (!historyPreferenceKey) {
@@ -757,6 +814,7 @@ export function LiveCustomersWorkspace() {
         notes: leadForm.notes.trim() || undefined,
         origin: leadForm.origin.trim() || undefined,
         phone: leadForm.phone.trim() || undefined,
+        vehicleId: leadForm.vehicleId || undefined,
       });
       setLeadForm(emptyMinimalLeadForm);
       setLeadModalOpen(false);
@@ -1294,6 +1352,23 @@ export function LiveCustomersWorkspace() {
                   value={leadForm.interest}
                 />
               </label>
+              <label className="lead-modal-wide">
+                Veiculo de interesse
+                <select
+                  disabled={!canReadInventory || inventoryStatus === "loading"}
+                  onChange={(event) => setLeadForm((current) => ({ ...current, vehicleId: event.target.value }))}
+                  value={leadForm.vehicleId}
+                >
+                  <option value="">{inventoryStatus === "loading" ? "Carregando estoque..." : "Sem veiculo vinculado"}</option>
+                  {inventoryOptions.map((item) => (
+                    <option key={item.id} value={item.vehicleId}>
+                      {vehicleLabel(item)} - {money(item.askingPrice)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!canReadInventory ? <p className="lead-modal-error lead-modal-wide">Sem permissao para listar estoque; o lead sera criado sem veiculo vinculado.</p> : null}
+              {canReadInventory && inventoryStatus === "error" ? <p className="lead-modal-error lead-modal-wide">Nao foi possivel carregar o estoque permitido.</p> : null}
               <label className="lead-modal-wide">
                 Observacao curta
                 <input

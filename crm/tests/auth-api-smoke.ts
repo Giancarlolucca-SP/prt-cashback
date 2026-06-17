@@ -1630,6 +1630,23 @@ try {
   assert.equal(createVehicleInterestLead.json().data.vehicle.brand, "Honda");
   assert.equal(createVehicleInterestLead.json().data.vehicle.model, "Civic");
 
+  const createMinimalLeadWithVehicle = await app.inject({
+    method: "POST",
+    url: "/customers/minimal-leads",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      email: `lead.veiculo.${leadSearchToken.toLowerCase()}@gt3.local`,
+      interest: "Honda Civic Touring em estoque",
+      name: `Lead Minimo Veiculo ${leadSearchToken}`,
+      origin: "Loja",
+      vehicleId: inventoryVehicleId,
+    },
+  });
+  assert.equal(createMinimalLeadWithVehicle.statusCode, 201);
+  assert.equal(createMinimalLeadWithVehicle.json().data.lead.vehicleId, inventoryVehicleId);
+
   const prepareVehiclePrimaryPhoto = await app.inject({
     method: "POST",
     url: "/files/prepare-upload",

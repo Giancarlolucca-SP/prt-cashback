@@ -2322,3 +2322,29 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: estender o mesmo seletor para o fluxo de lead minimo em `/clientes`.
+
+## 2026-06-17 - S1-US05 veiculo no lead minimo do cliente
+
+Contexto:
+
+- Etapa BMAP: fechar o ultimo pendente da S1-US05 no fluxo de entrada rapida em `/clientes`.
+- Foco: SDR/Vendedor pode criar cliente minimo e card comercial ja vinculado ao veiculo principal de interesse.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm run build:web` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- `POST /customers/minimal-leads` aceita `vehicleId` opcional e valida estoque comercial permitido.
+- Lead minimo grava `vehicleId`, historico operacional, auditoria e evento interno com o vinculo.
+- Modal `Novo lead minimo` em `/clientes` ganhou seletor de veiculo permitido.
+- Smoke cobre criacao de lead minimo com veiculo de estoque.
+
+Observacoes:
+
+- S1-US05 fica funcionalmente concluida para o MVP: lead/card comercial com um veiculo principal, bloqueio de repasse e rastreabilidade minima.

@@ -91,6 +91,7 @@ const createMinimalLeadSchema = z.object({
     .optional(),
   origin: z.string().trim().min(2).max(80).default("manual"),
   phone: z.string().trim().min(8).max(32).optional(),
+  vehicleId: z.string().uuid().optional(),
 }).refine((input) => Boolean(input.email || input.phone), {
   message: "Informe telefone ou e-mail para cadastrar o lead minimo.",
   path: ["phone"],
@@ -432,6 +433,41 @@ async function primaryInterestsByCustomer(storeId: string, customerIds: string[]
   return interests;
 }
 
+async function ensureVehicleInterestAllowed(storeId: string, vehicleId?: string) {
+  if (!vehicleId) {
+    return;
+  }
+
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: vehicleId,
+      storeId,
+      deletedAt: null,
+      status: "ACTIVE",
+    },
+    select: { id: true },
+  });
+
+  if (!vehicle) {
+    throw new ApiError("NOT_FOUND", "Veiculo de interesse nao encontrado no estoque comercial permitido.");
+  }
+
+  const inventory = await prisma.vehicleInventoryRecord.findFirst({
+    where: {
+      storeId,
+      vehicleId,
+      deletedAt: null,
+      ownershipType: { not: "REPASSE" },
+      status: { notIn: ["REPASSE", "REMOVED", "SOLD"] },
+    },
+    select: { id: true },
+  });
+
+  if (!inventory) {
+    throw new ApiError("NOT_FOUND", "Veiculo de interesse nao encontrado no estoque comercial permitido.");
+  }
+}
+
 function withPrimaryInterest<T extends { id: string }>(customer: T, interests: Map<string, string>) {
   return {
     ...customer,
@@ -518,6 +554,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       sensitiveArea: "general",
     });
     const input = createMinimalLeadSchema.parse(request.body);
+    await ensureVehicleInterestAllowed(session.user.storeId, input.vehicleId);
 
     const result = await prisma.$transaction(async (tx) => {
       const customer = await tx.customer.create({
@@ -543,6 +580,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           title: input.name,
           status: "NEW",
           interest: input.interest,
+          vehicleId: input.vehicleId,
         },
       });
 
@@ -578,6 +616,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
             leadId: lead.id,
             origin: input.origin,
             interest: input.interest,
+            vehicleId: input.vehicleId,
             actorRole: session.user.role,
           },
         },
@@ -597,6 +636,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
             metadata: {
               leadId: lead.id,
               origin: input.origin,
+              vehicleId: input.vehicleId,
             },
           },
           {
@@ -611,6 +651,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
             metadata: {
               customerId: customer.id,
               source: lead.source,
+              vehicleId: lead.vehicleId,
             },
           },
         ],
@@ -633,7 +674,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       actorId: session.user.id,
       entityType: "lead",
       entityId: result.lead.id,
-      payload: { customerId: result.customer.id, source: result.lead.source },
+      payload: { customerId: result.customer.id, source: result.lead.source, vehicleId: result.lead.vehicleId },
     });
 
     return reply.code(201).send({
@@ -643,6 +684,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           id: result.lead.id,
           customerId: result.lead.customerId,
           assignedUserId: result.lead.assignedUserId,
+          vehicleId: result.lead.vehicleId,
           source: result.lead.source,
           status: result.lead.status,
           title: result.lead.title,

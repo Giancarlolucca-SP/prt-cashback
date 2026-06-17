@@ -62,6 +62,7 @@ Endpoints principais:
   - `GET /customers` aceita filtros `origin`, `responsible_user_id`, `created_by_user_id`, `birth_month`, `purchase_done` e `visit_done`.
   - Respostas de clientes expõem `primaryInterest`, derivado do lead vinculado mais recente com `interest` preenchido.
 - `POST /customers/minimal-leads`
+  - Cria cliente minimo e lead inicial, aceita `vehicleId` opcional validado contra estoque comercial permitido, preservando auditoria e `primaryInterest` derivado do lead.
 - `GET /customers/kanban`
 - `GET/PATCH/DELETE /customers/:id`
 - `GET /customers/:id/history`
