@@ -729,6 +729,25 @@ export function LiveInventoryWorkspace() {
             </header>
             <div className="inventory-detail-grid">
               <section>
+                <strong>Resumo operacional</strong>
+                <ul>
+                  <li>
+                    <CarFront aria-hidden="true" size={17} />
+                    <span>
+                      <strong>{inventoryDetail.data.vehicle?.plate ?? "Sem placa"} | {statusLabels[inventoryDetail.data.status]}</strong>
+                      <em>Entrada {formatInventoryDate(inventoryDetail.data.entryDate)} | Estoque: {operationalDaysInStock(inventoryDetail.data)} dias</em>
+                    </span>
+                  </li>
+                  <li>
+                    <BadgeCheck aria-hidden="true" size={17} />
+                    <span>
+                      <strong>{inventoryDetail.data.vehicle?.color ? `Cor: ${inventoryDetail.data.vehicle.color}` : "Cor n/d"} | {money(inventoryDetail.data.askingPrice)}</strong>
+                      <em>{inventoryDetail.data.stockOrigin ?? "Origem n/d"} | {inventoryDetail.data.stockLocation ?? "Local n/d"}</em>
+                    </span>
+                  </li>
+                </ul>
+              </section>
+              <section>
                 <strong>Pasta documental</strong>
                 {inventoryDetailStatus === "loading" ? <p>Carregando documentos...</p> : null}
                 {inventoryDetailStatus === "error" ? <p>Nao foi possivel carregar o detalhe.</p> : null}

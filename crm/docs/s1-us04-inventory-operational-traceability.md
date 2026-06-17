@@ -27,6 +27,7 @@ Status: implemented baseline.
 | Status updates are audited | Inventory updates write `auditLog` entries and `vehicleStatusHistory` on status changes. |
 | Screen states exist | The stock workspace shows loading, fallback, error, locked, and empty states. |
 | Clicking a vehicle opens its operational detail | Each stock card vehicle header is an accessible button that calls `GET /inventory/:id/detail`. |
+| Vehicle detail shows operational summary | The inventory detail modal renders plate, status, entry date, days in stock, color, price, origin and location from the selected item. |
 
 ## Automated Coverage
 
