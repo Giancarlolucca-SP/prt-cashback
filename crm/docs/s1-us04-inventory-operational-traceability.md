@@ -10,6 +10,7 @@ Status: implemented baseline.
 | Inventory excludes repasse by default | `GET /inventory` excludes `REPASSE` status and ownership when no explicit filter is sent. |
 | Removed inventory is hidden by default | `GET /inventory` excludes `REMOVED` unless `status=REMOVED` is sent. |
 | Stock cards show ownership and status | `LiveInventoryWorkspace` renders ownership/status chips from API data. |
+| Stock cards show inventory entry date | `LiveInventoryWorkspace` renders `entryDate` as an `Entrada` chip on each stock card. |
 | Negotiation status exists in stock flow | `InventoryStatus.NEGOTIATION` is accepted by API filters/updates and rendered as `Em negociacao`. |
 | Days in stock is API-calculated | `sanitizeInventory` returns `daysInStock` from `entryDate`/`exitDate`. |
 | Summary shows total, own, consigned, status counts and pending count | `GET /inventory` returns `summary.total`, `own`, `consigned`, percentages, `byStatus`, and `relevantPending`. |

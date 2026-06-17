@@ -247,6 +247,10 @@ function operationalDaysInStock(item: InventoryItem) {
   return item.daysInStock ?? daysInStock(item.entryDate);
 }
 
+function formatInventoryDate(value: string) {
+  return new Date(value).toLocaleDateString("pt-BR");
+}
+
 function vehicleTitle(item: InventoryItem) {
   const vehicle = item.vehicle;
   if (!vehicle) return "Veiculo sem dados";
@@ -543,6 +547,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.notes ?? "Sem observacoes"}</span>
             <span>{item.stockOrigin ? `Origem: ${item.stockOrigin}` : "Origem n/d"}</span>
             <span>{item.stockLocation ? `Local: ${item.stockLocation}` : "Local n/d"}</span>
+            <span>Entrada: {formatInventoryDate(item.entryDate)}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{item.vehicle?.hasPrimaryPhoto ? "Foto principal vinculada" : "Foto principal pendente"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
