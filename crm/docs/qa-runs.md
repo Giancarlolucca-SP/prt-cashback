@@ -2471,3 +2471,28 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: fazer revisao final da matriz de aceite da S1-US06 e marcar a historia como concluida se nao houver lacuna restante.
+
+## 2026-06-17 - S1-US06 fechamento da matriz de aceite
+
+Contexto:
+
+- Etapa BMAP: revisao final dos criterios de aceite da auditoria minima.
+- Foco: reforcar cobertura de permissao, append-only e motivo obrigatorio em arquivamento.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Smoke confirma que Vendedor e SDR nao acessam `/audit/logs`.
+- Smoke confirma que usuario comum nao possui rota para apagar log de auditoria.
+- Smoke confirma que arquivar cliente sem motivo falha com validacao.
+- Smoke confirma que arquivamento valido de cliente grava log com `reason`.
+
+Observacoes:
+
+- S1-US06 fica concluida para o MVP: auditoria minima cobre clientes, leads, veiculos, estoque, documentos, cards comerciais, Kanban, permissao e mascaramento sensivel.

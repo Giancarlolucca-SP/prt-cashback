@@ -5485,6 +5485,16 @@ try {
   assert.equal(sellerAudit.statusCode, 403);
   assert.equal(sellerAudit.json().error.code, "FORBIDDEN");
 
+  const sdrAudit = await app.inject({
+    method: "GET",
+    url: "/audit/logs",
+    headers: {
+      authorization: `Bearer ${sdrToken}`,
+    },
+  });
+  assert.equal(sdrAudit.statusCode, 403);
+  assert.equal(sdrAudit.json().error.code, "FORBIDDEN");
+
   const auditLogs = await app.inject({
     method: "GET",
     url: "/audit/logs?module=customers&page=1&page_size=10",
@@ -5494,6 +5504,15 @@ try {
   });
   assert.equal(auditLogs.statusCode, 200);
   assert.ok(auditLogs.json().items.some((log: { entityId: string }) => log.entityId === createdCustomerId));
+
+  const sellerDeleteAuditLog = await app.inject({
+    method: "DELETE",
+    url: `/audit/logs/${auditLogs.json().items[0].id}`,
+    headers: {
+      authorization: `Bearer ${sellerTokenAgain}`,
+    },
+  });
+  assert.equal(sellerDeleteAuditLog.statusCode, 404);
 
   const technicalEvents = await app.inject({
     method: "GET",
@@ -5577,6 +5596,17 @@ try {
   assert.equal(duplicateWebhook.statusCode, 200);
   assert.equal(duplicateWebhook.json().idempotentHit, true);
 
+  const deleteCustomerWithoutReason = await app.inject({
+    method: "DELETE",
+    url: `/customers/${createdCustomerId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {},
+  });
+  assert.equal(deleteCustomerWithoutReason.statusCode, 400);
+  assert.equal(deleteCustomerWithoutReason.json().error.code, "VALIDATION_ERROR");
+
   const deleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,
@@ -5589,6 +5619,20 @@ try {
   });
   assert.equal(deleteCustomer.statusCode, 200);
   assert.equal(deleteCustomer.json().data.status, "ARCHIVED");
+
+  const customerDeleteAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=customers&action=delete&entity_type=customer&entity_id=${createdCustomerId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(customerDeleteAudit.statusCode, 200);
+  assert.ok(
+    customerDeleteAudit
+      .json()
+      .items.some((log: { metadata: { reason?: string } }) => log.metadata.reason === "Arquivamento validado pelo contrato de API"),
+  );
 
   const deletedCustomer = await app.inject({
     method: "GET",
