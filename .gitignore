@@ -28,6 +28,8 @@ crm/.env.*
 !crm/.env.example
 
 # BMAP/BMAD - bastidores internos
+_bmad/
+.claude/skills/bmad-*
 .bmap/
 .bmad/
 .bmap-logs/
