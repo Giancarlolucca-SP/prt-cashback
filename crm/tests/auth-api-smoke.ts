@@ -1762,6 +1762,16 @@ try {
   assert.equal(typeof listInventory.json().summary.ownPercent, "number");
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
 
+  const listInventoryWithPending = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&has_pending=true&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryWithPending.statusCode, 200);
+  assert.ok(listInventoryWithPending.json().items.some((item: { id: string }) => item.id === inventoryId));
+
   const defaultInventoryWithoutRemoved = await app.inject({
     method: "GET",
     url: "/inventory?page=1&page_size=100",
@@ -2316,6 +2326,16 @@ try {
   assert.ok(inventoryItemWithActiveListing);
   assert.equal(inventoryItemWithActiveListing.hasActiveListing, true);
   assert.equal(inventoryItemWithActiveListing.activeListingsCount, 1);
+
+  const filteredInventoryWithActiveListing = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&has_active_listing=true&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(filteredInventoryWithActiveListing.statusCode, 200);
+  assert.ok(filteredInventoryWithActiveListing.json().items.some((item: { id: string }) => item.id === inventoryId));
 
   const listingMetricDate = new Date(Date.now() + 172800000).toISOString();
   const listingMetric = await app.inject({

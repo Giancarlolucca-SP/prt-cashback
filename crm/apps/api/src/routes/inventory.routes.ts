@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { InventoryStatus as PrismaInventoryStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { ApiError } from "../api/errors.js";
 import { requireAuth, requirePermission } from "../api/auth-guards.js";
@@ -15,6 +16,8 @@ const inventorySortSchema = z
   .default("days_in_stock_desc");
 
 const inventoryQuerySchema = z.object({
+  has_active_listing: z.coerce.boolean().optional(),
+  has_pending: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().trim().max(120).optional(),
@@ -145,12 +148,12 @@ function calculateDaysInStock(record: Pick<InventoryRecord, "entryDate" | "exitD
 }
 
 function buildInventoryOperationalSummary(input: {
-  byOwnership: Array<{ ownershipType: string; _count: { _all: number } }>;
-  byStatus: Array<{ status: string; _count: { _all: number } }>;
+  byOwnership: Array<{ ownershipType: string; _count?: { _all?: number } }>;
+  byStatus: Array<{ status: string; _count?: { _all?: number } }>;
   total: number;
 }) {
-  const countByOwnership = Object.fromEntries(input.byOwnership.map((item) => [item.ownershipType, item._count._all]));
-  const countByStatus = Object.fromEntries(input.byStatus.map((item) => [item.status, item._count._all]));
+  const countByOwnership = Object.fromEntries(input.byOwnership.map((item) => [item.ownershipType, item._count?._all ?? 0]));
+  const countByStatus = Object.fromEntries(input.byStatus.map((item) => [item.status, item._count?._all ?? 0]));
   const own = countByOwnership.OWN ?? 0;
   const consigned = countByOwnership.CONSIGNED ?? 0;
 
@@ -181,6 +184,8 @@ function relevantPendingSummary(status: string) {
   if (status === "REMOVED") return "Veiculo removido/inativo";
   return null;
 }
+
+const relevantPendingStatuses: PrismaInventoryStatus[] = ["IN_PREPARATION", "REMOVED"];
 
 function sanitizeVehicle(vehicle: VehicleRecord) {
   return {
@@ -427,10 +432,29 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         ).map((vehicle) => vehicle.id)
       : null;
 
-    const commonInventoryGuards = [
-      ...(query.status ? [] : [{ status: { notIn: ["REPASSE" as const, "REMOVED" as const] } }]),
-      ...(query.ownership_type ? [] : [{ ownershipType: { not: "REPASSE" as const } }]),
-    ];
+    const activeListingVehicleIds =
+      query.has_active_listing === undefined
+        ? null
+        : (
+            await prisma.listing.findMany({
+              where: {
+                storeId: session.user.storeId,
+                deletedAt: null,
+                status: { in: ["PENDING", "PUBLISHED"] },
+              },
+              distinct: ["vehicleId"],
+              select: { vehicleId: true },
+            })
+          ).map((listing) => listing.vehicleId);
+
+    const commonInventoryGuards: Prisma.VehicleInventoryRecordWhereInput[] = [];
+    if (!query.status) commonInventoryGuards.push({ status: { notIn: ["REPASSE", "REMOVED"] } });
+    if (!query.ownership_type) commonInventoryGuards.push({ ownershipType: { not: "REPASSE" } });
+    if (query.has_pending === true) commonInventoryGuards.push({ status: { in: relevantPendingStatuses } });
+    if (query.has_pending === false) commonInventoryGuards.push({ status: { notIn: relevantPendingStatuses } });
+    if (query.has_active_listing === true && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeListingVehicleIds } });
+    if (query.has_active_listing === false && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { notIn: activeListingVehicleIds } });
+    if (matchingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: matchingVehicleIds } });
 
     const where = {
       storeId: session.user.storeId,
@@ -438,7 +462,6 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       ...(query.status ? { status: query.status } : {}),
       ...(query.ownership_type ? { ownershipType: query.ownership_type } : {}),
       ...(commonInventoryGuards.length ? { AND: commonInventoryGuards } : {}),
-      ...(matchingVehicleIds ? { vehicleId: { in: matchingVehicleIds } } : {}),
     };
 
     const [rawItems, total, byOwnership, byStatus] = await Promise.all([
