@@ -144,6 +144,15 @@ type InventoryRecord = {
   updatedAt: Date;
 };
 
+type InventoryServiceSummary = {
+  id: string;
+  providerName: string | null;
+  startedAt: string | null;
+  status: string;
+  type: string;
+  updatedAt: string;
+};
+
 function calculateDaysInStock(record: Pick<InventoryRecord, "entryDate" | "exitDate">) {
   const endDate = record.exitDate ?? new Date();
   return Math.max(0, Math.floor((endDate.getTime() - record.entryDate.getTime()) / 86400000));
@@ -219,7 +228,7 @@ function sanitizeVehicle(vehicle: VehicleRecord) {
 function sanitizeInventory(
   record: InventoryRecord,
   vehicle: VehicleRecord | undefined,
-  options: { activeListingsCount?: number; includeCosts: boolean },
+  options: { activeListingsCount?: number; activeService?: InventoryServiceSummary; includeCosts: boolean },
 ) {
   const activeListingsCount = options.activeListingsCount ?? 0;
   const pendingSummary = relevantPendingSummary(record.status);
@@ -236,6 +245,8 @@ function sanitizeInventory(
     exitDate: record.exitDate?.toISOString() ?? null,
     daysInStock: calculateDaysInStock(record),
     activeListingsCount,
+    activeService: options.activeService ?? null,
+    hasActiveService: Boolean(options.activeService),
     hasActiveListing: activeListingsCount > 0,
     hasRelevantPending: pendingSummary !== null,
     notes: record.notes,
@@ -529,12 +540,56 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         })
       : [];
     const activeListingCountByVehicleId = new Map(activeListingCounts.map((item) => [item.vehicleId, item._count._all]));
+    const activeServiceOrders = items.length
+      ? await prisma.serviceOrder.findMany({
+          where: {
+            storeId: session.user.storeId,
+            vehicleId: { in: items.map((item) => item.vehicleId) },
+            deletedAt: null,
+            status: { notIn: ["DONE", "CANCELLED"] },
+          },
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            providerId: true,
+            startedAt: true,
+            status: true,
+            type: true,
+            updatedAt: true,
+            vehicleId: true,
+          },
+        })
+      : [];
+    const activeServiceProviders = activeServiceOrders.some((order) => order.providerId)
+      ? await prisma.serviceProvider.findMany({
+          where: {
+            id: { in: activeServiceOrders.map((order) => order.providerId).filter((providerId): providerId is string => Boolean(providerId)) },
+            storeId: session.user.storeId,
+            deletedAt: null,
+          },
+          select: { id: true, name: true },
+        })
+      : [];
+    const serviceProviderNameById = new Map(activeServiceProviders.map((provider) => [provider.id, provider.name]));
+    const activeServiceByVehicleId = new Map<string, InventoryServiceSummary>();
+    for (const order of activeServiceOrders) {
+      if (!order.vehicleId || activeServiceByVehicleId.has(order.vehicleId)) continue;
+      activeServiceByVehicleId.set(order.vehicleId, {
+        id: order.id,
+        providerName: order.providerId ? serviceProviderNameById.get(order.providerId) ?? null : null,
+        startedAt: order.startedAt?.toISOString() ?? null,
+        status: order.status,
+        type: order.type,
+        updatedAt: order.updatedAt.toISOString(),
+      });
+    }
 
     return {
       ...listResponse(
         items.map((item) =>
           sanitizeInventory(item, vehicleById.get(item.vehicleId), {
             activeListingsCount: activeListingCountByVehicleId.get(item.vehicleId) ?? 0,
+            activeService: activeServiceByVehicleId.get(item.vehicleId),
             includeCosts,
           }),
         ),

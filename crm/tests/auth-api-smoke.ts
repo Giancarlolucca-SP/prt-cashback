@@ -79,6 +79,13 @@ function uniquePlate(prefix: string) {
   return `${letters}${number}${letter}${suffix}`;
 }
 
+function dateWindowAround(date: Date) {
+  return {
+    from: new Date(date.getTime() - 60000).toISOString(),
+    to: new Date(date.getTime() + 60000).toISOString(),
+  };
+}
+
 try {
   const invalidLogin = await app.inject({
     method: "POST",
@@ -856,7 +863,9 @@ try {
       .items.some((item: { stage: string; reasons: string[] }) => item.stage === "LOST" && item.reasons.includes(configuredLostReason)),
   );
 
-  const followUpDueAt = "2026-06-09T14:30:00.000Z";
+  const followUpDueAtDate = new Date(Date.now() + 2 * 86400000 + uniqueCounter * 60000);
+  const followUpDueAt = followUpDueAtDate.toISOString();
+  const followUpWindow = dateWindowAround(followUpDueAtDate);
   const scheduleLeadFollowUp = await app.inject({
     method: "POST",
     url: `/leads/${createdLeadId}/follow-ups`,
@@ -873,17 +882,11 @@ try {
   assert.equal(scheduleLeadFollowUp.json().data.nextActionAt, followUpDueAt);
   assert.equal(scheduleLeadFollowUp.json().followUp.type, "Retorno WhatsApp");
 
-  const createdFollowUp = await prisma.followUp.findFirst({
-    where: {
-      leadId: createdLeadId,
-      type: "Retorno WhatsApp",
-    },
-  });
-  assert.ok(createdFollowUp);
+  const createdFollowUp = scheduleLeadFollowUp.json().followUp as { id: string };
 
   const listLeadFollowUps = await app.inject({
     method: "GET",
-    url: "/leads/follow-ups?from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    url: `/leads/follow-ups?from=${encodeURIComponent(followUpWindow.from)}&to=${encodeURIComponent(followUpWindow.to)}`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -912,7 +915,7 @@ try {
 
   const listPendingFollowUpsAfterComplete = await app.inject({
     method: "GET",
-    url: "/leads/follow-ups?from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    url: `/leads/follow-ups?from=${encodeURIComponent(followUpWindow.from)}&to=${encodeURIComponent(followUpWindow.to)}`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -922,7 +925,7 @@ try {
 
   const listCompletedLeadFollowUps = await app.inject({
     method: "GET",
-    url: "/leads/follow-ups?include_completed=true&page_size=100&from=2026-06-09T00:00:00.000Z&to=2026-06-10T00:00:00.000Z",
+    url: `/leads/follow-ups?include_completed=true&page_size=100&from=${encodeURIComponent(followUpWindow.from)}&to=${encodeURIComponent(followUpWindow.to)}`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -934,7 +937,8 @@ try {
       .items.some((followUp: { id: string; completedAt: string | null }) => followUp.id === createdFollowUp.id && followUp.completedAt),
   );
 
-  const convertibleFollowUpDueAt = "2026-06-09T17:00:00.000Z";
+  const convertibleFollowUpDueAtDate = new Date(followUpDueAtDate.getTime() + 3600000);
+  const convertibleFollowUpDueAt = convertibleFollowUpDueAtDate.toISOString();
   const scheduleConvertibleFollowUp = await app.inject({
     method: "POST",
     url: `/leads/${createdLeadId}/follow-ups`,
@@ -957,7 +961,7 @@ try {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      endsAt: "2026-06-09T18:00:00.000Z",
+      endsAt: new Date(convertibleFollowUpDueAtDate.getTime() + 3600000).toISOString(),
       notes: "Cliente confirmou visita presencial",
       startsAt: convertibleFollowUpDueAt,
       title: "Visita convertida de follow-up",
@@ -2053,6 +2057,19 @@ try {
   });
   assert.equal(listServiceOrders.statusCode, 200);
   assert.ok(listServiceOrders.json().items.some((order: { id: string }) => order.id === serviceOrderId));
+
+  const listInventoryWithActiveService = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryWithActiveService.statusCode, 200);
+  const inventoryItemWithActiveService = listInventoryWithActiveService.json().items.find((item: { id: string }) => item.id === inventoryId);
+  assert.equal(inventoryItemWithActiveService.hasActiveService, true);
+  assert.equal(inventoryItemWithActiveService.activeService.id, serviceOrderId);
+  assert.equal(inventoryItemWithActiveService.activeService.providerName, providerName);
 
   const addServiceItem = await app.inject({
     method: "POST",

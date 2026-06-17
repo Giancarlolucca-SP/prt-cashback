@@ -21,6 +21,14 @@ type Vehicle = {
 };
 
 type InventoryItem = {
+  activeService?: {
+    id: string;
+    providerName: string | null;
+    startedAt: string | null;
+    status: string;
+    type: string;
+    updatedAt: string;
+  } | null;
   id: string;
   vehicle: Vehicle | null;
   ownershipType: OwnershipType;
@@ -32,6 +40,7 @@ type InventoryItem = {
   activeListingsCount?: number;
   daysInStock?: number;
   hasActiveListing?: boolean;
+  hasActiveService?: boolean;
   hasRelevantPending?: boolean;
   notes: string | null;
   pendingSummary?: string | null;
@@ -485,6 +494,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.notes ?? "Sem observacoes"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
+            <span>{item.hasActiveService ? `Servico: ${item.activeService?.type ?? "em andamento"}${item.activeService?.providerName ? ` | ${item.activeService.providerName}` : ""}` : "Sem servico ativo"}</span>
             <span>{item.hasRelevantPending ? item.pendingSummary ?? "Pendencia relevante" : "Sem pendencia relevante"}</span>
             <span>{operationalDaysInStock(item)} dias</span>
           </div>
