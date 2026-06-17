@@ -37,6 +37,7 @@ Status: implemented baseline.
 - seller cost masking;
 - repasse exclusion;
 - removed inventory default exclusion;
+- sold inventory days-in-stock using `exitDate`;
 - days-in-stock sort;
 - brand/model and status sorting;
 - negotiation status update and filtering;

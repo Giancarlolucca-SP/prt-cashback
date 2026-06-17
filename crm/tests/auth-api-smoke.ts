@@ -1791,6 +1791,56 @@ try {
   assert.equal(removedInventory.statusCode, 201);
   const removedInventoryId = removedInventory.json().data.id as string;
 
+  const soldDaysPlate = uniquePlate("SD");
+  const createSoldDaysInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Fiat",
+        model: "Pulse",
+        yearModel: 2023,
+        plate: soldDaysPlate,
+      },
+      ownershipType: "OWN",
+      status: "AVAILABLE",
+      entryDate: "2026-06-01T12:00:00.000Z",
+      askingPrice: 89900,
+    },
+  });
+  assert.equal(createSoldDaysInventory.statusCode, 201);
+  const soldDaysInventoryId = createSoldDaysInventory.json().data.id as string;
+
+  const closeSoldDaysInventory = await app.inject({
+    method: "PATCH",
+    url: `/inventory/${soldDaysInventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "SOLD",
+      exitDate: "2026-06-11T12:00:00.000Z",
+    },
+  });
+  assert.equal(closeSoldDaysInventory.statusCode, 200);
+  assert.equal(closeSoldDaysInventory.json().data.daysInStock, 10);
+
+  const listSoldDaysInventory = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&status=SOLD&search=${encodeURIComponent(soldDaysPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listSoldDaysInventory.statusCode, 200);
+  const soldDaysItem = listSoldDaysInventory.json().items.find((item: { id: string }) => item.id === soldDaysInventoryId);
+  assert.ok(soldDaysItem);
+  assert.equal(soldDaysItem.exitDate, "2026-06-11T12:00:00.000Z");
+  assert.equal(soldDaysItem.daysInStock, 10);
+
   const listInventory = await app.inject({
     method: "GET",
     url: `/inventory?page=1&page_size=5&search=${encodeURIComponent(inventoryPlate)}`,
