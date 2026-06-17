@@ -2044,6 +2044,42 @@ try {
       .items.some((log: { metadata: { fromStatus?: string; toStatus?: string } }) => log.metadata.fromStatus === "IN_PREPARATION" && log.metadata.toStatus === "AVAILABLE"),
   );
 
+  const moveInventoryToNegotiation = await app.inject({
+    method: "PATCH",
+    url: `/inventory/${inventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "NEGOTIATION",
+    },
+  });
+  assert.equal(moveInventoryToNegotiation.statusCode, 200);
+  assert.equal(moveInventoryToNegotiation.json().data.status, "NEGOTIATION");
+
+  const listInventoryInNegotiation = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&status=NEGOTIATION&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryInNegotiation.statusCode, 200);
+  assert.ok(listInventoryInNegotiation.json().items.some((item: { id: string; status: string }) => item.id === inventoryId && item.status === "NEGOTIATION"));
+
+  const returnInventoryToAvailable = await app.inject({
+    method: "PATCH",
+    url: `/inventory/${inventoryId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      status: "AVAILABLE",
+    },
+  });
+  assert.equal(returnInventoryToAvailable.statusCode, 200);
+  assert.equal(returnInventoryToAvailable.json().data.status, "AVAILABLE");
+
   const addInventoryCost = await app.inject({
     method: "POST",
     url: `/inventory/${inventoryId}/costs`,

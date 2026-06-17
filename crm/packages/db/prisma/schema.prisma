@@ -2021,6 +2021,7 @@ enum VehicleOwnershipType {
 enum InventoryStatus {
   IN_PREPARATION
   AVAILABLE
+  NEGOTIATION
   RESERVED
   SOLD
   REPASSE

@@ -10,6 +10,7 @@ Status: implemented baseline.
 | Inventory excludes repasse by default | `GET /inventory` excludes `REPASSE` status and ownership when no explicit filter is sent. |
 | Removed inventory is hidden by default | `GET /inventory` excludes `REMOVED` unless `status=REMOVED` is sent. |
 | Stock cards show ownership and status | `LiveInventoryWorkspace` renders ownership/status chips from API data. |
+| Negotiation status exists in stock flow | `InventoryStatus.NEGOTIATION` is accepted by API filters/updates and rendered as `Em negociacao`. |
 | Days in stock is API-calculated | `sanitizeInventory` returns `daysInStock` from `entryDate`/`exitDate`. |
 | Summary shows total, own, consigned, status counts and pending count | `GET /inventory` returns `summary.total`, `own`, `consigned`, percentages, `byStatus`, and `relevantPending`. |
 | Summary shows active services and listings | `summary.activeServices` and `summary.activeListings` count distinct vehicles matching current filters. |
@@ -34,6 +35,7 @@ Status: implemented baseline.
 - removed inventory default exclusion;
 - days-in-stock sort;
 - brand/model and status sorting;
+- negotiation status update and filtering;
 - responsible/origin/location/pending/listing/service filters;
 - entry-period filter;
 - active listing indicator and detail;
@@ -50,4 +52,4 @@ Project-wide validation commands used for this story:
 
 ## BMAP Note
 
-Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Service return forecast is complete after migration `20260617121000_add_service_expected_return`. Primary vehicle photo reference is complete after migration `20260617123000_add_vehicle_primary_photo`, using internal attachments instead of remote media URLs.
+Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Service return forecast is complete after migration `20260617121000_add_service_expected_return`. Primary vehicle photo reference is complete after migration `20260617123000_add_vehicle_primary_photo`, using internal attachments instead of remote media URLs. Negotiation status is complete after migration `20260617124000_add_inventory_negotiation_status`.

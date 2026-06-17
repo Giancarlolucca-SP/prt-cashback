@@ -1,0 +1,1 @@
+ALTER TYPE "InventoryStatus" ADD VALUE 'NEGOTIATION';

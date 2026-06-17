@@ -6,7 +6,7 @@ import { apiGet, apiPatch, apiPost } from "../auth/auth-client";
 import { useAuth } from "../auth/auth-provider";
 
 type OwnershipType = "OWN" | "CONSIGNED" | "REPASSE" | "TRADE_IN";
-type InventoryStatus = "IN_PREPARATION" | "AVAILABLE" | "RESERVED" | "SOLD" | "REPASSE" | "REMOVED";
+type InventoryStatus = "IN_PREPARATION" | "AVAILABLE" | "NEGOTIATION" | "RESERVED" | "SOLD" | "REPASSE" | "REMOVED";
 type InventorySort = "brand_model_asc" | "days_in_stock_desc" | "days_in_stock_asc" | "entry_date_desc" | "status_asc" | "updated_at_desc" | "price_desc" | "price_asc";
 
 type Vehicle = {
@@ -194,6 +194,7 @@ const filters: Array<{ hasActiveListing?: boolean; hasActiveService?: boolean; h
   { label: "Consignados", ownershipType: "CONSIGNED" },
   { label: "Prontos", status: "AVAILABLE" },
   { label: "Preparacao", status: "IN_PREPARATION" },
+  { label: "Negociacao", status: "NEGOTIATION" },
   { label: "Reservados", status: "RESERVED" },
   { hasActiveListing: true, label: "Com anuncio" },
   { hasActiveService: true, label: "Em servico" },
@@ -214,6 +215,7 @@ const sortOptions: Array<{ label: string; value: InventorySort }> = [
 const statusLabels: Record<InventoryStatus, string> = {
   AVAILABLE: "Pronto venda",
   IN_PREPARATION: "Preparacao",
+  NEGOTIATION: "Em negociacao",
   REMOVED: "Removido",
   REPASSE: "Repasse",
   RESERVED: "Reservado",
@@ -227,7 +229,7 @@ const ownershipLabels: Record<OwnershipType, string> = {
   TRADE_IN: "Troca",
 };
 const stockOwnershipOptions: OwnershipType[] = ["OWN", "CONSIGNED", "TRADE_IN"];
-const stockStatusOptions: InventoryStatus[] = ["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REMOVED"];
+const stockStatusOptions: InventoryStatus[] = ["IN_PREPARATION", "AVAILABLE", "NEGOTIATION", "RESERVED", "SOLD", "REMOVED"];
 
 const currency = new Intl.NumberFormat("pt-BR", { currency: "BRL", maximumFractionDigits: 0, style: "currency" });
 const percent = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1, style: "percent" });
@@ -255,7 +257,7 @@ function toneFor(item: InventoryItem) {
   if (item.ownershipType === "CONSIGNED") return "consigned";
   if (item.status === "AVAILABLE") return "ready";
   if (item.status === "IN_PREPARATION") return "prep";
-  if (item.status === "RESERVED" || item.status === "SOLD") return "sold";
+  if (item.status === "NEGOTIATION" || item.status === "RESERVED" || item.status === "SOLD") return "sold";
   return "risk";
 }
 

@@ -10,7 +10,7 @@ import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const ownershipTypeSchema = z.enum(["OWN", "CONSIGNED", "REPASSE", "TRADE_IN"]);
-const inventoryStatusSchema = z.enum(["IN_PREPARATION", "AVAILABLE", "RESERVED", "SOLD", "REPASSE", "REMOVED"]);
+const inventoryStatusSchema = z.enum(["IN_PREPARATION", "AVAILABLE", "NEGOTIATION", "RESERVED", "SOLD", "REPASSE", "REMOVED"]);
 const inventorySortSchema = z
   .enum(["brand_model_asc", "days_in_stock_desc", "days_in_stock_asc", "entry_date_desc", "status_asc", "updated_at_desc", "price_desc", "price_asc"])
   .default("days_in_stock_desc");
