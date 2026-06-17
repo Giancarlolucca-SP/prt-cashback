@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -5,6 +6,12 @@ import { ApiError } from "../api/errors.js";
 import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { prisma } from "../lib/db.js";
+import {
+  buildTechnicalDeliveryDocument,
+  renderTechnicalDeliveryDocumentHtml,
+  technicalDeliveryDocumentNumber,
+  type TechnicalDeliveryChecklistItem,
+} from "../services/technical-delivery-document.js";
 
 const deliveryStatusSchema = z.enum([
   "AWAITING_PREREQUISITES",
@@ -31,6 +38,10 @@ const technicalDeliveryParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const documentQuerySchema = z.object({
+  format: z.enum(["json", "html"]).default("json"),
+});
+
 const scheduleTechnicalDeliverySchema = z.object({
   saleId: z.string().uuid(),
   scheduledAt: z.coerce.date(),
@@ -38,6 +49,16 @@ const scheduleTechnicalDeliverySchema = z.object({
 });
 
 const allowedSchedulerRoles = new Set(["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"]);
+// A document can only be generated for a delivery that is effectively scheduled.
+// Regeneration is allowed once already generated/printed (creates a new version).
+const documentGeneratableStatuses = new Set([
+  "SCHEDULED",
+  "RESCHEDULED",
+  "DOCUMENT_GENERATED",
+  "PRINTED_PENDING_SIGNATURE",
+]);
+const documentClassification = "technical_delivery_document";
+const documentBucket = "system-generated";
 const requiredBuyerDocumentKeys = ["buyer_document_delivered", "buyer_document_checked"];
 
 const defaultTechnicalDeliveryChecklist = [
@@ -82,6 +103,29 @@ type TechnicalDeliveryRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+function resolveChecklist(snapshot: unknown): TechnicalDeliveryChecklistItem[] {
+  if (Array.isArray(snapshot)) {
+    const items = snapshot
+      .map((entry) => {
+        if (entry && typeof entry === "object" && "key" in entry && "label" in entry) {
+          const key = (entry as { key: unknown }).key;
+          const label = (entry as { label: unknown }).label;
+          if (typeof key === "string" && typeof label === "string") {
+            return { key, label } satisfies TechnicalDeliveryChecklistItem;
+          }
+        }
+        return null;
+      })
+      .filter((item): item is TechnicalDeliveryChecklistItem => item !== null);
+
+    if (items.length > 0) {
+      return items;
+    }
+  }
+
+  return defaultTechnicalDeliveryChecklist;
+}
 
 function sanitizeTechnicalDelivery(delivery: TechnicalDeliveryRecord) {
   return {
@@ -359,5 +403,227 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
     });
 
     return reply.code(result.created ? 201 : 200).send({ data: sanitizeTechnicalDelivery(result.delivery) });
+  });
+
+  app.post("/:id/generate-document", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "sales",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    assertCanScheduleTechnicalDelivery(session.user.role);
+    const params = technicalDeliveryParamsSchema.parse(request.params);
+
+    const delivery = await prisma.technicalDelivery.findFirst({
+      where: { id: params.id, storeId: session.user.storeId },
+    });
+
+    if (!delivery) {
+      throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
+    }
+
+    if (!documentGeneratableStatuses.has(delivery.status)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Documento de entrega tecnica nao pode ser gerado no status atual.", {
+        status: delivery.status,
+      });
+    }
+
+    // Re-check prerequisites: the printed document must only exist once the
+    // delivery is actually liberada (contract signed, buyer docs checked, payment confirmed).
+    await ensureDeliveryPrerequisites(session.user.storeId, delivery.saleId);
+
+    const [store, customer, vehicle, seller, responsible, scheduledBy] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: session.user.storeId },
+        select: { name: true, legalName: true, cnpj: true },
+      }),
+      prisma.customer.findFirst({
+        where: { id: delivery.customerId, storeId: session.user.storeId },
+        select: { name: true, document: true, phone: true, email: true },
+      }),
+      prisma.vehicle.findFirst({
+        where: { id: delivery.vehicleId, storeId: session.user.storeId },
+        select: {
+          brand: true,
+          model: true,
+          version: true,
+          yearModel: true,
+          yearBuild: true,
+          plate: true,
+          vin: true,
+          color: true,
+        },
+      }),
+      delivery.sellerUserId
+        ? prisma.user.findFirst({ where: { id: delivery.sellerUserId }, select: { name: true } })
+        : Promise.resolve(null),
+      delivery.responsibleUserId
+        ? prisma.user.findFirst({ where: { id: delivery.responsibleUserId }, select: { name: true } })
+        : Promise.resolve(null),
+      prisma.user.findFirst({ where: { id: delivery.scheduledByUserId }, select: { name: true } }),
+    ]);
+
+    if (!store || !customer || !vehicle) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Dados da venda incompletos para gerar o documento de entrega tecnica.", {
+        missing: [!store ? "store" : null, !customer ? "customer" : null, !vehicle ? "vehicle" : null].filter(Boolean),
+      });
+    }
+
+    const documentId = randomUUID();
+    const generatedAt = new Date();
+    const checklist = resolveChecklist(delivery.checklistSnapshot);
+    const document = buildTechnicalDeliveryDocument({
+      documentId,
+      generatedAt,
+      store,
+      customer,
+      vehicle,
+      seller,
+      responsible,
+      scheduledBy,
+      sale: { id: delivery.saleId, status: delivery.status },
+      scheduledAt: delivery.scheduledAt,
+      status: "DOCUMENT_GENERATED",
+      checklist,
+    });
+    const html = renderTechnicalDeliveryDocumentHtml(document);
+    const storagePath = `${session.user.storeId}/technical_delivery/${delivery.id}/${documentId}-entrega-tecnica.html`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const attachment = await tx.fileAttachment.create({
+        data: {
+          id: documentId,
+          storeId: session.user.storeId,
+          bucket: documentBucket,
+          path: storagePath,
+          originalName: `entrega-tecnica-${document.documentNumber}.html`,
+          mimeType: "text/html",
+          sizeBytes: Buffer.byteLength(html, "utf8"),
+          classification: documentClassification,
+          uploadedByUserId: session.user.id,
+        },
+      });
+
+      // Link the generated document to the vehicle digital folder, the sale and the customer.
+      await tx.fileAttachmentLink.createMany({
+        data: [
+          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "vehicle", entityId: delivery.vehicleId, purpose: documentClassification },
+          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "sale", entityId: delivery.saleId, purpose: documentClassification },
+          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "customer", entityId: delivery.customerId, purpose: documentClassification },
+        ],
+      });
+
+      await tx.documentVersion.create({
+        data: {
+          storeId: session.user.storeId,
+          attachmentId: attachment.id,
+          version: 1,
+          snapshot: { document, html } as Prisma.InputJsonValue,
+        },
+      });
+
+      const updated = await tx.technicalDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: "DOCUMENT_GENERATED",
+          documentGeneratedAt: generatedAt,
+          documentFileId: attachment.id,
+          checklistSnapshot: checklist as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "technical_deliveries",
+          action: "technical_delivery_document_generated",
+          entityType: "technical_delivery",
+          entityId: delivery.id,
+          result: "SUCCESS",
+          metadata: {
+            documentId: attachment.id,
+            documentNumber: document.documentNumber,
+            bucket: attachment.bucket,
+            path: attachment.path,
+            previousStatus: delivery.status,
+            saleId: delivery.saleId,
+            vehicleId: delivery.vehicleId,
+            customerId: delivery.customerId,
+          },
+        },
+      });
+
+      return updated;
+    });
+
+    return reply.code(201).send({
+      data: sanitizeTechnicalDelivery(result),
+      document: {
+        id: documentId,
+        number: document.documentNumber,
+        bucket: documentBucket,
+        path: storagePath,
+        generatedAt: generatedAt.toISOString(),
+      },
+    });
+  });
+
+  app.get("/:id/document", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "sales",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = technicalDeliveryParamsSchema.parse(request.params);
+    const query = documentQuerySchema.parse(request.query);
+
+    const delivery = await prisma.technicalDelivery.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        ...sellerScopedWhere(session.user),
+      },
+    });
+
+    if (!delivery) {
+      throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
+    }
+
+    if (!delivery.documentFileId) {
+      throw new ApiError("NOT_FOUND", "Documento de entrega tecnica ainda nao gerado.");
+    }
+
+    const version = await prisma.documentVersion.findFirst({
+      where: { attachmentId: delivery.documentFileId, storeId: session.user.storeId },
+      orderBy: { version: "desc" },
+    });
+
+    const snapshot = (version?.snapshot ?? null) as { document?: unknown; html?: unknown } | null;
+    const html = typeof snapshot?.html === "string" ? snapshot.html : null;
+    const document = snapshot?.document ?? null;
+
+    if (!html || !document) {
+      throw new ApiError("NOT_FOUND", "Conteudo do documento de entrega tecnica nao encontrado.");
+    }
+
+    if (query.format === "html") {
+      return reply.type("text/html; charset=utf-8").send(html);
+    }
+
+    return {
+      data: {
+        id: delivery.id,
+        status: delivery.status,
+        documentFileId: delivery.documentFileId,
+        documentNumber: technicalDeliveryDocumentNumber(delivery.documentFileId),
+        documentGeneratedAt: delivery.documentGeneratedAt?.toISOString() ?? null,
+      },
+      document,
+      html,
+    };
   });
 }
