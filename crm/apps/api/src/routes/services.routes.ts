@@ -80,6 +80,7 @@ const serviceOrderSchema = z.object({
   status: serviceOrderStatusSchema.default("OPEN"),
   totalAmount: z.number().nonnegative().optional(),
   startedAt: z.coerce.date().optional(),
+  expectedReturnAt: z.coerce.date().optional(),
 });
 
 const serviceOrderParamsSchema = z.object({ id: z.string().uuid() });
@@ -133,6 +134,7 @@ type ServiceOrderRecord = {
   status: string;
   totalAmount: { toString(): string } | null;
   startedAt: Date | null;
+  expectedReturnAt: Date | null;
   finishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -218,6 +220,7 @@ function sanitizeOrder(order: ServiceOrderRecord) {
     status: order.status,
     totalAmount: order.totalAmount?.toString() ?? null,
     startedAt: order.startedAt?.toISOString() ?? null,
+    expectedReturnAt: order.expectedReturnAt?.toISOString() ?? null,
     finishedAt: order.finishedAt?.toISOString() ?? null,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),

@@ -2069,11 +2069,13 @@ try {
       status: "OPEN",
       totalAmount: 900,
       startedAt: "2026-06-06T16:00:00.000Z",
+      expectedReturnAt: "2026-06-09T16:00:00.000Z",
     },
   });
   assert.equal(createServiceOrder.statusCode, 201);
   assert.equal(createServiceOrder.json().data.vehicleId, inventoryVehicleId);
   assert.equal(createServiceOrder.json().data.totalAmount, "900");
+  assert.equal(createServiceOrder.json().data.expectedReturnAt, "2026-06-09T16:00:00.000Z");
   const serviceOrderId = createServiceOrder.json().data.id as string;
 
   const listServiceOrders = await app.inject({
@@ -2098,6 +2100,7 @@ try {
   assert.equal(inventoryItemWithActiveService.hasActiveService, true);
   assert.equal(inventoryItemWithActiveService.activeService.id, serviceOrderId);
   assert.equal(inventoryItemWithActiveService.activeService.providerName, providerName);
+  assert.equal(inventoryItemWithActiveService.activeService.expectedReturnAt, "2026-06-09T16:00:00.000Z");
   assert.equal(listInventoryWithActiveService.json().summary.activeServices, 1);
 
   const detailInventoryWithActiveService = await app.inject({
@@ -2111,6 +2114,7 @@ try {
   assert.equal(detailInventoryWithActiveService.json().data.hasActiveService, true);
   assert.equal(detailInventoryWithActiveService.json().data.activeService.id, serviceOrderId);
   assert.equal(detailInventoryWithActiveService.json().data.activeService.providerName, providerName);
+  assert.equal(detailInventoryWithActiveService.json().data.activeService.expectedReturnAt, "2026-06-09T16:00:00.000Z");
 
   const filteredInventoryWithActiveService = await app.inject({
     method: "GET",

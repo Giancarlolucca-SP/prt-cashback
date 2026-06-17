@@ -22,6 +22,7 @@ type Vehicle = {
 
 type InventoryItem = {
   activeService?: {
+    expectedReturnAt: string | null;
     id: string;
     providerName: string | null;
     startedAt: string | null;
@@ -534,6 +535,7 @@ export function LiveInventoryWorkspace() {
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
             <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
             <span>{item.hasActiveService ? `Servico: ${item.activeService?.type ?? "em andamento"}${item.activeService?.providerName ? ` | ${item.activeService.providerName}` : ""}` : "Sem servico ativo"}</span>
+            <span>{item.activeService?.expectedReturnAt ? `Retorno: ${new Date(item.activeService.expectedReturnAt).toLocaleDateString("pt-BR")}` : "Retorno n/d"}</span>
             <span>{item.hasRelevantPending ? item.pendingSummary ?? "Pendencia relevante" : "Sem pendencia relevante"}</span>
             <span>{operationalDaysInStock(item)} dias</span>
           </div>
@@ -754,7 +756,7 @@ export function LiveInventoryWorkspace() {
                       <Wrench aria-hidden="true" size={17} />
                       <span>
                         <strong>{inventoryDetail.data.activeService.type}</strong>
-                        <em>{inventoryDetail.data.activeService.status} | {inventoryDetail.data.activeService.providerName ?? "Prestador nao informado"}</em>
+                        <em>{inventoryDetail.data.activeService.status} | {inventoryDetail.data.activeService.providerName ?? "Prestador nao informado"} | Retorno {inventoryDetail.data.activeService.expectedReturnAt ? new Date(inventoryDetail.data.activeService.expectedReturnAt).toLocaleDateString("pt-BR") : "n/d"}</em>
                       </span>
                     </li>
                   </ul>

@@ -1358,6 +1358,7 @@ model ServiceOrder {
   status             ServiceOrderStatus @default(OPEN)
   totalAmount        Decimal?           @map("total_amount") @db.Decimal(14, 2)
   startedAt          DateTime?          @map("started_at")
+  expectedReturnAt   DateTime?          @map("expected_return_at")
   finishedAt         DateTime?          @map("finished_at")
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
@@ -1367,6 +1368,7 @@ model ServiceOrder {
   @@index([customerId])
   @@index([postSaleCustomerId])
   @@index([vehicleId])
+  @@index([expectedReturnAt])
   @@map("service_orders")
 }
 

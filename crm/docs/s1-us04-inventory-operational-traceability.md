@@ -16,7 +16,7 @@ Status: implemented baseline with remaining explicit deferred fields.
 | Filters cover status, ownership, brand/model search, responsible user, origin, location, period, pending, listing, service | `GET /inventory` accepts `status`, `ownership_type`, `search`, `responsible_user_id`, `stock_origin`, `stock_location`, `entry_date_from`, `entry_date_to`, `has_pending`, `has_active_listing`, and `has_active_service`. |
 | Sorts cover days, update, entry date, price, brand/model, status | `sort` accepts `days_in_stock_desc`, `days_in_stock_asc`, `updated_at_desc`, `entry_date_desc`, `price_desc`, `price_asc`, `brand_model_asc`, and `status_asc`. |
 | Active listing indicator exists | List items return `hasActiveListing` and `activeListingsCount`; detail returns `activeListings`. |
-| Active service/preparation indicator exists | List/detail items return `hasActiveService` and `activeService` for non-terminal service orders. |
+| Active service/preparation indicator exists | List/detail items return `hasActiveService` and `activeService` for non-terminal service orders, including expected return when available. |
 | Relevant pending indicator exists | List items return `hasRelevantPending` and `pendingSummary`. |
 | Cost fields are permission-protected | `purchaseCost` is returned only when the user has `inventory:read_costs`. |
 | Status updates are audited | Inventory updates write `auditLog` entries and `vehicleStatusHistory` on status changes. |
@@ -35,7 +35,7 @@ Status: implemented baseline with remaining explicit deferred fields.
 - responsible/origin/location/pending/listing/service filters;
 - entry-period filter;
 - active listing indicator and detail;
-- active service indicator and detail;
+- active service indicator/detail with expected return;
 - summary counts for ownership, statuses, active listings, and active services;
 - status-change audit log.
 
@@ -51,9 +51,8 @@ The following S1-US04 fields are intentionally not implemented yet because the c
 
 | Deferred field/filter | Current status | Next required work |
 |---|---|---|
-| service return forecast | Not present on `ServiceOrder`. Current detail exposes `startedAt`, status, type, and provider. | Add expected return/deadline field to service orders if required by operations. |
 | primary photo URL | Not present on vehicle/inventory. Attachments exist as documents. | Add photo attachment classification or a primary media relation. |
 
 ## BMAP Note
 
-Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Do not mark service return forecast or primary photo as complete until their data fields exist in the model, API, UI, and smoke coverage.
+Responsible/origin/location filters are complete after migration `20260617120000_add_inventory_operational_fields`. Service return forecast is complete after migration `20260617121000_add_service_expected_return`. Do not mark primary photo as complete until its data field exists in the model, API, UI, and smoke coverage.

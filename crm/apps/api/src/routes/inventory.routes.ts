@@ -158,6 +158,7 @@ type InventoryRecord = {
 };
 
 type InventoryServiceSummary = {
+  expectedReturnAt: string | null;
   id: string;
   providerName: string | null;
   startedAt: string | null;
@@ -635,6 +636,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
           orderBy: { updatedAt: "desc" },
           select: {
             id: true,
+            expectedReturnAt: true,
             providerId: true,
             startedAt: true,
             status: true,
@@ -660,6 +662,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       if (!order.vehicleId || activeServiceByVehicleId.has(order.vehicleId)) continue;
       activeServiceByVehicleId.set(order.vehicleId, {
         id: order.id,
+        expectedReturnAt: order.expectedReturnAt?.toISOString() ?? null,
         providerName: order.providerId ? serviceProviderNameById.get(order.providerId) ?? null : null,
         startedAt: order.startedAt?.toISOString() ?? null,
         status: order.status,
@@ -739,6 +742,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
+        expectedReturnAt: true,
         providerId: true,
         startedAt: true,
         status: true,
@@ -758,6 +762,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         activeService: activeService
           ? {
               id: activeService.id,
+              expectedReturnAt: activeService.expectedReturnAt?.toISOString() ?? null,
               providerName: activeServiceProvider?.name ?? null,
               startedAt: activeService.startedAt?.toISOString() ?? null,
               status: activeService.status,
