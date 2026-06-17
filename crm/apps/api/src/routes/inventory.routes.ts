@@ -698,9 +698,44 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       },
       orderBy: { updatedAt: "desc" },
     });
+    const activeService = await prisma.serviceOrder.findFirst({
+      where: {
+        storeId: session.user.storeId,
+        vehicleId: vehicle.id,
+        deletedAt: null,
+        status: { notIn: ["DONE", "CANCELLED"] },
+      },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        providerId: true,
+        startedAt: true,
+        status: true,
+        type: true,
+        updatedAt: true,
+      },
+    });
+    const activeServiceProvider = activeService?.providerId
+      ? await prisma.serviceProvider.findFirst({
+          where: { id: activeService.providerId, storeId: session.user.storeId, deletedAt: null },
+          select: { name: true },
+        })
+      : null;
 
     return {
-      data: sanitizeInventory(inventory, vehicle, { includeCosts }),
+      data: sanitizeInventory(inventory, vehicle, {
+        activeService: activeService
+          ? {
+              id: activeService.id,
+              providerName: activeServiceProvider?.name ?? null,
+              startedAt: activeService.startedAt?.toISOString() ?? null,
+              status: activeService.status,
+              type: activeService.type,
+              updatedAt: activeService.updatedAt.toISOString(),
+            }
+          : undefined,
+        includeCosts,
+      }),
       documents: links.flatMap((link) => {
         const attachment = attachmentById.get(link.attachmentId);
         return attachment ? [sanitizeInventoryDocument({ attachment, link })] : [];

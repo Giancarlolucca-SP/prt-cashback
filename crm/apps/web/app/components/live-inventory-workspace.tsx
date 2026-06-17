@@ -714,6 +714,22 @@ export function LiveInventoryWorkspace() {
                   </ul>
                 )}
               </section>
+              <section>
+                <strong>Servico ativo</strong>
+                {inventoryDetail.data.activeService ? (
+                  <ul>
+                    <li>
+                      <Wrench aria-hidden="true" size={17} />
+                      <span>
+                        <strong>{inventoryDetail.data.activeService.type}</strong>
+                        <em>{inventoryDetail.data.activeService.status} | {inventoryDetail.data.activeService.providerName ?? "Prestador nao informado"}</em>
+                      </span>
+                    </li>
+                  </ul>
+                ) : (
+                  <p>Nenhuma OS ativa vinculada a este veiculo.</p>
+                )}
+              </section>
             </div>
           </section>
         </div>

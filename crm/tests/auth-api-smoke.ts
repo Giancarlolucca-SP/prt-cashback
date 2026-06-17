@@ -2074,6 +2074,18 @@ try {
   assert.equal(inventoryItemWithActiveService.activeService.providerName, providerName);
   assert.equal(listInventoryWithActiveService.json().summary.activeServices, 1);
 
+  const detailInventoryWithActiveService = await app.inject({
+    method: "GET",
+    url: `/inventory/${inventoryId}/detail`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(detailInventoryWithActiveService.statusCode, 200);
+  assert.equal(detailInventoryWithActiveService.json().data.hasActiveService, true);
+  assert.equal(detailInventoryWithActiveService.json().data.activeService.id, serviceOrderId);
+  assert.equal(detailInventoryWithActiveService.json().data.activeService.providerName, providerName);
+
   const filteredInventoryWithActiveService = await app.inject({
     method: "GET",
     url: `/inventory?page=1&page_size=20&has_active_service=true&search=${encodeURIComponent(inventoryPlate)}`,
