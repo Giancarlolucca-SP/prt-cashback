@@ -196,7 +196,12 @@ function sanitizeVehicle(vehicle: VehicleRecord) {
   };
 }
 
-function sanitizeInventory(record: InventoryRecord, vehicle: VehicleRecord | undefined, options: { includeCosts: boolean }) {
+function sanitizeInventory(
+  record: InventoryRecord,
+  vehicle: VehicleRecord | undefined,
+  options: { activeListingsCount?: number; includeCosts: boolean },
+) {
+  const activeListingsCount = options.activeListingsCount ?? 0;
   return {
     id: record.id,
     vehicleId: record.vehicleId,
@@ -209,6 +214,8 @@ function sanitizeInventory(record: InventoryRecord, vehicle: VehicleRecord | und
     entryDate: record.entryDate.toISOString(),
     exitDate: record.exitDate?.toISOString() ?? null,
     daysInStock: calculateDaysInStock(record),
+    activeListingsCount,
+    hasActiveListing: activeListingsCount > 0,
     notes: record.notes,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -455,10 +462,28 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
       where: { id: { in: items.map((item) => item.vehicleId) }, storeId: session.user.storeId },
     });
     const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+    const activeListingCounts = items.length
+      ? await prisma.listing.groupBy({
+          by: ["vehicleId"],
+          where: {
+            storeId: session.user.storeId,
+            vehicleId: { in: items.map((item) => item.vehicleId) },
+            deletedAt: null,
+            status: { in: ["PENDING", "PUBLISHED"] },
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const activeListingCountByVehicleId = new Map(activeListingCounts.map((item) => [item.vehicleId, item._count._all]));
 
     return {
       ...listResponse(
-        items.map((item) => sanitizeInventory(item, vehicleById.get(item.vehicleId), { includeCosts })),
+        items.map((item) =>
+          sanitizeInventory(item, vehicleById.get(item.vehicleId), {
+            activeListingsCount: activeListingCountByVehicleId.get(item.vehicleId) ?? 0,
+            includeCosts,
+          }),
+        ),
         query,
         total,
       ),

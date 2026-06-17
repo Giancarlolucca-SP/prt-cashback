@@ -28,7 +28,9 @@ type InventoryItem = {
   purchaseCost: string | null;
   askingPrice: string | null;
   entryDate: string;
+  activeListingsCount?: number;
   daysInStock?: number;
+  hasActiveListing?: boolean;
   notes: string | null;
 };
 
@@ -459,6 +461,7 @@ export function LiveInventoryWorkspace() {
             <span>{statusLabels[item.status]}</span>
             <span>{item.notes ?? "Sem observacoes"}</span>
             <span>{item.vehicle?.relevantOptions ?? "Opcionais n/d"}</span>
+            <span>{item.hasActiveListing ? `${item.activeListingsCount ?? 1} anuncio ativo` : "Sem anuncio ativo"}</span>
             <span>{operationalDaysInStock(item)} dias</span>
           </div>
           <div className="vehicle-price">

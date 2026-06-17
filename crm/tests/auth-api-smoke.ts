@@ -2302,6 +2302,19 @@ try {
       .activeListings.some((listing: { id: string; status: string; title: string }) => listing.id === listingId && listing.status === "PUBLISHED" && listing.title === "Honda Civic Touring QA"),
   );
 
+  const inventoryListWithActiveListing = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryListWithActiveListing.statusCode, 200);
+  const inventoryItemWithActiveListing = inventoryListWithActiveListing.json().items.find((item: { id: string }) => item.id === inventoryId);
+  assert.ok(inventoryItemWithActiveListing);
+  assert.equal(inventoryItemWithActiveListing.hasActiveListing, true);
+  assert.equal(inventoryItemWithActiveListing.activeListingsCount, 1);
+
   const listingMetricDate = new Date(Date.now() + 172800000).toISOString();
   const listingMetric = await app.inject({
     method: "POST",
