@@ -646,7 +646,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
         },
       });
 
-      await tx.leadCard.create({
+      const leadCard = await tx.leadCard.create({
         data: {
           storeId: session.user.storeId,
           leadId: lead.id,
@@ -714,6 +714,25 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
               customerId: customer.id,
               source: lead.source,
               vehicleId: lead.vehicleId,
+            },
+          },
+          {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "create",
+            entityType: "lead_card",
+            entityId: leadCard.id,
+            result: "SUCCESS",
+            metadata: {
+              leadId: lead.id,
+              customerId: customer.id,
+              vehicleId: lead.vehicleId,
+              boardKey: leadCard.boardKey,
+              stageKey: leadCard.stageKey,
+              position: leadCard.position,
+              origin: input.origin,
             },
           },
         ],

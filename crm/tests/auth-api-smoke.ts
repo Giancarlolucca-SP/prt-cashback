@@ -710,6 +710,34 @@ try {
   assert.equal(createLead.json().data.status, "NEW");
   const createdLeadId = createLead.json().data.id as string;
 
+  const createdLeadCard = await prisma.leadCard.findFirst({
+    where: {
+      leadId: createdLeadId,
+      boardKey: "leads",
+    },
+  });
+  assert.ok(createdLeadCard);
+
+  const leadCardCreateAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=leads&action=create&entity_type=lead_card&entity_id=${createdLeadCard.id}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(leadCardCreateAudit.statusCode, 200);
+  assert.ok(
+    leadCardCreateAudit
+      .json()
+      .items.some(
+        (log: { metadata: { leadId?: string; boardKey?: string; stageKey?: string; position?: number } }) =>
+          log.metadata.leadId === createdLeadId &&
+          log.metadata.boardKey === "leads" &&
+          log.metadata.stageKey === "NEW" &&
+          log.metadata.position === 0,
+      ),
+  );
+
   const listLeads = await app.inject({
     method: "GET",
     url: `/leads?page=1&page_size=5&search=${encodeURIComponent(leadSearchToken)}`,
@@ -787,6 +815,37 @@ try {
   assert.equal(moveLeadStage.statusCode, 200);
   assert.equal(moveLeadStage.json().data.status, "CONTACTED");
   assert.equal(moveLeadStage.json().unchanged, false);
+
+  const leadCardMoveAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=leads&action=pipeline_moved&entity_type=lead_card&entity_id=${createdLeadCard.id}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(leadCardMoveAudit.statusCode, 200);
+  assert.ok(
+    leadCardMoveAudit
+      .json()
+      .items.some(
+        (log: {
+          metadata: {
+            leadId?: string;
+            fromStage?: string;
+            toStage?: string;
+            fromPosition?: number | null;
+            toPosition?: number;
+            reason?: string | null;
+          };
+        }) =>
+          log.metadata.leadId === createdLeadId &&
+          log.metadata.fromStage === "NEW" &&
+          log.metadata.toStage === "CONTACTED" &&
+          log.metadata.fromPosition === 0 &&
+          log.metadata.toPosition === 2 &&
+          log.metadata.reason === "Primeiro contato realizado em QA",
+      ),
+  );
 
   const moveLeadToLostWithoutReason = await app.inject({
     method: "POST",
@@ -1674,6 +1733,34 @@ try {
   });
   assert.equal(createMinimalLeadWithVehicle.statusCode, 201);
   assert.equal(createMinimalLeadWithVehicle.json().data.lead.vehicleId, inventoryVehicleId);
+  const minimalLeadWithVehicleId = createMinimalLeadWithVehicle.json().data.lead.id as string;
+  const minimalLeadWithVehicleCard = await prisma.leadCard.findFirst({
+    where: {
+      leadId: minimalLeadWithVehicleId,
+      boardKey: "leads",
+    },
+  });
+  assert.ok(minimalLeadWithVehicleCard);
+
+  const minimalLeadCardAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=leads&action=create&entity_type=lead_card&entity_id=${minimalLeadWithVehicleCard.id}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(minimalLeadCardAudit.statusCode, 200);
+  assert.ok(
+    minimalLeadCardAudit
+      .json()
+      .items.some(
+        (log: { metadata: { leadId?: string; vehicleId?: string | null; boardKey?: string; stageKey?: string } }) =>
+          log.metadata.leadId === minimalLeadWithVehicleId &&
+          log.metadata.vehicleId === inventoryVehicleId &&
+          log.metadata.boardKey === "leads" &&
+          log.metadata.stageKey === "NEW",
+      ),
+  );
 
   const prepareVehiclePrimaryPhoto = await app.inject({
     method: "POST",

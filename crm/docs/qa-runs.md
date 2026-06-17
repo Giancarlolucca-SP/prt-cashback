@@ -2446,3 +2446,28 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: revisar logs de card comercial e movimento de Kanban para fechar os criterios restantes da S1-US06.
+
+## 2026-06-17 - S1-US06 auditoria de card comercial e Kanban
+
+Contexto:
+
+- Etapa BMAP: fechar criterios de aceite de card cliente/lead x veiculo e movimentacao de Kanban.
+- Foco: `leadCard` deve ter log proprio, alem da auditoria ja existente do `lead`.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Criacao de lead agora grava auditoria `entityType=lead_card` com `action=create`.
+- Criacao de lead minimo tambem grava auditoria do card, incluindo `vehicleId` quando houver veiculo vinculado.
+- Mudanca de etapa via `POST /leads/:id/stage` grava auditoria `entityType=lead_card` com `action=pipeline_moved`.
+- Smoke cobre criacao de card, card com veiculo vinculado e movimentacao de Kanban com antes/depois.
+
+Observacoes:
+
+- Proxima melhoria recomendada: fazer revisao final da matriz de aceite da S1-US06 e marcar a historia como concluida se nao houver lacuna restante.

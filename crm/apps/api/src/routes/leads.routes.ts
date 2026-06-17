@@ -943,7 +943,7 @@ export async function registerLeadRoutes(app: FastifyInstance) {
         },
       });
 
-      await tx.leadCard.create({
+      const createdCard = await tx.leadCard.create({
         data: {
           storeId: session.user.storeId,
           leadId: created.id,
@@ -980,6 +980,27 @@ export async function registerLeadRoutes(app: FastifyInstance) {
             vehicleId: created.vehicleId,
             source: created.source,
             status: created.status,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "create",
+          entityType: "lead_card",
+          entityId: createdCard.id,
+          result: "SUCCESS",
+          metadata: {
+            leadId: created.id,
+            customerId: created.customerId,
+            vehicleId: created.vehicleId,
+            boardKey: createdCard.boardKey,
+            stageKey: createdCard.stageKey,
+            position: createdCard.position,
           },
         },
       });
@@ -1113,25 +1134,23 @@ export async function registerLeadRoutes(app: FastifyInstance) {
         },
       });
 
-      if (currentCard) {
-        await tx.leadCard.update({
-          where: { id: currentCard.id },
-          data: {
-            stageKey: input.toStage,
-            position: input.position,
-          },
-        });
-      } else {
-        await tx.leadCard.create({
-          data: {
-            storeId: session.user.storeId,
-            leadId: updated.id,
-            boardKey: "leads",
-            stageKey: input.toStage,
-            position: input.position,
-          },
-        });
-      }
+      const movedCard = currentCard
+        ? await tx.leadCard.update({
+            where: { id: currentCard.id },
+            data: {
+              stageKey: input.toStage,
+              position: input.position,
+            },
+          })
+        : await tx.leadCard.create({
+            data: {
+              storeId: session.user.storeId,
+              leadId: updated.id,
+              boardKey: "leads",
+              stageKey: input.toStage,
+              position: input.position,
+            },
+          });
 
       await tx.leadStageHistory.create({
         data: {
@@ -1158,6 +1177,31 @@ export async function registerLeadRoutes(app: FastifyInstance) {
             fromStage: current.status,
             toStage: input.toStage,
             reason: input.reason,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "pipeline_moved",
+          entityType: "lead_card",
+          entityId: movedCard.id,
+          result: "SUCCESS",
+          metadata: {
+            leadId: updated.id,
+            customerId: updated.customerId,
+            vehicleId: updated.vehicleId,
+            boardKey: movedCard.boardKey,
+            fromStage: currentCard?.stageKey ?? current.status,
+            toStage: input.toStage,
+            fromPosition: currentCard?.position ?? null,
+            toPosition: movedCard.position,
+            reason: input.reason,
+            cardCreatedDuringMove: !currentCard,
           },
         },
       });
