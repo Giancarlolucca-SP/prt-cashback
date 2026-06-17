@@ -467,36 +467,51 @@ model Lead {
   customerId     String?    @map("customer_id")
   assignedUserId String?    @map("assigned_user_id")
   vehicleId      String?    @map("vehicle_id")
-  source         String?
-  title          String
-  status         LeadStatus @default(NEW)
-  interest       String?
-  temperature    Int?
-  nextActionAt   DateTime?  @map("next_action_at")
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
-  deletedAt      DateTime?  @map("deleted_at")
+  source            String?
+  title             String
+  status            LeadStatus @default(NEW)
+  interest          String?
+  temperature       Int?
+  channel           String?
+  campaign          String?
+  contactedAt       DateTime?  @map("contacted_at")
+  lastInteractionAt DateTime?  @map("last_interaction_at")
+  nextActionAt      DateTime?  @map("next_action_at")
+  createdByUserId   String?    @map("created_by_user_id")
+  updatedByUserId   String?    @map("updated_by_user_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  deletedAt         DateTime?  @map("deleted_at")
+
+  cards LeadCard[]
 
   @@index([storeId])
   @@index([customerId])
   @@index([assignedUserId])
   @@index([vehicleId])
   @@index([status, nextActionAt])
+  @@index([storeId, lastInteractionAt])
   @@map("leads")
 }
 
 model LeadCard {
-  id        String   @id @default(uuid())
-  storeId   String   @map("store_id")
-  leadId    String   @map("lead_id")
-  boardKey  String   @map("board_key")
-  stageKey  String   @map("stage_key")
-  position  Int      @default(0)
-  metadata  Json?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String    @id @default(uuid())
+  storeId        String    @map("store_id")
+  leadId         String    @map("lead_id")
+  boardKey       String    @map("board_key")
+  stageKey       String    @map("stage_key")
+  position       Int       @default(0)
+  stageEnteredAt DateTime  @default(now()) @map("stage_entered_at")
+  archivedAt     DateTime? @map("archived_at")
+  lostReason     String?   @map("lost_reason")
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id])
 
   @@index([storeId, boardKey, stageKey])
+  @@index([storeId, boardKey, archivedAt])
   @@index([leadId])
   @@map("lead_cards")
 }
