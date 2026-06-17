@@ -2372,3 +2372,28 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: aplicar o mesmo detalhamento em alteracoes de veiculo/estoque sensiveis, especialmente preco e tipo de estoque.
+
+## 2026-06-17 - S1-US06 auditoria detalhada de estoque
+
+Contexto:
+
+- Etapa BMAP: continuar S1-US06 ampliando campos alterados para estoque e veiculo.
+- Foco: `PATCH /inventory/:id` deve registrar antes/depois de campos operacionais e comerciais relevantes.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Update de estoque grava `metadata.changedFields` e `metadata.changes` em `audit_logs`.
+- Alteracoes de inventario cobrem status, tipo de estoque, responsavel, local, custo, preco, datas e observacoes.
+- Alteracoes aninhadas de veiculo sao registradas com prefixo `vehicle.*`, por exemplo `vehicle.mileage`.
+- Smoke confirma auditoria de preco anunciado e quilometragem com valor anterior e novo valor.
+
+Observacoes:
+
+- Proxima melhoria recomendada: consolidar helper compartilhado de auditoria para evitar duplicacao entre clientes e estoque.

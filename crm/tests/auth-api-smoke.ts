@@ -2180,6 +2180,31 @@ try {
       .items.some((log: { metadata: { fromStatus?: string; toStatus?: string } }) => log.metadata.fromStatus === "IN_PREPARATION" && log.metadata.toStatus === "AVAILABLE"),
   );
 
+  const inventoryUpdateAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=inventory&action=update&entity_type=vehicle_inventory&entity_id=${inventoryId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryUpdateAudit.statusCode, 200);
+  const inventoryUpdateLog = inventoryUpdateAudit.json().items.find((log: { metadata: { changedFields?: string[] } | null }) =>
+    log.metadata?.changedFields?.includes("askingPrice"),
+  );
+  assert.ok(inventoryUpdateLog);
+  assert.ok(
+    inventoryUpdateLog.metadata.changes.some(
+      (change: { field: string; newValue: string; oldValue: string }) =>
+        change.field === "askingPrice" && change.oldValue === "124900" && change.newValue === "122900",
+    ),
+  );
+  assert.ok(
+    inventoryUpdateLog.metadata.changes.some(
+      (change: { field: string; newValue: string; oldValue: string }) =>
+        change.field === "vehicle.mileage" && change.oldValue === "42000" && change.newValue === "42100",
+    ),
+  );
+
   const moveInventoryToNegotiation = await app.inject({
     method: "PATCH",
     url: `/inventory/${inventoryId}`,

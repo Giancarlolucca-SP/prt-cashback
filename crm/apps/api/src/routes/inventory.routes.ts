@@ -105,6 +105,8 @@ const updateInventorySchema = z
     message: "Informe ao menos um campo para atualizar.",
   });
 
+type UpdateInventoryInput = z.infer<typeof updateInventorySchema>;
+
 const inventoryParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -172,6 +174,55 @@ type InventoryServiceSummary = {
 function calculateDaysInStock(record: Pick<InventoryRecord, "entryDate" | "exitDate">) {
   const endDate = record.exitDate ?? new Date();
   return Math.max(0, Math.floor((endDate.getTime() - record.entryDate.getTime()) / 86400000));
+}
+
+function auditComparableValue(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number") return String(value);
+  if (typeof value === "object" && "toString" in value && typeof value.toString === "function") return value.toString();
+  return value;
+}
+
+function inventoryAuditChanges(current: { inventory: InventoryRecord; vehicle: VehicleRecord }, input: UpdateInventoryInput) {
+  const changes: Array<{ field: string; newValue: unknown; oldValue: unknown }> = [];
+
+  const addChange = (field: string, oldValue: unknown, newValue: unknown) => {
+    const normalizedOld = auditComparableValue(oldValue);
+    const normalizedNew = auditComparableValue(newValue);
+    if (normalizedOld !== normalizedNew) {
+      changes.push({ field, oldValue: normalizedOld, newValue: normalizedNew });
+    }
+  };
+
+  const inventoryFields: Array<keyof Omit<UpdateInventoryInput, "vehicle">> = [
+    "ownershipType",
+    "status",
+    "ownerCustomerId",
+    "responsibleUserId",
+    "stockLocation",
+    "stockOrigin",
+    "purchaseCost",
+    "askingPrice",
+    "entryDate",
+    "exitDate",
+    "notes",
+  ];
+
+  for (const field of inventoryFields) {
+    if (field in input) {
+      addChange(field, current.inventory[field], input[field]);
+    }
+  }
+
+  if (input.vehicle) {
+    for (const [field, newValue] of Object.entries(input.vehicle)) {
+      addChange(`vehicle.${field}`, current.vehicle[field as keyof VehicleRecord], newValue);
+    }
+  }
+
+  return changes;
 }
 
 function buildInventoryOperationalSummary(input: {
@@ -952,6 +1003,8 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     const nextPurchaseCost = input.purchaseCost === undefined ? current.inventory.purchaseCost : input.purchaseCost;
     const statusChanged = input.status !== undefined && input.status !== current.inventory.status;
     const ownershipTypeChanged = input.ownershipType !== undefined && input.ownershipType !== current.inventory.ownershipType;
+    const changes = inventoryAuditChanges(current, input);
+    const changedFields = changes.map((change) => change.field);
 
     enforceConsignedInventoryRules({
       ownerCustomerId: nextOwnerCustomerId,
@@ -1001,7 +1054,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
           entityType: "vehicle_inventory",
           entityId: inventory.id,
           result: "SUCCESS",
-          metadata: { changedFields: Object.keys(input) },
+          metadata: { changedFields, changes } as Prisma.InputJsonObject,
         },
       });
 
