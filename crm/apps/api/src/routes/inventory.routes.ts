@@ -411,16 +411,17 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
         ).map((vehicle) => vehicle.id)
       : null;
 
+    const commonInventoryGuards = [
+      ...(query.status ? [] : [{ status: { notIn: ["REPASSE" as const, "REMOVED" as const] } }]),
+      ...(query.ownership_type ? [] : [{ ownershipType: { not: "REPASSE" as const } }]),
+    ];
+
     const where = {
       storeId: session.user.storeId,
       deletedAt: null,
       ...(query.status ? { status: query.status } : {}),
       ...(query.ownership_type ? { ownershipType: query.ownership_type } : {}),
-      ...(!query.status && !query.ownership_type
-        ? {
-            NOT: [{ status: "REPASSE" as const }, { ownershipType: "REPASSE" as const }],
-          }
-        : {}),
+      ...(commonInventoryGuards.length ? { AND: commonInventoryGuards } : {}),
       ...(matchingVehicleIds ? { vehicleId: { in: matchingVehicleIds } } : {}),
     };
 

@@ -1722,6 +1722,27 @@ try {
   assert.equal(duplicateInventory.statusCode, 409);
   assert.equal(duplicateInventory.json().error.code, "CONFLICT");
 
+  const removedInventory = await app.inject({
+    method: "POST",
+    url: "/inventory",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      vehicle: {
+        brand: "Renault",
+        model: "Duster",
+        yearModel: 2020,
+        plate: uniquePlate("RM"),
+      },
+      ownershipType: "OWN",
+      status: "REMOVED",
+      entryDate: "2026-06-06T12:00:00.000Z",
+    },
+  });
+  assert.equal(removedInventory.statusCode, 201);
+  const removedInventoryId = removedInventory.json().data.id as string;
+
   const listInventory = await app.inject({
     method: "GET",
     url: `/inventory?page=1&page_size=5&search=${encodeURIComponent(inventoryPlate)}`,
@@ -1738,6 +1759,26 @@ try {
   assert.ok(listInventory.json().summary.own >= 1);
   assert.equal(typeof listInventory.json().summary.ownPercent, "number");
   assert.equal(typeof listInventory.json().summary.byStatus.IN_PREPARATION, "number");
+
+  const defaultInventoryWithoutRemoved = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(defaultInventoryWithoutRemoved.statusCode, 200);
+  assert.ok(!defaultInventoryWithoutRemoved.json().items.some((item: { id: string }) => item.id === removedInventoryId));
+
+  const listRemovedInventory = await app.inject({
+    method: "GET",
+    url: "/inventory?page=1&page_size=100&status=REMOVED",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listRemovedInventory.statusCode, 200);
+  assert.ok(listRemovedInventory.json().items.some((item: { id: string }) => item.id === removedInventoryId));
 
   const listInventoryByDaysInStock = await app.inject({
     method: "GET",
@@ -2739,7 +2780,7 @@ try {
 
   const defaultInventoryAfterRepasseCancel = await app.inject({
     method: "GET",
-    url: "/inventory?page=1&page_size=100",
+    url: "/inventory?page=1&page_size=100&search=Pulse",
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
