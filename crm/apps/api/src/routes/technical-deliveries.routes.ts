@@ -723,4 +723,96 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       },
     });
   });
+
+  app.post("/:id/signed-copy", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "sales",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    assertCanScheduleTechnicalDelivery(session.user.role);
+    const params = technicalDeliveryParamsSchema.parse(request.params);
+    const input = registerSignedCopySchema.parse(request.body);
+
+    const delivery = await prisma.technicalDelivery.findFirst({
+      where: { id: params.id, storeId: session.user.storeId },
+    });
+
+    if (!delivery) {
+      throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
+    }
+
+    if (!canRegisterSignedCopy(delivery.status as TechnicalDeliveryStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Via assinada so pode ser registrada apos a impressao para assinatura.", {
+        status: delivery.status,
+      });
+    }
+
+    // The signed copy must be a real, already-uploaded file (scan/photo) in the store.
+    const attachment = await prisma.fileAttachment.findFirst({
+      where: { id: input.signedCopyFileId, storeId: session.user.storeId, status: "ACTIVE", deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!attachment) {
+      throw new ApiError("NOT_FOUND", "Arquivo da via assinada nao encontrado.");
+    }
+
+    const completedAt = new Date();
+    const updated = await prisma.$transaction(async (tx) => {
+      // Attach the signed copy to the vehicle digital folder, the sale and the customer.
+      await tx.fileAttachmentLink.createMany({
+        data: [
+          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "vehicle", entityId: delivery.vehicleId, purpose: "technical_delivery_signed_copy" },
+          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "sale", entityId: delivery.saleId, purpose: "technical_delivery_signed_copy" },
+          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "customer", entityId: delivery.customerId, purpose: "technical_delivery_signed_copy" },
+        ],
+        skipDuplicates: true,
+      });
+
+      const next = await tx.technicalDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: "COMPLETED_SIGNED",
+          signedCopyStatus: "RECEIVED",
+          signedCopyFileId: attachment.id,
+          completedAt,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "technical_deliveries",
+          action: "technical_delivery_signed_copy_registered",
+          entityType: "technical_delivery",
+          entityId: delivery.id,
+          result: "SUCCESS",
+          metadata: {
+            previousStatus: delivery.status,
+            status: next.status,
+            signedCopyFileId: attachment.id,
+            completedAt: completedAt.toISOString(),
+            vehicleId: delivery.vehicleId,
+            saleId: delivery.saleId,
+            customerId: delivery.customerId,
+          },
+        },
+      });
+
+      return next;
+    });
+
+    return reply.code(200).send({
+      data: sanitizeTechnicalDelivery(updated),
+      signedCopy: {
+        fileId: attachment.id,
+        status: "RECEIVED",
+        completedAt: completedAt.toISOString(),
+      },
+    });
+  });
 }
