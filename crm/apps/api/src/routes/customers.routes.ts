@@ -253,6 +253,68 @@ function sanitizeCustomerHistoryEvent(event: {
   };
 }
 
+function maskAuditValue(field: string, value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  const text = String(value);
+  if (field === "document") {
+    return text.length <= 4 ? "***" : `${text.slice(0, 3)}***${text.slice(-2)}`;
+  }
+
+  if (field === "email") {
+    const [name, domain] = text.split("@");
+    if (!name || !domain) return "***";
+    return `${name.slice(0, 2)}***@${domain}`;
+  }
+
+  if (field === "phone") {
+    return text.length <= 4 ? "***" : `***${text.slice(-4)}`;
+  }
+
+  return value;
+}
+
+function customerAuditChanges(
+  current: {
+    birthDate: Date | null;
+    document: string | null;
+    email: string | null;
+    name: string;
+    notes: string | null;
+    origin: string | null;
+    phone: string | null;
+    type: string;
+  },
+  input: Partial<{
+    birthDate: Date;
+    document: string;
+    email: string;
+    name: string;
+    notes: string;
+    origin: string;
+    phone: string;
+    type: string;
+  }>,
+) {
+  return Object.entries(input)
+    .filter(([field, newValue]) => {
+      const oldValue = current[field as keyof typeof current];
+      const normalizedOld = oldValue instanceof Date ? oldValue.toISOString() : oldValue ?? null;
+      const normalizedNew = newValue instanceof Date ? newValue.toISOString() : newValue ?? null;
+      return normalizedOld !== normalizedNew;
+    })
+    .map(([field, newValue]) => ({
+      field,
+      newValue: maskAuditValue(field, newValue),
+      oldValue: maskAuditValue(field, current[field as keyof typeof current]),
+    }));
+}
+
 function customerScopeWhere(user: { id: string; role: string }) {
   if (user.role === "SELLER" || user.role === "SDR") {
     return { createdByUserId: user.id };
@@ -1199,6 +1261,9 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       }
     }
 
+    const changes = customerAuditChanges(current, input);
+    const changedFields = changes.map((change) => change.field);
+
     const customer = await prisma.$transaction(async (tx) => {
       const updated = await tx.customer.update({
         where: { id: current.id },
@@ -1215,7 +1280,8 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           type: "customer.updated",
           title: "Cadastro de cliente atualizado",
           metadata: {
-            changedFields: Object.keys(input),
+            changedFields,
+            changes,
             origin: "administrative",
             actorRole: session.user.role,
           },
@@ -1233,7 +1299,8 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
           entityId: updated.id,
           result: "SUCCESS",
           metadata: {
-            changedFields: Object.keys(input),
+            changedFields,
+            changes,
           },
         },
       });
@@ -1247,7 +1314,7 @@ export async function registerCustomerRoutes(app: FastifyInstance) {
       actorId: session.user.id,
       entityType: "customer",
       entityId: customer.id,
-      payload: { changedFields: Object.keys(input) },
+      payload: { changedFields },
     });
 
     return { data: sanitizeCustomer(customer) };

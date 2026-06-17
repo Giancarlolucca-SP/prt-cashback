@@ -549,6 +549,20 @@ try {
   assert.equal(updateCustomer.statusCode, 200);
   assert.equal(updateCustomer.json().data.email, "cliente.contrato.api@gt3.local");
 
+  const customerUpdateAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=customers&action=update&entity_type=customer&entity_id=${createdCustomerId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(customerUpdateAudit.statusCode, 200);
+  const customerUpdateLog = customerUpdateAudit.json().items.find((log: { metadata: { changedFields?: string[] } | null }) =>
+    log.metadata?.changedFields?.includes("email"),
+  );
+  assert.ok(customerUpdateLog);
+  assert.ok(customerUpdateLog.metadata.changes.some((change: { field: string; newValue: string }) => change.field === "email" && change.newValue === "cl***@gt3.local"));
+
   const serviceToken = uniqueToken("QA");
   const createProvider = await app.inject({
     method: "POST",

@@ -2348,3 +2348,27 @@ Resultado:
 Observacoes:
 
 - S1-US05 fica funcionalmente concluida para o MVP: lead/card comercial com um veiculo principal, bloqueio de repasse e rastreabilidade minima.
+
+## 2026-06-17 - S1-US06 auditoria detalhada de edicao de cliente
+
+Contexto:
+
+- Etapa BMAP: iniciar S1-US06 pela lacuna de auditoria com campos alterados.
+- Foco: `PATCH /customers/:id` deve registrar campo, valor anterior e novo valor, mascarando dados sensiveis.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Update de cliente grava `metadata.changedFields` e `metadata.changes` no historico operacional e em `audit_logs`.
+- Campos sensiveis `document`, `email` e `phone` sao mascarados nos valores antigos/novos da auditoria.
+- Smoke confirma log de update de cliente com alteracao de e-mail mascarada.
+
+Observacoes:
+
+- Proxima melhoria recomendada: aplicar o mesmo detalhamento em alteracoes de veiculo/estoque sensiveis, especialmente preco e tipo de estoque.
