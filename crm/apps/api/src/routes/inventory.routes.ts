@@ -16,6 +16,8 @@ const inventorySortSchema = z
   .default("days_in_stock_desc");
 
 const inventoryQuerySchema = z.object({
+  entry_date_from: z.coerce.date().optional(),
+  entry_date_to: z.coerce.date().optional(),
   has_active_listing: z.coerce.boolean().optional(),
   has_pending: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -461,6 +463,14 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     if (query.has_pending === false) commonInventoryGuards.push({ status: { notIn: relevantPendingStatuses } });
     if (query.has_active_listing === true && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeListingVehicleIds } });
     if (query.has_active_listing === false && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { notIn: activeListingVehicleIds } });
+    if (query.entry_date_from || query.entry_date_to) {
+      commonInventoryGuards.push({
+        entryDate: {
+          ...(query.entry_date_from ? { gte: query.entry_date_from } : {}),
+          ...(query.entry_date_to ? { lte: query.entry_date_to } : {}),
+        },
+      });
+    }
     if (matchingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: matchingVehicleIds } });
 
     const where = {

@@ -254,6 +254,8 @@ export function LiveInventoryWorkspace() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [entryDateFrom, setEntryDateFrom] = useState("");
+  const [entryDateTo, setEntryDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<InventorySort>("days_in_stock_desc");
   const [status, setStatus] = useState<"fallback" | "loading" | "live" | "error" | "locked">("fallback");
@@ -269,6 +271,8 @@ export function LiveInventoryWorkspace() {
     const query = new URLSearchParams({ page: "1", page_size: "50", sort });
     if (activeFilter.hasActiveListing !== undefined) query.set("has_active_listing", String(activeFilter.hasActiveListing));
     if (activeFilter.hasRelevantPending !== undefined) query.set("has_pending", String(activeFilter.hasRelevantPending));
+    if (entryDateFrom) query.set("entry_date_from", new Date(`${entryDateFrom}T00:00:00.000Z`).toISOString());
+    if (entryDateTo) query.set("entry_date_to", new Date(`${entryDateTo}T23:59:59.999Z`).toISOString());
     if (activeFilter.status) query.set("status", activeFilter.status);
     if (activeFilter.ownershipType) query.set("ownership_type", activeFilter.ownershipType);
     if (search.trim()) query.set("search", search.trim());
@@ -288,7 +292,7 @@ export function LiveInventoryWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [activeFilter, canReadInventory, refreshKey, search, sort, token]);
+  }, [activeFilter, canReadInventory, entryDateFrom, entryDateTo, refreshKey, search, sort, token]);
 
   useEffect(() => {
     if (!modalOpen || form.ownershipType !== "CONSIGNED") {
@@ -566,6 +570,12 @@ export function LiveInventoryWorkspace() {
         </div>
         <label className="search-box">
           <input aria-label="Buscar estoque" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo, placa, ano ou cor" value={search} />
+        </label>
+        <label className="search-box">
+          <input aria-label="Entrada inicial" onChange={(event) => setEntryDateFrom(event.target.value)} type="date" value={entryDateFrom} />
+        </label>
+        <label className="search-box">
+          <input aria-label="Entrada final" onChange={(event) => setEntryDateTo(event.target.value)} type="date" value={entryDateTo} />
         </label>
         <label className="search-box">
           <select aria-label="Ordenar estoque" onChange={(event) => setSort(event.target.value as InventorySort)} value={sort}>

@@ -1772,6 +1772,26 @@ try {
   assert.equal(listInventoryWithPending.statusCode, 200);
   assert.ok(listInventoryWithPending.json().items.some((item: { id: string }) => item.id === inventoryId));
 
+  const listInventoryByEntryPeriod = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&entry_date_from=2026-06-06T00:00:00.000Z&entry_date_to=2026-06-06T23:59:59.999Z&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryByEntryPeriod.statusCode, 200);
+  assert.ok(listInventoryByEntryPeriod.json().items.some((item: { id: string }) => item.id === inventoryId));
+
+  const listInventoryOutsideEntryPeriod = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&entry_date_from=2026-06-07T00:00:00.000Z&entry_date_to=2026-06-07T23:59:59.999Z&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listInventoryOutsideEntryPeriod.statusCode, 200);
+  assert.ok(!listInventoryOutsideEntryPeriod.json().items.some((item: { id: string }) => item.id === inventoryId));
+
   const defaultInventoryWithoutRemoved = await app.inject({
     method: "GET",
     url: "/inventory?page=1&page_size=100",
