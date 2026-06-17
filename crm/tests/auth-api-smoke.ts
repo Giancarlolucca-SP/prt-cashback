@@ -2071,6 +2071,16 @@ try {
   assert.equal(inventoryItemWithActiveService.activeService.id, serviceOrderId);
   assert.equal(inventoryItemWithActiveService.activeService.providerName, providerName);
 
+  const filteredInventoryWithActiveService = await app.inject({
+    method: "GET",
+    url: `/inventory?page=1&page_size=20&has_active_service=true&search=${encodeURIComponent(inventoryPlate)}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(filteredInventoryWithActiveService.statusCode, 200);
+  assert.ok(filteredInventoryWithActiveService.json().items.some((item: { id: string }) => item.id === inventoryId));
+
   const addServiceItem = await app.inject({
     method: "POST",
     url: `/services/orders/${serviceOrderId}/items`,

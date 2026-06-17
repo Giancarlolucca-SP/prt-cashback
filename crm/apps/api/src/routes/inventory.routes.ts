@@ -19,6 +19,7 @@ const inventoryQuerySchema = z.object({
   entry_date_from: z.coerce.date().optional(),
   entry_date_to: z.coerce.date().optional(),
   has_active_listing: z.coerce.boolean().optional(),
+  has_active_service: z.coerce.boolean().optional(),
   has_pending: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
@@ -466,6 +467,23 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
               select: { vehicleId: true },
             })
           ).map((listing) => listing.vehicleId);
+    const activeServiceVehicleIds =
+      query.has_active_service === undefined
+        ? null
+        : (
+            await prisma.serviceOrder.findMany({
+              where: {
+                storeId: session.user.storeId,
+                deletedAt: null,
+                status: { notIn: ["DONE", "CANCELLED"] },
+                vehicleId: { not: null },
+              },
+              distinct: ["vehicleId"],
+              select: { vehicleId: true },
+            })
+          )
+            .map((order) => order.vehicleId)
+            .filter((vehicleId): vehicleId is string => Boolean(vehicleId));
 
     const commonInventoryGuards: Prisma.VehicleInventoryRecordWhereInput[] = [];
     if (!query.status) commonInventoryGuards.push({ status: { notIn: ["REPASSE", "REMOVED"] } });
@@ -474,6 +492,8 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
     if (query.has_pending === false) commonInventoryGuards.push({ status: { notIn: relevantPendingStatuses } });
     if (query.has_active_listing === true && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeListingVehicleIds } });
     if (query.has_active_listing === false && activeListingVehicleIds) commonInventoryGuards.push({ vehicleId: { notIn: activeListingVehicleIds } });
+    if (query.has_active_service === true && activeServiceVehicleIds) commonInventoryGuards.push({ vehicleId: { in: activeServiceVehicleIds } });
+    if (query.has_active_service === false && activeServiceVehicleIds) commonInventoryGuards.push({ vehicleId: { notIn: activeServiceVehicleIds } });
     if (query.entry_date_from || query.entry_date_to) {
       commonInventoryGuards.push({
         entryDate: {

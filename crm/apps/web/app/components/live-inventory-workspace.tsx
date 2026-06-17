@@ -167,7 +167,7 @@ const fallbackItems: InventoryItem[] = [
   },
 ];
 
-const filters: Array<{ hasActiveListing?: boolean; hasRelevantPending?: boolean; label: string; ownershipType?: OwnershipType; status?: InventoryStatus }> = [
+const filters: Array<{ hasActiveListing?: boolean; hasActiveService?: boolean; hasRelevantPending?: boolean; label: string; ownershipType?: OwnershipType; status?: InventoryStatus }> = [
   { label: "Todos" },
   { label: "Proprios", ownershipType: "OWN" },
   { label: "Consignados", ownershipType: "CONSIGNED" },
@@ -175,6 +175,7 @@ const filters: Array<{ hasActiveListing?: boolean; hasRelevantPending?: boolean;
   { label: "Preparacao", status: "IN_PREPARATION" },
   { label: "Reservados", status: "RESERVED" },
   { hasActiveListing: true, label: "Com anuncio" },
+  { hasActiveService: true, label: "Em servico" },
   { hasRelevantPending: true, label: "Com pendencia" },
 ];
 
@@ -279,6 +280,7 @@ export function LiveInventoryWorkspace() {
     let isCurrent = true;
     const query = new URLSearchParams({ page: "1", page_size: "50", sort });
     if (activeFilter.hasActiveListing !== undefined) query.set("has_active_listing", String(activeFilter.hasActiveListing));
+    if (activeFilter.hasActiveService !== undefined) query.set("has_active_service", String(activeFilter.hasActiveService));
     if (activeFilter.hasRelevantPending !== undefined) query.set("has_pending", String(activeFilter.hasRelevantPending));
     if (entryDateFrom) query.set("entry_date_from", new Date(`${entryDateFrom}T00:00:00.000Z`).toISOString());
     if (entryDateTo) query.set("entry_date_to", new Date(`${entryDateTo}T23:59:59.999Z`).toISOString());
