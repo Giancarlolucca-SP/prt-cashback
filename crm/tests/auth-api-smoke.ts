@@ -1697,6 +1697,25 @@ try {
   assert.equal(prepareVehiclePrimaryPhoto.statusCode, 201);
   const primaryPhotoAttachmentId = prepareVehiclePrimaryPhoto.json().data.id as string;
 
+  const vehicleDocumentAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=documents&action=document_attached&entity_type=vehicle&entity_id=${inventoryVehicleId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(vehicleDocumentAudit.statusCode, 200);
+  assert.ok(
+    vehicleDocumentAudit
+      .json()
+      .items.some(
+        (log: { metadata: { attachmentId?: string; classification?: string | null; purpose?: string | null } }) =>
+          log.metadata.attachmentId === primaryPhotoAttachmentId &&
+          log.metadata.classification === "vehicle_primary_photo" &&
+          log.metadata.purpose === "primary_photo",
+      ),
+  );
+
   const updatePrimaryPhoto = await app.inject({
     method: "PATCH",
     url: `/inventory/${inventoryId}`,
@@ -1764,6 +1783,26 @@ try {
     },
   });
   assert.equal(prepareConsignedContract.statusCode, 201);
+  const consignedContractAttachmentId = prepareConsignedContract.json().data.id as string;
+
+  const inventoryDocumentAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=documents&action=document_attached&entity_type=vehicle_inventory&entity_id=${consignedInventoryId}&page=1&page_size=5`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(inventoryDocumentAudit.statusCode, 200);
+  assert.ok(
+    inventoryDocumentAudit
+      .json()
+      .items.some(
+        (log: { metadata: { attachmentId?: string; classification?: string | null; purpose?: string | null } }) =>
+          log.metadata.attachmentId === consignedContractAttachmentId &&
+          log.metadata.classification === "consignment_contract" &&
+          log.metadata.purpose === "consignment_contract",
+      ),
+  );
 
   const consignedInventoryDetail = await app.inject({
     method: "GET",

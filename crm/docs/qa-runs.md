@@ -2422,3 +2422,27 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: revisar se anexos/documentos de veiculo ja possuem o mesmo nivel de rastreabilidade em smoke dedicado.
+
+## 2026-06-17 - S1-US06 auditoria de documentos vinculados a veiculo
+
+Contexto:
+
+- Etapa BMAP: cobrir criterio de aceite de documento/contrato anexado ao veiculo.
+- Foco: `POST /files/prepare-upload` deve gerar log pesquisavel pela entidade vinculada, nao apenas pelo arquivo.
+
+Comandos executados:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Passou |
+| `npm test` | Passou |
+
+Resultado:
+
+- Preparacao de upload agora grava `audit_logs` com `action=document_attached` na entidade vinculada.
+- O log inclui `attachmentId`, `bucket`, `classification`, `originalName` e `purpose`.
+- Smoke cobre foto principal vinculada a `vehicle` e contrato de consignacao vinculado a `vehicle_inventory`.
+
+Observacoes:
+
+- Proxima melhoria recomendada: revisar logs de card comercial e movimento de Kanban para fechar os criterios restantes da S1-US06.

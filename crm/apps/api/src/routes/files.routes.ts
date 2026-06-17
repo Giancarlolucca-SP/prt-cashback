@@ -343,6 +343,26 @@ export async function registerFileRoutes(app: FastifyInstance) {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "documents",
+          action: "document_attached",
+          entityType: input.link.entityType,
+          entityId: input.link.entityId,
+          result: "SUCCESS",
+          metadata: {
+            attachmentId: created.id,
+            bucket: created.bucket,
+            classification: created.classification,
+            originalName: created.originalName,
+            purpose: input.link.purpose,
+          },
+        },
+      });
+
       return created;
     });
 
