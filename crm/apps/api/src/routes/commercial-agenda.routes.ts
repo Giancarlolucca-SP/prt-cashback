@@ -11,6 +11,13 @@ import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 import {
   COMMERCIAL_APPOINTMENT_STATUSES,
   COMMERCIAL_APPOINTMENT_TYPES,
+  canCancelAppointment,
+  canCompleteAppointment,
+  canConfirmAppointment,
+  canMarkAttended,
+  canMarkNoResponse,
+  canMarkNoShow,
+  canRescheduleAppointment,
   commercialAppointmentLinkErrors,
   commercialAppointmentStatusLabel,
   commercialAppointmentTypeLabel,
@@ -75,6 +82,21 @@ const commercialAppointmentParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const appointmentReasonSchema = z
+  .object({ reason: z.string().trim().max(300).optional() })
+  .default({});
+
+const rescheduleAppointmentSchema = z
+  .object({
+    startsAt: z.coerce.date(),
+    endsAt: z.coerce.date().optional(),
+    reason: z.string().trim().max(300).optional(),
+  })
+  .refine((input) => !input.endsAt || input.endsAt > input.startsAt, {
+    message: "Horario final deve ser posterior ao horario inicial.",
+    path: ["endsAt"],
+  });
+
 type CommercialAppointmentRecord = Prisma.CommercialAppointmentGetPayload<Record<string, never>>;
 
 function agendaScopeWhere(user: { id: string; role: string }): Prisma.CommercialAppointmentWhereInput {
@@ -119,6 +141,80 @@ async function ensureUserInStore(storeId: string, userId: string) {
   if (!user) {
     throw new ApiError("NOT_FOUND", "Responsavel do agendamento nao encontrado.");
   }
+}
+
+type AgendaSession = Awaited<ReturnType<typeof requirePermission>>;
+
+async function loadScopedAppointment(session: AgendaSession, id: string) {
+  const appointment = await prisma.commercialAppointment.findFirst({
+    where: { id, storeId: session.user.storeId, ...agendaScopeWhere(session.user) },
+  });
+  if (!appointment) {
+    throw new ApiError("NOT_FOUND", "Agendamento comercial nao encontrado.");
+  }
+  return appointment;
+}
+
+async function transitionCommercialAppointment(
+  session: AgendaSession,
+  appointment: CommercialAppointmentRecord,
+  options: {
+    toStatus: CommercialAppointmentStatus;
+    action: string;
+    reason?: string | null;
+    data?: { cancelReason?: string | null; noShowReason?: string | null };
+  },
+) {
+  const fromStatus = appointment.status;
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.commercialAppointment.update({
+      where: { id: appointment.id },
+      data: { status: options.toStatus, ...(options.data ?? {}) },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "commercial_appointments",
+        action: "commercial_appointment_status_changed",
+        entityType: "commercial_appointment",
+        entityId: appointment.id,
+        result: "SUCCESS",
+        metadata: { fromStatus, toStatus: options.toStatus, action: options.action, reason: options.reason ?? null },
+      },
+    });
+
+    if (appointment.leadId) {
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "commercial_appointment_status_changed",
+          entityType: "lead",
+          entityId: appointment.leadId,
+          result: "SUCCESS",
+          metadata: { appointmentId: appointment.id, fromStatus, toStatus: options.toStatus, action: options.action, reason: options.reason ?? null },
+        },
+      });
+    }
+
+    return next;
+  });
+
+  await emitInternalEvent({
+    name: "commercial_appointment.status_changed",
+    storeId: session.user.storeId,
+    actorId: session.user.id,
+    entityType: "commercial_appointment",
+    entityId: appointment.id,
+    payload: { fromStatus, toStatus: options.toStatus, action: options.action },
+  });
+
+  return updated;
 }
 
 export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
@@ -309,5 +405,183 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send({ data: sanitizeCommercialAppointment(appointment) });
+  });
+
+  app.post("/appointments/:id/confirm", async (request) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canConfirmAppointment(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser confirmado no status atual.", { status: appointment.status });
+    }
+    const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "CONFIRMED", action: "confirm" });
+    return { data: sanitizeCommercialAppointment(updated) };
+  });
+
+  app.post("/appointments/:id/attended", async (request) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canMarkAttended(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser marcado como comparecido no status atual.", { status: appointment.status });
+    }
+    const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "ATTENDED", action: "attended" });
+    return { data: sanitizeCommercialAppointment(updated) };
+  });
+
+  app.post("/appointments/:id/complete", async (request) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canCompleteAppointment(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser concluido no status atual.", { status: appointment.status });
+    }
+    const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "COMPLETED", action: "complete" });
+    return { data: sanitizeCommercialAppointment(updated) };
+  });
+
+  app.post("/appointments/:id/no-response", async (request) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canMarkNoResponse(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser marcado como sem resposta no status atual.", { status: appointment.status });
+    }
+    const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "NO_RESPONSE", action: "no_response" });
+    return { data: sanitizeCommercialAppointment(updated) };
+  });
+
+  app.post("/appointments/:id/no-show", async (request) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const input = appointmentReasonSchema.parse(request.body ?? {});
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canMarkNoShow(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser marcado como nao comparecido no status atual.", { status: appointment.status });
+    }
+    const updated = await transitionCommercialAppointment(session, appointment, {
+      toStatus: "NO_SHOW",
+      action: "no_show",
+      reason: input.reason,
+      data: { noShowReason: input.reason ?? null },
+    });
+    return { data: sanitizeCommercialAppointment(updated) };
+  });
+
+  app.post("/appointments/:id/cancel", async (request) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const input = appointmentReasonSchema.parse(request.body ?? {});
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canCancelAppointment(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento finalizado nao pode ser cancelado.", { status: appointment.status });
+    }
+    const updated = await transitionCommercialAppointment(session, appointment, {
+      toStatus: "CANCELLED",
+      action: "cancel",
+      reason: input.reason,
+      data: { cancelReason: input.reason ?? null },
+    });
+    return { data: sanitizeCommercialAppointment(updated) };
+  });
+
+  app.post("/appointments/:id/reschedule", async (request, reply) => {
+    const session = await requirePermission(request, { module: "appointments", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = commercialAppointmentParamsSchema.parse(request.params);
+    const input = rescheduleAppointmentSchema.parse(request.body);
+    const appointment = await loadScopedAppointment(session, params.id);
+    if (!canRescheduleAppointment(appointment.status as CommercialAppointmentStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser reagendado no status atual.", { status: appointment.status });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // The new appointment preserves the link to the previous one (reschedule chain).
+      const created = await tx.commercialAppointment.create({
+        data: {
+          storeId: session.user.storeId,
+          cardId: appointment.cardId,
+          leadId: appointment.leadId,
+          customerId: appointment.customerId,
+          vehicleId: appointment.vehicleId,
+          ...(appointment.vehicleInterest ? { vehicleInterest: appointment.vehicleInterest as Prisma.InputJsonValue } : {}),
+          responsibleUserId: appointment.responsibleUserId,
+          type: appointment.type,
+          status: "SCHEDULED",
+          startsAt: input.startsAt,
+          endsAt: input.endsAt,
+          location: appointment.location,
+          origin: appointment.origin,
+          channel: appointment.channel,
+          notes: appointment.notes,
+          rescheduleFromId: appointment.id,
+          createdByUserId: session.user.id,
+        },
+      });
+
+      const previous = await tx.commercialAppointment.update({
+        where: { id: appointment.id },
+        data: { status: "RESCHEDULED" },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_appointments",
+          action: "commercial_appointment_status_changed",
+          entityType: "commercial_appointment",
+          entityId: appointment.id,
+          result: "SUCCESS",
+          metadata: { fromStatus: appointment.status, toStatus: "RESCHEDULED", action: "reschedule", reason: input.reason ?? null, newAppointmentId: created.id },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_appointments",
+          action: "commercial_appointment_created",
+          entityType: "commercial_appointment",
+          entityId: created.id,
+          result: "SUCCESS",
+          metadata: { rescheduleFromId: appointment.id, cardId: created.cardId, leadId: created.leadId, type: created.type, startsAt: created.startsAt.toISOString() },
+        },
+      });
+
+      if (appointment.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_appointment_status_changed",
+            entityType: "lead",
+            entityId: appointment.leadId,
+            result: "SUCCESS",
+            metadata: { appointmentId: appointment.id, newAppointmentId: created.id, fromStatus: appointment.status, toStatus: "RESCHEDULED", action: "reschedule" },
+          },
+        });
+      }
+
+      return { created, previous };
+    });
+
+    await emitInternalEvent({
+      name: "commercial_appointment.status_changed",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "commercial_appointment",
+      entityId: appointment.id,
+      payload: { fromStatus: appointment.status, toStatus: "RESCHEDULED", action: "reschedule", newAppointmentId: result.created.id },
+    });
+
+    return reply.code(201).send({
+      data: sanitizeCommercialAppointment(result.created),
+      previous: sanitizeCommercialAppointment(result.previous),
+    });
   });
 }
