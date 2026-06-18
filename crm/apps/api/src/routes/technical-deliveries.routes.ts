@@ -18,6 +18,10 @@ import {
   canRegisterSignedCopy,
   type TechnicalDeliveryStatus,
 } from "../services/technical-delivery-status.js";
+import {
+  TECHNICAL_DELIVERY_SIGNED_COPY_PURPOSE,
+  technicalDeliveryLinkTargets,
+} from "../services/technical-delivery-attachments.js";
 
 const deliveryStatusSchema = z.enum([
   "AWAITING_PREREQUISITES",
@@ -828,11 +832,17 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
     const updated = await prisma.$transaction(async (tx) => {
       // Attach the signed copy to the vehicle digital folder, the sale and the customer.
       await tx.fileAttachmentLink.createMany({
-        data: [
-          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "vehicle", entityId: delivery.vehicleId, purpose: "technical_delivery_signed_copy" },
-          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "sale", entityId: delivery.saleId, purpose: "technical_delivery_signed_copy" },
-          { storeId: session.user.storeId, attachmentId: attachment.id, entityType: "customer", entityId: delivery.customerId, purpose: "technical_delivery_signed_copy" },
-        ],
+        data: technicalDeliveryLinkTargets({
+          vehicleId: delivery.vehicleId,
+          saleId: delivery.saleId,
+          customerId: delivery.customerId,
+        }).map((target) => ({
+          storeId: session.user.storeId,
+          attachmentId: attachment.id,
+          entityType: target.entityType,
+          entityId: target.entityId,
+          purpose: TECHNICAL_DELIVERY_SIGNED_COPY_PURPOSE,
+        })),
         skipDuplicates: true,
       });
 
