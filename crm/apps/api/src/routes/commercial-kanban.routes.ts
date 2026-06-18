@@ -127,6 +127,7 @@ function sanitizeCommercialCard(
     vehicle: { id: string; brand: string; model: string; version: string | null; yearModel: number | null; plate: string | null } | null;
     customerName: string | null;
     hasFutureSchedule: boolean;
+    nextAppointment: { id: string; type: string; status: string; startsAt: string } | null;
   },
 ) {
   const lead = card.lead;
@@ -166,6 +167,7 @@ function sanitizeCommercialCard(
     temperatureStatus,
     archivedAt: card.archivedAt?.toISOString() ?? null,
     lostReason: card.lostReason,
+    nextAppointment: context.nextAppointment,
   };
 }
 
@@ -247,8 +249,9 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
     const vehicleIds = [...new Set(cards.map((card) => card.lead.vehicleId).filter((id): id is string => Boolean(id)))];
     const customerIds = [...new Set(cards.map((card) => card.lead.customerId).filter((id): id is string => Boolean(id)))];
     const leadIds = cards.map((card) => card.leadId);
+    const cardIds = cards.map((card) => card.id);
 
-    const [vehicles, customers, futureAppointments] = await Promise.all([
+    const [vehicles, customers, futureAppointments, upcomingCommercialAppointments] = await Promise.all([
       vehicleIds.length
         ? prisma.vehicle.findMany({
             where: { id: { in: vehicleIds }, storeId: session.user.storeId, deletedAt: null },
@@ -273,20 +276,48 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
             select: { leadId: true },
           })
         : Promise.resolve([]),
+      cardIds.length
+        ? prisma.commercialAppointment.findMany({
+            where: {
+              cardId: { in: cardIds },
+              storeId: session.user.storeId,
+              startsAt: { gte: now },
+              status: { in: ["SCHEDULED", "CONFIRMED"] },
+            },
+            orderBy: { startsAt: "asc" },
+            select: { id: true, cardId: true, type: true, status: true, startsAt: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
     const customerNameById = new Map(customers.map((customer) => [customer.id, customer.name]));
     const leadsWithFutureSchedule = new Set(futureAppointments.map((appointment) => appointment.leadId).filter((id): id is string => Boolean(id)));
 
-    const items = cards.map((card) =>
-      sanitizeCommercialCard(card, {
+    // Earliest upcoming commercial appointment per card (next appointment shown on the card).
+    const nextAppointmentByCard = new Map<string, { id: string; type: string; status: string; startsAt: string }>();
+    for (const appointment of upcomingCommercialAppointments) {
+      if (!nextAppointmentByCard.has(appointment.cardId)) {
+        nextAppointmentByCard.set(appointment.cardId, {
+          id: appointment.id,
+          type: appointment.type,
+          status: appointment.status,
+          startsAt: appointment.startsAt.toISOString(),
+        });
+      }
+    }
+
+    const items = cards.map((card) => {
+      const nextAppointment = nextAppointmentByCard.get(card.id) ?? null;
+      return sanitizeCommercialCard(card, {
         now,
         vehicle: card.lead.vehicleId ? vehicleById.get(card.lead.vehicleId) ?? null : null,
         customerName: card.lead.customerId ? customerNameById.get(card.lead.customerId) ?? null : null,
-        hasFutureSchedule: leadsWithFutureSchedule.has(card.leadId),
-      }),
-    );
+        // A future commercial appointment also softens the cooling alert.
+        hasFutureSchedule: leadsWithFutureSchedule.has(card.leadId) || nextAppointment !== null,
+        nextAppointment,
+      });
+    });
 
     return listResponse(items, query, total);
   });

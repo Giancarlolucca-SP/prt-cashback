@@ -359,6 +359,7 @@ async function seedDemoData(store, userByRole) {
     { title: "Comercial Demo - Risco alto 72h", stage: "NEGOTIATION", customerId: paulo.id, vehicleId: corolla.id, assignedUserId: seller?.id, source: "Site", channel: "site", interactionHoursAgo: 72 },
   ];
 
+  const commercialDemoEntries = [];
   for (const cardSeed of commercialCardSeeds) {
     const interactionAt = commercialHoursAgo(cardSeed.interactionHoursAgo);
     const archivedAt = cardSeed.stage === "LOST" ? interactionAt : null;
@@ -381,7 +382,7 @@ async function seedDemoData(store, userByRole) {
       { assignedUserId: cardSeed.assignedUserId, channel: cardSeed.channel, lastInteractionAt: interactionAt },
     );
 
-    await findOrCreate(
+    const commercialCard = await findOrCreate(
       "leadCard",
       { storeId: store.id, leadId: lead.id, boardKey: "commercial" },
       {
@@ -397,6 +398,72 @@ async function seedDemoData(store, userByRole) {
       },
       { stageKey: cardSeed.stage, stageEnteredAt: interactionAt, archivedAt, lostReason: cardSeed.lostReason ?? null },
     );
+
+    commercialDemoEntries.push({ lead, card: commercialCard, cardSeed });
+  }
+
+  // Commercial agenda (S2-US02) demo appointments linked to the commercial cards above.
+  const findDemoCard = (title) => commercialDemoEntries.find((entry) => entry.cardSeed.title === title);
+  const demoAppointmentSeeds = [
+    { title: "Comercial Demo - Novo lead", type: "VISIT", status: "SCHEDULED", startsAt: daysFromNow(1, 14) },
+    { title: "Comercial Demo - Test drive", type: "TEST_DRIVE", status: "SCHEDULED", startsAt: daysFromNow(1, 16) },
+    { title: "Comercial Demo - Em contato", type: "FOLLOW_UP", status: "SCHEDULED", startsAt: daysFromNow(2, 10) },
+    { title: "Comercial Demo - Visitou loja", type: "VISIT", status: "CONFIRMED", startsAt: daysFromNow(0, 15) },
+    { title: "Comercial Demo - Aguardando retorno", type: "VISIT", status: "NO_SHOW", startsAt: daysFromNow(-1, 11), noShowReason: "Cliente nao compareceu e nao avisou" },
+  ];
+  for (const apptSeed of demoAppointmentSeeds) {
+    const entry = findDemoCard(apptSeed.title);
+    if (!entry) {
+      continue;
+    }
+    const responsibleUserId = entry.lead.assignedUserId ?? seller?.id ?? admin?.id;
+    if (!responsibleUserId) {
+      continue;
+    }
+    await findOrCreate(
+      "commercialAppointment",
+      { storeId: store.id, cardId: entry.card.id, type: apptSeed.type, origin: "seed-demo" },
+      {
+        storeId: store.id,
+        cardId: entry.card.id,
+        leadId: entry.lead.id,
+        customerId: entry.lead.customerId,
+        vehicleId: entry.lead.vehicleId,
+        responsibleUserId,
+        type: apptSeed.type,
+        status: apptSeed.status,
+        startsAt: apptSeed.startsAt,
+        origin: "seed-demo",
+        noShowReason: apptSeed.noShowReason ?? null,
+      },
+      { status: apptSeed.status, startsAt: apptSeed.startsAt, noShowReason: apptSeed.noShowReason ?? null },
+    );
+  }
+
+  // 0km/order appointment without a physical vehicle (vehicle interest spec only).
+  const zeroKmEntry = findDemoCard("Comercial Demo - Novo lead");
+  if (zeroKmEntry) {
+    const zeroKmResponsible = zeroKmEntry.lead.assignedUserId ?? seller?.id ?? admin?.id;
+    if (zeroKmResponsible) {
+      await findOrCreate(
+        "commercialAppointment",
+        { storeId: store.id, cardId: zeroKmEntry.card.id, type: "COMMERCIAL_RECONTACT", origin: "seed-demo" },
+        {
+          storeId: store.id,
+          cardId: zeroKmEntry.card.id,
+          leadId: zeroKmEntry.lead.id,
+          customerId: zeroKmEntry.lead.customerId,
+          vehicleId: null,
+          vehicleInterest: { brand: "Toyota", model: "Corolla Cross", version: "XRE", color: "Branco", note: "0km encomenda" },
+          responsibleUserId: zeroKmResponsible,
+          type: "COMMERCIAL_RECONTACT",
+          status: "SCHEDULED",
+          startsAt: daysFromNow(3, 9),
+          origin: "seed-demo",
+        },
+        { status: "SCHEDULED" },
+      );
+    }
   }
 
   await Promise.all([

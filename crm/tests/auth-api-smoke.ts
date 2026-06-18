@@ -5070,6 +5070,190 @@ try {
   assert.equal(reassignCommercialCard.json().data.previousAssignedUserId, sdrUserId);
   checkpoint("commercial-kanban");
 
+  // --- Commercial agenda (S2-US02): create, mandatory links, scope, transitions, next-on-card ---
+  const agendaCardWithVehicle = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { name: "Agenda Card Veiculo", phone: "11990002222", vehicleId: inventoryVehicleId, source: "ligacao_loja" },
+  });
+  assert.equal(agendaCardWithVehicle.statusCode, 201);
+  const agendaCardId = agendaCardWithVehicle.json().data.id as string;
+
+  const agendaCardNoVehicle = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { name: "Agenda Card 0km", source: "ligacao_loja" },
+  });
+  assert.equal(agendaCardNoVehicle.statusCode, 201);
+  const agendaCardNoVehicleId = agendaCardNoVehicle.json().data.id as string;
+
+  // Appraiser has no appointments:manage -> forbidden.
+  const appraiserCreateAppointment = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${appraiserToken}` },
+    payload: { cardId: agendaCardId, type: "VISIT", startsAt: "2027-03-10T14:00:00.000Z" },
+  });
+  assert.equal(appraiserCreateAppointment.statusCode, 403);
+
+  // Mandatory link: a card with no vehicle and no interest cannot be scheduled.
+  const missingVehicleAppointment = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardNoVehicleId, type: "FOLLOW_UP", startsAt: "2027-03-10T14:00:00.000Z" },
+  });
+  assert.equal(missingVehicleAppointment.statusCode, 422);
+  assert.ok(missingVehicleAppointment.json().error.details.missingLinks.includes("vehicle_or_interest"));
+
+  // 0km/order interest satisfies the vehicle link without a physical vehicle.
+  const interestAppointment = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: {
+      cardId: agendaCardNoVehicleId,
+      type: "FOLLOW_UP",
+      startsAt: "2027-03-11T14:00:00.000Z",
+      vehicleInterest: { brand: "Toyota", model: "Corolla Cross", note: "0km encomenda" },
+    },
+  });
+  assert.equal(interestAppointment.statusCode, 201);
+
+  // SDR creates a visit on its own card.
+  const createCommercialAppointment = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, type: "VISIT", startsAt: "2027-03-10T14:00:00.000Z", notes: "Cliente confirmou interesse." },
+  });
+  assert.equal(createCommercialAppointment.statusCode, 201);
+  assert.equal(createCommercialAppointment.json().data.status, "SCHEDULED");
+  assert.equal(createCommercialAppointment.json().data.cardId, agendaCardId);
+  assert.equal(createCommercialAppointment.json().data.vehicleId, inventoryVehicleId);
+  const appointmentId = createCommercialAppointment.json().data.id as string;
+
+  // Next appointment shows up on the Kanban card.
+  const cardWithNextAppointment = await app.inject({
+    method: "GET",
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(cardWithNextAppointment.statusCode, 200);
+  const agendaCardView = cardWithNextAppointment.json().items.find((card: { id: string }) => card.id === agendaCardId);
+  assert.ok(agendaCardView);
+  assert.equal(agendaCardView.nextAppointment.id, appointmentId);
+  assert.equal(agendaCardView.nextAppointment.type, "VISIT");
+
+  // Scope: SDR sees own agenda; another seller does not.
+  const sdrAgenda = await app.inject({
+    method: "GET",
+    url: "/commercial-agenda/appointments?page_size=100",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrAgenda.statusCode, 200);
+  assert.ok(sdrAgenda.json().items.some((appointment: { id: string }) => appointment.id === appointmentId));
+
+  const sellerAgenda = await app.inject({
+    method: "GET",
+    url: "/commercial-agenda/appointments?page_size=100",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerAgenda.statusCode, 200);
+  assert.ok(!sellerAgenda.json().items.some((appointment: { id: string }) => appointment.id === appointmentId));
+
+  const ownerAgenda = await app.inject({
+    method: "GET",
+    url: "/commercial-agenda/appointments?page_size=100",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownerAgenda.statusCode, 200);
+  assert.ok(ownerAgenda.json().items.some((appointment: { id: string }) => appointment.id === appointmentId));
+
+  // A seller from another portfolio cannot transition this appointment (out of scope -> 404).
+  const otherSellerConfirm = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${appointmentId}/confirm`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(otherSellerConfirm.statusCode, 404);
+
+  // Transitions: confirm -> reschedule (preserves link) -> blocked re-confirm.
+  const confirmCommercialAppointment = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${appointmentId}/confirm`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(confirmCommercialAppointment.statusCode, 200);
+  assert.equal(confirmCommercialAppointment.json().data.status, "CONFIRMED");
+
+  const rescheduleAppointment = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${appointmentId}/reschedule`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { startsAt: "2027-03-12T16:00:00.000Z", reason: "Cliente pediu outro horario" },
+  });
+  assert.equal(rescheduleAppointment.statusCode, 201);
+  assert.equal(rescheduleAppointment.json().data.status, "SCHEDULED");
+  assert.equal(rescheduleAppointment.json().data.rescheduleFromId, appointmentId);
+  assert.equal(rescheduleAppointment.json().previous.status, "RESCHEDULED");
+  const rescheduledAppointmentId = rescheduleAppointment.json().data.id as string;
+
+  const blockedReconfirm = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${appointmentId}/confirm`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(blockedReconfirm.statusCode, 422);
+
+  // No-show with justification on the rescheduled appointment.
+  const noShowAppointment = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${rescheduledAppointmentId}/no-show`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { reason: "Cliente nao compareceu e nao avisou" },
+  });
+  assert.equal(noShowAppointment.statusCode, 200);
+  assert.equal(noShowAppointment.json().data.status, "NO_SHOW");
+  assert.equal(noShowAppointment.json().data.noShowReason, "Cliente nao compareceu e nao avisou");
+
+  // Attended -> completed happy path on a fresh appointment.
+  const attendableAppointment = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, type: "TEST_DRIVE", startsAt: "2027-04-01T10:00:00.000Z" },
+  });
+  assert.equal(attendableAppointment.statusCode, 201);
+  const attendableAppointmentId = attendableAppointment.json().data.id as string;
+
+  const markAttended = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${attendableAppointmentId}/attended`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(markAttended.statusCode, 200);
+  assert.equal(markAttended.json().data.status, "ATTENDED");
+
+  const markCompleted = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${attendableAppointmentId}/complete`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(markCompleted.statusCode, 200);
+  assert.equal(markCompleted.json().data.status, "COMPLETED");
+
+  const appointmentStatusAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=commercial_appointments&action=commercial_appointment_status_changed&entity_type=commercial_appointment&entity_id=${appointmentId}&page=1&page_size=20`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(appointmentStatusAudit.statusCode, 200);
+  assert.ok(appointmentStatusAudit.json().items.some((log: { metadata: { toStatus?: string } }) => log.metadata.toStatus === "RESCHEDULED"));
+  checkpoint("commercial-agenda");
+
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,
