@@ -61,6 +61,19 @@ test("status-transition gates allow the expected actions", () => {
   assert.equal(canCancelAppointment("COMPLETED"), false);
 });
 
+test("cancellation is only allowed before an outcome is recorded (review fix #5)", () => {
+  assert.equal(canCancelAppointment("SCHEDULED"), true);
+  assert.equal(canCancelAppointment("CONFIRMED"), true);
+  // Already-recorded outcomes are not cancellable.
+  assert.equal(canCancelAppointment("ATTENDED"), false);
+  assert.equal(canCancelAppointment("NO_SHOW"), false);
+  assert.equal(canCancelAppointment("NO_RESPONSE"), false);
+  // Terminal states remain non-cancellable.
+  assert.equal(canCancelAppointment("COMPLETED"), false);
+  assert.equal(canCancelAppointment("CANCELLED"), false);
+  assert.equal(canCancelAppointment("RESCHEDULED"), false);
+});
+
 test("reschedule action targets the RESCHEDULED status", () => {
   assert.equal(COMMERCIAL_APPOINTMENT_ACTION_TARGET.reschedule, "RESCHEDULED");
   assert.equal(COMMERCIAL_APPOINTMENT_ACTION_TARGET.noShow, "NO_SHOW");

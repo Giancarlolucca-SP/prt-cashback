@@ -88,6 +88,9 @@ const COMPLETABLE: ReadonlySet<CommercialAppointmentStatus> = new Set(["SCHEDULE
 const NO_SHOWABLE: ReadonlySet<CommercialAppointmentStatus> = new Set(["SCHEDULED", "CONFIRMED"]);
 const NO_RESPONSEABLE: ReadonlySet<CommercialAppointmentStatus> = new Set(["SCHEDULED", "CONFIRMED"]);
 const RESCHEDULABLE: ReadonlySet<CommercialAppointmentStatus> = new Set(["SCHEDULED", "CONFIRMED", "NO_SHOW", "NO_RESPONSE"]);
+// Cancellation only makes sense before an outcome is recorded; ATTENDED/NO_SHOW/NO_RESPONSE
+// (and the terminal states) already carry an outcome and are not cancellable.
+const CANCELLABLE: ReadonlySet<CommercialAppointmentStatus> = new Set(["SCHEDULED", "CONFIRMED"]);
 
 export function canConfirmAppointment(status: CommercialAppointmentStatus): boolean {
   return CONFIRMABLE.has(status);
@@ -108,7 +111,7 @@ export function canRescheduleAppointment(status: CommercialAppointmentStatus): b
   return RESCHEDULABLE.has(status);
 }
 export function canCancelAppointment(status: CommercialAppointmentStatus): boolean {
-  return !isTerminalAppointmentStatus(status);
+  return CANCELLABLE.has(status);
 }
 
 export const COMMERCIAL_APPOINTMENT_ACTION_TARGET = {
