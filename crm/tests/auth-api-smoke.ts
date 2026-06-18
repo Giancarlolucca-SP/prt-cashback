@@ -4870,6 +4870,206 @@ try {
   });
   assert.equal(sdrCustomer.statusCode, 200);
 
+  // --- Commercial Kanban board (S2-US01): stages, manual creation, listing, move, reassign ---
+  const sdrUserId = sdrLogin.json().user.id as string;
+
+  const commercialStages = await app.inject({
+    method: "GET",
+    url: "/commercial-kanban/stages",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialStages.statusCode, 200);
+  assert.equal(commercialStages.json().items.length, 9);
+  assert.equal(commercialStages.json().items[0].key, "NEW_LEAD");
+
+  // Appraiser cannot create commercial cards (no leads:create).
+  const appraiserCreateCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${appraiserToken}` },
+    payload: { name: "Lead via ligacao" },
+  });
+  assert.equal(appraiserCreateCard.statusCode, 403);
+
+  // Validation: name is required.
+  const invalidCommercialCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: {},
+  });
+  assert.equal(invalidCommercialCard.statusCode, 400);
+  assert.equal(invalidCommercialCard.json().error.code, "VALIDATION_ERROR");
+
+  // SDR creates a card manually from a phone call (no full customer record required).
+  const sdrCreateCommercialCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: {
+      name: "Interessado Ligacao QA",
+      phone: "11990001111",
+      vehicleId: inventoryVehicleId,
+      source: "ligacao_loja",
+      channel: "telefone",
+      note: "Pediu retorno a tarde.",
+    },
+  });
+  assert.equal(sdrCreateCommercialCard.statusCode, 201);
+  assert.equal(sdrCreateCommercialCard.json().data.stage, "NEW_LEAD");
+  assert.equal(sdrCreateCommercialCard.json().data.assignedUserId, sdrUserId);
+  const commercialCardId = sdrCreateCommercialCard.json().data.id as string;
+
+  // SDR sees own card; another seller (different portfolio) does not.
+  const sdrListCommercialCards = await app.inject({
+    method: "GET",
+    url: "/commercial-kanban/cards?stage=NEW_LEAD&page_size=100",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrListCommercialCards.statusCode, 200);
+  assert.ok(sdrListCommercialCards.json().items.some((card: { id: string }) => card.id === commercialCardId));
+
+  const sellerListCommercialCards = await app.inject({
+    method: "GET",
+    url: "/commercial-kanban/cards?page_size=100",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerListCommercialCards.statusCode, 200);
+  assert.ok(!sellerListCommercialCards.json().items.some((card: { id: string }) => card.id === commercialCardId));
+
+  // Move rules: SDR advances early stages + forwards to negotiation, but cannot confirm purchase.
+  const sdrMoveScheduled = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { toStage: "SCHEDULED" },
+  });
+  assert.equal(sdrMoveScheduled.statusCode, 200);
+  assert.equal(sdrMoveScheduled.json().data.stage, "SCHEDULED");
+
+  const sdrMoveForbidden = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { toStage: "AWAITING_PURCHASE_CONFIRMATION" },
+  });
+  assert.equal(sdrMoveForbidden.statusCode, 403);
+
+  const sdrMoveVisited = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { toStage: "VISITED" },
+  });
+  assert.equal(sdrMoveVisited.statusCode, 200);
+
+  const sdrForwardNegotiation = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { toStage: "NEGOTIATION", notes: "Encaminhado para negociacao direta." },
+  });
+  assert.equal(sdrForwardNegotiation.statusCode, 200);
+
+  // A seller from another portfolio cannot move this card (out of scope -> 404).
+  const otherSellerMoveCard = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { toStage: "AWAITING_RETURN" },
+  });
+  assert.equal(otherSellerMoveCard.statusCode, 404);
+
+  // Moving to LOST requires a reason and archives the card.
+  const moveLostWithoutReason = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { toStage: "LOST" },
+  });
+  assert.equal(moveLostWithoutReason.statusCode, 400);
+
+  const moveLostWithReason = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${commercialCardId}/move`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { toStage: "LOST", reason: "Cliente comprou em outra loja" },
+  });
+  assert.equal(moveLostWithReason.statusCode, 200);
+  assert.equal(moveLostWithReason.json().data.stage, "LOST");
+  assert.equal(moveLostWithReason.json().data.archived, true);
+  assert.equal(moveLostWithReason.json().data.lostReason, "Cliente comprou em outra loja");
+
+  // Archived (LOST) card leaves the default active view but stays filterable.
+  const activeViewCommercialCards = await app.inject({
+    method: "GET",
+    url: "/commercial-kanban/cards?page_size=100",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(activeViewCommercialCards.statusCode, 200);
+  assert.ok(!activeViewCommercialCards.json().items.some((card: { id: string }) => card.id === commercialCardId));
+
+  const lostViewCommercialCards = await app.inject({
+    method: "GET",
+    url: "/commercial-kanban/cards?stage=LOST&page_size=100",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(lostViewCommercialCards.statusCode, 200);
+  assert.ok(lostViewCommercialCards.json().items.some((card: { id: string }) => card.id === commercialCardId));
+
+  const commercialMoveAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=leads&action=commercial_card_moved&entity_type=lead_card&entity_id=${commercialCardId}&page=1&page_size=20`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialMoveAudit.statusCode, 200);
+  assert.ok(commercialMoveAudit.json().items.some((log: { metadata: { toStage?: string } }) => log.metadata.toStage === "LOST"));
+
+  // Responsible change: manager-only, reason required.
+  const reassignSourceCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { name: "Lead para troca de responsavel", source: "ligacao_loja" },
+  });
+  assert.equal(reassignSourceCard.statusCode, 201);
+  const reassignCardId = reassignSourceCard.json().data.id as string;
+
+  const sellerReassign = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${reassignCardId}/assign`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { assignedUserId: administrativeBody.user.id, reason: "Tentativa sem permissao em QA" },
+  });
+  assert.equal(sellerReassign.statusCode, 403);
+
+  const sdrReassign = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${reassignCardId}/assign`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { assignedUserId: administrativeBody.user.id, reason: "Tentativa sem permissao em QA" },
+  });
+  assert.equal(sdrReassign.statusCode, 403);
+
+  const reassignWithoutReason = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${reassignCardId}/assign`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { assignedUserId: administrativeBody.user.id },
+  });
+  assert.equal(reassignWithoutReason.statusCode, 400);
+
+  const reassignCommercialCard = await app.inject({
+    method: "POST",
+    url: `/commercial-kanban/cards/${reassignCardId}/assign`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { assignedUserId: administrativeBody.user.id, reason: "Redistribuicao de carteira em QA" },
+  });
+  assert.equal(reassignCommercialCard.statusCode, 200);
+  assert.equal(reassignCommercialCard.json().data.assignedUserId, administrativeBody.user.id);
+  assert.equal(reassignCommercialCard.json().data.previousAssignedUserId, sdrUserId);
+  checkpoint("commercial-kanban");
+
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,
