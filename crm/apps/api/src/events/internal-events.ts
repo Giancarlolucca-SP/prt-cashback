@@ -29,6 +29,8 @@ export type InternalEventName =
   | "commercial_card.created"
   | "commercial_card.moved"
   | "commercial_card.reassigned"
+  | "commercial_appointment.created"
+  | "commercial_appointment.status_changed"
   | "appointment.created"
   | "appointment.updated"
   | "appointment.status_changed"
