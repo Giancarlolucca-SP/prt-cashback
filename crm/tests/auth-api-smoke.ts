@@ -5589,6 +5589,25 @@ try {
   assert.equal(resolveNearFollowUp.statusCode, 200);
   const cardAfterResolve = await readMultiFollowUpCard();
   assert.equal(cardAfterResolve.nextActionAt, "2030-01-10T10:00:00.000Z");
+
+  // overdue_only is parsed explicitly (review fix #5): "false" must NOT behave like true.
+  const overdueOnlyFalse = await app.inject({
+    method: "GET",
+    url: `/commercial-interactions?card_id=${agendaCardId}&overdue_only=false&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(overdueOnlyFalse.statusCode, 200);
+  // The non-overdue NOTE interaction is present when overdue_only=false.
+  assert.ok(overdueOnlyFalse.json().items.some((it: { id: string }) => it.id === ownerInteractionId));
+
+  const overdueOnlyTrue = await app.inject({
+    method: "GET",
+    url: `/commercial-interactions?card_id=${agendaCardId}&overdue_only=true&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(overdueOnlyTrue.statusCode, 200);
+  // ...but filtered out when overdue_only=true (it has no overdue follow-up).
+  assert.ok(!overdueOnlyTrue.json().items.some((it: { id: string }) => it.id === ownerInteractionId));
   checkpoint("commercial-interactions");
 
   const sellerDeleteCustomer = await app.inject({

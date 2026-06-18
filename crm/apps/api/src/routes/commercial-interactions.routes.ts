@@ -110,7 +110,8 @@ const interactionsQuerySchema = z.object({
   result: interactionResultSchema.optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
-  overdue_only: z.coerce.boolean().optional(),
+  // Explicit boolean parsing: only "true"/"1" mean true (z.coerce.boolean turns "false" into true).
+  overdue_only: z.preprocess((value) => value === "true" || value === "1", z.boolean()),
 });
 
 type CommercialInteractionRecord = Prisma.CommercialInteractionGetPayload<Record<string, never>>;
