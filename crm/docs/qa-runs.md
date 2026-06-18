@@ -2526,3 +2526,30 @@ Resultado:
 Observacoes:
 
 - Proxima melhoria recomendada: gerar o documento/PDF de entrega tecnica preenchido automaticamente com checklist manual.
+
+## 2026-06-18 - S2-US06 Entrega Tecnica (finalizacao)
+
+Contexto:
+
+- Story `S2-US06-entrega-tecnica-inicial-checklist` finalizada apos a base (tabela, pre-requisitos, permissoes, agendamento/reagendamento, commit `02ed905`) e a geracao do documento+checklist (commit `91aa153`).
+- Foco: itens restantes do checklist tecnico em etapas, com `npm run typecheck` + `npm test` e commit por etapa. Escopo apenas `crm/`.
+
+Etapas e comandos executados (typecheck + test verdes em todas):
+
+| Etapa | Commit | `npm run typecheck` | `npm test` |
+| --- | --- | --- | --- |
+| 1. Status de impressao (`/:id/print`, print_status/printed_at, PDF manual se sem impressora) | `be0177d` | Passou | Passou |
+| 2. Via assinada (`/:id/signed-copy`, signed_copy_status/file_id + anexo na pasta digital do veiculo/venda/cliente) | `b38c9f4` | Passou | Passou |
+| 3. Auditoria de cada transicao de status (`technical_delivery_status_changed`) + cancelamento (`/:id/cancel`) | `697c97d` | Passou | Passou |
+| 4. Testes de mudanca de status e anexo (modulos puros + 8 casos unitarios) | `20ecb36` | Passou | Passou |
+
+Resultado:
+
+- Ciclo de status completo e auditado: SCHEDULED/RESCHEDULED -> DOCUMENT_GENERATED -> PRINTED_PENDING_SIGNATURE -> COMPLETED_SIGNED, alem de CANCELLED. Cada transicao grava evento de auditoria uniforme (`technical_delivery_status_changed`) e o evento especifico da acao.
+- Impressao: marca `print_status=PRINTED`/`printed_at`; com impressora configurada envia para impressao, sem impressora aponta o documento pronto para PDF/impressao manual (`GET /:id/document?format=html`).
+- Via assinada: valida o arquivo enviado, vincula a pasta digital do veiculo + venda + cliente (`FileAttachmentLink`), grava `signed_copy_status=RECEIVED`/`signed_copy_file_id` e `completed_at`.
+- Criterios de Aceite 1-9 cobertos. Status da story atualizado para `done`.
+
+Observacoes sobre cobertura de testes:
+
+- `npm test` cobre as regras puras (geracao do documento+checklist, validacao/transicoes de status, alvos de vinculo do anexo) sem necessidade de banco. Os testes de integracao end-to-end com fixtures de venda completa (login + agendar + gerar + imprimir + via assinada via banco) seguem o padrao do repo de viverem em scripts `qa:*:local`/smoke e nao foram adicionados ao gate `npm test` desta rodada; recomendado executar um smoke funcional local em rodada dedicada.
