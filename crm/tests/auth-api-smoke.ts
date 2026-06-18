@@ -5687,6 +5687,69 @@ try {
   });
   assert.equal(sellerSalesList.statusCode, 200);
   assert.ok(sellerSalesList.json().items.some((sale: { id: string }) => sale.id === transferredSaleId));
+
+  // --- Operate sales (S2-US04 stage 3): negotiation, own-financing alert, initial docs, LOST ---
+  const updateNegotiation = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { salePrice: 95000, paymentMethodForecast: "financiamento", hasFinancing: true, financingType: "CUSTOMER_OWN", initialDocsStatus: "PARTIAL" },
+  });
+  assert.equal(updateNegotiation.statusCode, 200);
+  assert.equal(updateNegotiation.json().data.financingType, "CUSTOMER_OWN");
+  assert.equal(updateNegotiation.json().data.salePrice, "95000");
+  // Own financing raises the alert (the value must land in the store account).
+  assert.equal(updateNegotiation.json().financingAlert, true);
+
+  // SDR does not operate the sales Kanban (PATCH forbidden).
+  const sdrPatchSale = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { paymentMethodForecast: "PIX" },
+  });
+  assert.equal(sdrPatchSale.statusCode, 403);
+
+  // Seller registers the buyer's initial documents -> REAL producer of the US06 prerequisite.
+  const initialDocuments = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/initial-documents`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { status: "COLLECTED" },
+  });
+  assert.equal(initialDocuments.statusCode, 200);
+  assert.equal(initialDocuments.json().data.initialDocsStatus, "COLLECTED");
+  const buyerDocDelivered = await prisma.saleDocumentChecklist.findFirst({
+    where: { saleId: transferredSaleId, itemKey: "buyer_document_delivered", isDone: true },
+  });
+  assert.ok(buyerDocDelivered);
+
+  // Move the sales stage (negotiation).
+  const moveToNegotiation = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/move`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { toStage: "IN_NEGOTIATION" },
+  });
+  assert.equal(moveToNegotiation.statusCode, 200);
+  assert.equal(moveToNegotiation.json().data.stageKey, "IN_NEGOTIATION");
+
+  // LOST cancels/soft-deletes the sale and removes it from lists/open-sales count.
+  const directSaleId = sellerDirectSale.json().data.id as string;
+  const lostMove = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${directSaleId}/move`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { toStage: "LOST", reason: "Cliente desistiu da compra" },
+  });
+  assert.equal(lostMove.statusCode, 200);
+  assert.equal(lostMove.json().data.status, "CANCELLED");
+  const lostSaleGet = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${directSaleId}`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(lostSaleGet.statusCode, 404);
   checkpoint("commercial-sales");
 
   const sellerDeleteCustomer = await app.inject({

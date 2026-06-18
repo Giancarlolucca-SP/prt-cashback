@@ -12,7 +12,9 @@ import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 import {
   CUSTOMER_ARRIVAL_STATUSES,
   canTransferToSales,
+  requiresOwnFinancingAlert,
   type CustomerArrivalStatus,
+  type FinancingType,
 } from "../services/sales-transition.js";
 
 // Sales-board (Kanban Vendas) default stage when an opportunity enters the sales flow.
@@ -56,6 +58,43 @@ const salesQuerySchema = z.object({
 });
 
 const saleParamsSchema = z.object({ id: z.string().uuid() });
+
+const financingTypeSchema = z.enum(["STORE_PARTNER", "CUSTOMER_OWN", "NOT_APPLICABLE"]);
+const initialDocStatusSchema = z.enum(["PENDING", "PARTIAL", "COLLECTED"]);
+
+// Statuses in which the sales process is still editable/negotiable.
+const EDITABLE_SALE_STATUSES: ReadonlySet<string> = new Set(["DRAFT", "PROPOSAL", "APPROVED"]);
+
+const salePatchSchema = z
+  .object({
+    salePrice: z.coerce.number().nonnegative().optional(),
+    paymentMethodForecast: z.string().trim().max(120).optional(),
+    hasFinancing: z.boolean().optional(),
+    financingType: financingTypeSchema.optional(),
+    hasTradeIn: z.boolean().optional(),
+    initialDocsStatus: initialDocStatusSchema.optional(),
+    notes: notesField,
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Informe ao menos um campo para atualizar.",
+  });
+
+const salesMoveSchema = z
+  .object({
+    toStage: z.enum(["ASSUMED", "IN_NEGOTIATION", "AWAITING_RETURN", "LOST"]),
+    reason: z.string().trim().max(300).optional(),
+    position: z.number().int().min(0).default(0),
+  })
+  .superRefine((input, ctx) => {
+    if (input.toStage === "LOST" && (!input.reason || input.reason.trim().length < 8)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe um motivo (>=8 caracteres) para perder o processo.", path: ["reason"] });
+    }
+  });
+
+const initialDocumentsSchema = z.object({
+  status: initialDocStatusSchema.default("COLLECTED"),
+  notes: notesField,
+});
 
 type SaleRecord = Prisma.SaleGetPayload<Record<string, never>>;
 
@@ -197,6 +236,32 @@ async function createSaleFromCard(
   });
 
   return result;
+}
+
+async function loadScopedSale(session: SalesSession, id: string) {
+  const sale = await prisma.sale.findFirst({
+    where: {
+      id,
+      storeId: session.user.storeId,
+      deletedAt: null,
+      leadCardId: { not: null },
+      ...(isCommercialFullView(session.user.role) ? {} : { sellerUserId: session.user.id }),
+    },
+  });
+  if (!sale) {
+    throw new ApiError("NOT_FOUND", "Processo de vendas nao encontrado.");
+  }
+  return sale;
+}
+
+async function getSaleStageKey(saleId: string): Promise<string | null> {
+  const card = await prisma.saleCard.findFirst({ where: { saleId }, select: { stageKey: true } });
+  return card?.stageKey ?? null;
+}
+
+function mergeSnapshot(snapshot: Prisma.JsonValue | null, patch: Record<string, unknown>): Prisma.InputJsonObject {
+  const base = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) ? (snapshot as Record<string, unknown>) : {};
+  return { ...base, ...patch } as Prisma.InputJsonObject;
 }
 
 export async function registerCommercialSalesRoutes(app: FastifyInstance) {
@@ -360,5 +425,223 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send({ data: sanitizeSale(sale, saleCard.stageKey) });
+  });
+
+  app.patch("/:id", async (request) => {
+    const session = await requirePermission(request, { module: "leads", action: "update", scope: "STORE", sensitiveArea: "general" });
+    if (!OPERATE_SALES_ROLES.has(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Seu perfil nao opera o Kanban Vendas.");
+    }
+    const params = saleParamsSchema.parse(request.params);
+    const input = salePatchSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    if (!EDITABLE_SALE_STATUSES.has(sale.status)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Processo de vendas nao editavel no status atual.", { status: sale.status });
+    }
+
+    const snapshotPatch: Record<string, unknown> = {};
+    if (input.hasTradeIn !== undefined) snapshotPatch.hasTradeIn = input.hasTradeIn;
+    if (input.notes !== undefined) snapshotPatch.observationNotes = input.notes;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.sale.update({
+        where: { id: sale.id },
+        data: {
+          ...(input.salePrice !== undefined ? { salePrice: input.salePrice } : {}),
+          ...(input.paymentMethodForecast !== undefined ? { paymentMethodForecast: input.paymentMethodForecast } : {}),
+          ...(input.hasFinancing !== undefined ? { hasFinancing: input.hasFinancing } : {}),
+          ...(input.financingType !== undefined ? { financingType: input.financingType } : {}),
+          ...(input.initialDocsStatus !== undefined ? { initialDocsStatus: input.initialDocsStatus } : {}),
+          ...(Object.keys(snapshotPatch).length ? { snapshot: mergeSnapshot(sale.snapshot, snapshotPatch) } : {}),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "commercial_sale_updated",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: { changedFields: Object.keys(input), financingType: next.financingType },
+        },
+      });
+      if (sale.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_sale_updated",
+            entityType: "lead",
+            entityId: sale.leadId,
+            result: "SUCCESS",
+            metadata: { saleId: sale.id, changedFields: Object.keys(input) },
+          },
+        });
+      }
+
+      return next;
+    });
+
+    const stageKey = await getSaleStageKey(updated.id);
+    return {
+      data: sanitizeSale(updated, stageKey),
+      // Own-financing alert: the value must land in the store account (operational block).
+      financingAlert: requiresOwnFinancingAlert(updated.financingType as FinancingType | null),
+    };
+  });
+
+  app.post("/:id/move", async (request) => {
+    const session = await requirePermission(request, { module: "leads", action: "update", scope: "STORE", sensitiveArea: "general" });
+    if (!OPERATE_SALES_ROLES.has(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Seu perfil nao opera o Kanban Vendas.");
+    }
+    const params = saleParamsSchema.parse(request.params);
+    const input = salesMoveSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    if (!EDITABLE_SALE_STATUSES.has(sale.status)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Processo de vendas nao pode ser movido no status atual.", { status: sale.status });
+    }
+    const card = await prisma.saleCard.findFirst({ where: { saleId: sale.id } });
+    if (!card) {
+      throw new ApiError("NOT_FOUND", "Card de vendas nao encontrado.");
+    }
+    const fromStage = card.stageKey;
+    if (fromStage === input.toStage) {
+      return { data: sanitizeSale(sale, fromStage), unchanged: true };
+    }
+
+    const lost = input.toStage === "LOST";
+    const updatedSale = await prisma.$transaction(async (tx) => {
+      // Concurrency guard on the sale-card stage.
+      const changed = await tx.saleCard.updateMany({
+        where: { id: card.id, stageKey: fromStage },
+        data: { stageKey: input.toStage, position: input.position },
+      });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Card de vendas foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+
+      let next = sale;
+      if (lost) {
+        // LOST cancels + soft-deletes the sale, removing it from the open-sales count and lists.
+        next = await tx.sale.update({
+          where: { id: sale.id },
+          data: { status: "CANCELLED", deletedAt: new Date(), snapshot: mergeSnapshot(sale.snapshot, { lostReason: input.reason ?? null }) },
+        });
+      }
+
+      await tx.saleStageHistory.create({
+        data: { storeId: session.user.storeId, saleId: sale.id, fromStage, toStage: input.toStage, actorUserId: session.user.id },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "commercial_sale_stage_changed",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: { fromStage, toStage: input.toStage, reason: input.reason ?? null, cancelled: lost },
+        },
+      });
+      if (sale.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_sale_stage_changed",
+            entityType: "lead",
+            entityId: sale.leadId,
+            result: "SUCCESS",
+            metadata: { saleId: sale.id, fromStage, toStage: input.toStage },
+          },
+        });
+      }
+
+      return next;
+    });
+
+    return { data: sanitizeSale(updatedSale, input.toStage), unchanged: false };
+  });
+
+  app.post("/:id/initial-documents", async (request) => {
+    const session = await requirePermission(request, { module: "leads", action: "update", scope: "STORE", sensitiveArea: "general" });
+    if (!OPERATE_SALES_ROLES.has(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Seu perfil nao opera o Kanban Vendas.");
+    }
+    const params = saleParamsSchema.parse(request.params);
+    const input = initialDocumentsSchema.parse(request.body ?? {});
+    const sale = await loadScopedSale(session, params.id);
+    if (!EDITABLE_SALE_STATUSES.has(sale.status)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Processo de vendas nao editavel no status atual.", { status: sale.status });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Real producer of the technical-delivery prerequisite (buyer documents delivered, S2-US06).
+      await tx.saleDocumentChecklist.upsert({
+        where: { saleId_itemKey: { saleId: sale.id, itemKey: "buyer_document_delivered" } },
+        update: { isDone: true, completedAt: new Date() },
+        create: {
+          storeId: session.user.storeId,
+          saleId: sale.id,
+          itemKey: "buyer_document_delivered",
+          label: "Documentos do comprador entregues",
+          isDone: true,
+          completedAt: new Date(),
+        },
+      });
+
+      const next = await tx.sale.update({
+        where: { id: sale.id },
+        data: {
+          initialDocsStatus: input.status,
+          ...(input.notes !== undefined ? { snapshot: mergeSnapshot(sale.snapshot, { initialDocsNotes: input.notes }) } : {}),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "commercial_sale_initial_documents",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: { status: input.status, itemKey: "buyer_document_delivered" },
+        },
+      });
+      if (sale.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_sale_initial_documents",
+            entityType: "lead",
+            entityId: sale.leadId,
+            result: "SUCCESS",
+            metadata: { saleId: sale.id, status: input.status },
+          },
+        });
+      }
+
+      return next;
+    });
+
+    const stageKey = await getSaleStageKey(result.id);
+    return { data: sanitizeSale(result, stageKey) };
   });
 }
