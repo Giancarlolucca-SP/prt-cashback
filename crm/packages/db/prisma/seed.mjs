@@ -341,6 +341,64 @@ async function seedDemoData(store, userByRole) {
     findOrCreate("lead", { storeId: store.id, title: "Carlos Tracker" }, { storeId: store.id, assignedUserId: sdr?.id, source: "Site", title: "Carlos Tracker", status: "COLD", interest: "Tracker Premier", temperature: 48, nextActionAt: daysFromNow(2, 11) }, { assignedUserId: sdr?.id, status: "COLD", temperature: 48 }),
   ]);
 
+  // Commercial Kanban (S2-US01) demo cards across stages and cooling states.
+  const nowRef = new Date();
+  const commercialHoursAgo = (hours) => new Date(nowRef.getTime() - hours * 60 * 60 * 1000);
+  const commercialCardSeeds = [
+    { title: "Comercial Demo - Novo lead", stage: "NEW_LEAD", customerId: marina.id, vehicleId: corolla.id, assignedUserId: sdr?.id, source: "ligacao_loja", channel: "telefone", interactionHoursAgo: 1 },
+    { title: "Comercial Demo - Em contato", stage: "IN_CONTACT", customerId: paulo.id, vehicleId: compass.id, assignedUserId: seller?.id, source: "WhatsApp", channel: "whatsapp", interactionHoursAgo: 3 },
+    { title: "Comercial Demo - Agendado", stage: "SCHEDULED", customerId: marina.id, vehicleId: hrv.id, assignedUserId: seller?.id, source: "Site", channel: "site", interactionHoursAgo: 5 },
+    { title: "Comercial Demo - Visitou loja", stage: "VISITED", customerId: paulo.id, vehicleId: corolla.id, assignedUserId: seller?.id, source: "Loja", channel: "presencial", interactionHoursAgo: 6 },
+    { title: "Comercial Demo - Test drive", stage: "TEST_DRIVE", customerId: marina.id, vehicleId: compass.id, assignedUserId: seller?.id, source: "Loja", channel: "presencial", interactionHoursAgo: 8 },
+    { title: "Comercial Demo - Em negociacao", stage: "NEGOTIATION", customerId: paulo.id, vehicleId: hrv.id, assignedUserId: seller?.id, source: "WhatsApp", channel: "whatsapp", interactionHoursAgo: 10 },
+    { title: "Comercial Demo - Aguardando retorno", stage: "AWAITING_RETURN", customerId: marina.id, vehicleId: onix.id, assignedUserId: seller?.id, source: "Telefone", channel: "telefone", interactionHoursAgo: 30 },
+    { title: "Comercial Demo - Aguardando confirmacao", stage: "AWAITING_PURCHASE_CONFIRMATION", customerId: paulo.id, vehicleId: corolla.id, assignedUserId: seller?.id, source: "WhatsApp", channel: "whatsapp", interactionHoursAgo: 12 },
+    { title: "Comercial Demo - Perdido", stage: "LOST", customerId: marina.id, vehicleId: onix.id, assignedUserId: seller?.id, source: "Site", channel: "site", interactionHoursAgo: 96, lostReason: "Cliente comprou em outra loja" },
+    { title: "Comercial Demo - Atencao 24h", stage: "IN_CONTACT", customerId: paulo.id, vehicleId: compass.id, assignedUserId: sdr?.id, source: "Site", channel: "site", interactionHoursAgo: 24 },
+    { title: "Comercial Demo - Esfriando 48h", stage: "IN_CONTACT", customerId: marina.id, vehicleId: hrv.id, assignedUserId: sdr?.id, source: "Site", channel: "site", interactionHoursAgo: 48 },
+    { title: "Comercial Demo - Risco alto 72h", stage: "NEGOTIATION", customerId: paulo.id, vehicleId: corolla.id, assignedUserId: seller?.id, source: "Site", channel: "site", interactionHoursAgo: 72 },
+  ];
+
+  for (const cardSeed of commercialCardSeeds) {
+    const interactionAt = commercialHoursAgo(cardSeed.interactionHoursAgo);
+    const archivedAt = cardSeed.stage === "LOST" ? interactionAt : null;
+    const lead = await findOrCreate(
+      "lead",
+      { storeId: store.id, title: cardSeed.title },
+      {
+        storeId: store.id,
+        customerId: cardSeed.customerId,
+        assignedUserId: cardSeed.assignedUserId,
+        vehicleId: cardSeed.vehicleId,
+        source: cardSeed.source,
+        channel: cardSeed.channel,
+        title: cardSeed.title,
+        status: "NEW",
+        lastInteractionAt: interactionAt,
+        createdByUserId: cardSeed.assignedUserId,
+        updatedByUserId: cardSeed.assignedUserId,
+      },
+      { assignedUserId: cardSeed.assignedUserId, channel: cardSeed.channel, lastInteractionAt: interactionAt },
+    );
+
+    await findOrCreate(
+      "leadCard",
+      { storeId: store.id, leadId: lead.id, boardKey: "commercial" },
+      {
+        storeId: store.id,
+        leadId: lead.id,
+        boardKey: "commercial",
+        stageKey: cardSeed.stage,
+        position: 0,
+        stageEnteredAt: interactionAt,
+        archivedAt,
+        lostReason: cardSeed.lostReason ?? null,
+        metadata: { source: "seed-demo", demoStage: cardSeed.stage },
+      },
+      { stageKey: cardSeed.stage, stageEnteredAt: interactionAt, archivedAt, lostReason: cardSeed.lostReason ?? null },
+    );
+  }
+
   await Promise.all([
     findOrCreate("appointment", { storeId: store.id, title: "Visita Marina - Corolla" }, { storeId: store.id, customerId: marina.id, leadId: leads[0].id, vehicleId: corolla.id, assignedUserId: seller?.id, type: "Visita", title: "Visita Marina - Corolla", startsAt: daysFromNow(0, 16), endsAt: daysFromNow(0, 17), status: "CONFIRMED", notes: "Cliente pediu simulacao com entrada." }, { startsAt: daysFromNow(0, 16), status: "CONFIRMED" }),
     findOrCreate("appointment", { storeId: store.id, title: "Avaliacao HR-V consignado" }, { storeId: store.id, customerId: paulo.id, leadId: leads[1].id, vehicleId: hrv.id, assignedUserId: appraiser?.id, type: "Avaliacao", title: "Avaliacao HR-V consignado", startsAt: daysFromNow(1, 10), endsAt: daysFromNow(1, 11), status: "SCHEDULED", notes: "Conferir contrato de consignacao." }, { startsAt: daysFromNow(1, 10), status: "SCHEDULED" }),
