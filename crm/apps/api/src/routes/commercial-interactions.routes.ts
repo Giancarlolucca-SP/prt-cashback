@@ -8,17 +8,22 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
-import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
+import { COMMERCIAL_BOARD_KEY, isActiveStage, type CommercialStageKey } from "../services/commercial-kanban.js";
 import {
   COMMERCIAL_INTERACTION_CHANNELS,
   COMMERCIAL_INTERACTION_RESULTS,
   COMMERCIAL_INTERACTION_TYPES,
   COMMERCIAL_NEXT_ACTION_TYPES,
+  COMMERCIAL_NOTIFICATION_TYPES,
+  commercialNotificationDedupKey,
+  continuityNeedsManagerNotification,
   isFollowUpOverdue,
+  leadContinuityStatus,
   type CommercialInteractionChannel,
   type CommercialInteractionResult,
   type CommercialInteractionType,
   type CommercialNextActionType,
+  type CommercialNotificationType,
 } from "../services/commercial-interaction.js";
 
 const interactionTypeKeys = COMMERCIAL_INTERACTION_TYPES.map((entry) => entry.key) as [CommercialInteractionType, ...CommercialInteractionType[]];
@@ -405,5 +410,129 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
     });
 
     return { data: sanitizeInteraction(updated, new Date()) };
+  });
+
+  app.post("/scan-followups", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    // Managerial maintenance action that generates Admin/Dono-Gestor notifications.
+    if (!isCommercialFullView(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Apenas Gestao/Administracao pode executar a varredura de follow-ups.");
+    }
+    const storeId = session.user.storeId;
+    const now = new Date();
+
+    // Notification recipients: Administrador + Dono/Gestor.
+    const recipients = await prisma.user.findMany({
+      where: { storeId, role: { in: ["OWNER_MANAGER", "ADMIN"] }, isActive: true, deletedAt: null },
+      select: { id: true },
+    });
+
+    // Active commercial cards (for both overdue scoping and continuity).
+    const activeCards = await prisma.leadCard.findMany({
+      where: { storeId, boardKey: COMMERCIAL_BOARD_KEY, archivedAt: null, stageKey: { not: "LOST" } },
+      include: { lead: true },
+    });
+    const activeCardById = new Map(activeCards.map((card) => [card.id, card]));
+
+    // Overdue follow-ups (pending next action in the past) on active cards.
+    const overdueInteractions = await prisma.commercialInteraction.findMany({
+      where: { storeId, deletedAt: null, nextActionStatus: "PENDING", nextActionAt: { lt: now } },
+      select: { cardId: true },
+    });
+    const overdueActiveCardIds = [...new Set(overdueInteractions.map((entry) => entry.cardId))].filter((id) => activeCardById.has(id));
+
+    // Future appointments per active card (continuity exception).
+    const activeCardIds = activeCards.map((card) => card.id);
+    const futureAppointments = activeCardIds.length
+      ? await prisma.commercialAppointment.findMany({
+          where: { storeId, cardId: { in: activeCardIds }, startsAt: { gt: now }, status: { in: ["SCHEDULED", "CONFIRMED"] } },
+          select: { cardId: true },
+        })
+      : [];
+    const cardsWithFutureAppointment = new Set(futureAppointments.map((entry) => entry.cardId));
+
+    // Build the needed (card, reason) alerts.
+    const alerts: Array<{ cardId: string; leadId: string | null; type: CommercialNotificationType; title: string }> = [];
+    for (const cardId of overdueActiveCardIds) {
+      alerts.push({ cardId, leadId: activeCardById.get(cardId)?.leadId ?? null, type: "follow_up_overdue", title: "Follow-up vencido" });
+    }
+    for (const card of activeCards) {
+      const status = leadContinuityStatus({
+        stageActive: isActiveStage(card.stageKey as CommercialStageKey),
+        hasFutureNextAction: Boolean(card.lead.nextActionAt && card.lead.nextActionAt.getTime() > now.getTime()),
+        hasFutureAppointment: cardsWithFutureAppointment.has(card.id),
+        lastActivityAt: card.lead.lastInteractionAt ?? card.lead.createdAt,
+        now,
+      });
+      if (continuityNeedsManagerNotification(status)) {
+        alerts.push({ cardId: card.id, leadId: card.leadId, type: "lead_no_continuity", title: `Lead sem continuidade (${status})` });
+      }
+    }
+
+    // Dedup against existing UNREAD notifications for the same card + reason (production use of the dedup key).
+    const candidateCardIds = [...new Set(alerts.map((alert) => alert.cardId))];
+    const existing = candidateCardIds.length
+      ? await prisma.notification.findMany({
+          where: { storeId, readAt: null, entityType: { in: [...COMMERCIAL_NOTIFICATION_TYPES] }, entityId: { in: candidateCardIds } },
+          select: { entityType: true, entityId: true },
+        })
+      : [];
+    const seenKeys = new Set(existing.map((entry) => `${entry.entityType}:${entry.entityId}`));
+
+    let notificationsCreated = 0;
+    let deduped = 0;
+    for (const alert of alerts) {
+      const key = commercialNotificationDedupKey(alert.cardId, alert.type);
+      if (seenKeys.has(key)) {
+        deduped += 1;
+        continue;
+      }
+      seenKeys.add(key);
+      if (recipients.length === 0) {
+        continue;
+      }
+      await prisma.notification.createMany({
+        data: recipients.map((recipient) => ({
+          storeId,
+          userId: recipient.id,
+          title: alert.title,
+          body: `Card comercial ${alert.cardId} requer atencao da gestao.`,
+          entityType: alert.type,
+          entityId: alert.cardId,
+        })),
+      });
+      notificationsCreated += recipients.length;
+
+      if (alert.leadId) {
+        await prisma.auditLog.create({
+          data: {
+            storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "commercial_interactions",
+            action: alert.type === "follow_up_overdue" ? "follow_up_overdue_alert" : "lead_no_continuity_alert",
+            entityType: "lead",
+            entityId: alert.leadId,
+            result: "SUCCESS",
+            metadata: { cardId: alert.cardId, type: alert.type },
+          },
+        });
+      }
+    }
+
+    return {
+      data: {
+        overdueFollowUps: overdueActiveCardIds.length,
+        noContinuityAlerts: alerts.filter((alert) => alert.type === "lead_no_continuity").length,
+        notificationsCreated,
+        deduped,
+        recipients: recipients.length,
+      },
+    };
   });
 }

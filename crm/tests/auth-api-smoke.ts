@@ -5413,6 +5413,48 @@ try {
     payload: { action: "complete" },
   });
   assert.equal(reCompleteFollowUp.statusCode, 422);
+
+  // Overdue follow-up -> scan generates a deduped managerial notification (review fix #5: real path).
+  const overdueInteraction = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, interactionType: "CONTACT_ATTEMPT", nextActionType: "CALL", nextActionAt: "2020-01-01T10:00:00.000Z" },
+  });
+  assert.equal(overdueInteraction.statusCode, 201);
+
+  // Only management can run the scan.
+  const scanForbidden = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions/scan-followups",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(scanForbidden.statusCode, 403);
+
+  const scanFollowUps = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions/scan-followups",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(scanFollowUps.statusCode, 200);
+  assert.ok(scanFollowUps.json().data.notificationsCreated >= 1);
+
+  const ownerOverdueNotifications = await app.inject({
+    method: "GET",
+    url: "/notifications?entity_type=follow_up_overdue&page_size=100",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownerOverdueNotifications.statusCode, 200);
+  assert.ok(ownerOverdueNotifications.json().items.some((n: { entityId: string }) => n.entityId === agendaCardId));
+
+  // Re-running dedups: no new notification for the same card+reason while still unread.
+  const scanFollowUpsAgain = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions/scan-followups",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(scanFollowUpsAgain.statusCode, 200);
+  assert.ok(scanFollowUpsAgain.json().data.deduped >= 1);
   checkpoint("commercial-interactions");
 
   const sellerDeleteCustomer = await app.inject({
