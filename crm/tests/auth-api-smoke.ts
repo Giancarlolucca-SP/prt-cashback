@@ -5394,6 +5394,25 @@ try {
   assert.ok(
     interactionLeadAudit.json().items.some((log: { metadata: { interactionId?: string } }) => log.metadata.interactionId === interactionId),
   );
+
+  // Resolve the follow-up (complete); a second resolve is blocked (no pending follow-up).
+  const completeFollowUp = await app.inject({
+    method: "POST",
+    url: `/commercial-interactions/${interactionId}/follow-up`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { action: "complete" },
+  });
+  assert.equal(completeFollowUp.statusCode, 200);
+  assert.equal(completeFollowUp.json().data.nextActionStatus, "DONE");
+  assert.equal(completeFollowUp.json().data.followUpOverdue, false);
+
+  const reCompleteFollowUp = await app.inject({
+    method: "POST",
+    url: `/commercial-interactions/${interactionId}/follow-up`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { action: "complete" },
+  });
+  assert.equal(reCompleteFollowUp.statusCode, 422);
   checkpoint("commercial-interactions");
 
   const sellerDeleteCustomer = await app.inject({

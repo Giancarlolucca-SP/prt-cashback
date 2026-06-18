@@ -73,6 +73,21 @@ const createInteractionSchema = z
     }
   });
 
+const interactionParamsSchema = z.object({ id: z.string().uuid() });
+
+const resolveFollowUpSchema = z
+  .object({
+    action: z.enum(["complete", "cancel", "reschedule"]),
+    nextActionAt: z.coerce.date().optional(),
+    nextActionType: nextActionTypeSchema.optional(),
+    reason: z.string().trim().max(300).optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.action === "reschedule" && !input.nextActionAt) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe a nova data/hora para reagendar o follow-up.", path: ["nextActionAt"] });
+    }
+  });
+
 const interactionsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
@@ -289,5 +304,106 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
     });
 
     return reply.code(201).send({ data: sanitizeInteraction(interaction, now) });
+  });
+
+  app.post("/:id/follow-up", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = interactionParamsSchema.parse(request.params);
+    const input = resolveFollowUpSchema.parse(request.body);
+
+    // Scope: SDR/Vendedor only resolve their own follow-ups.
+    const interaction = await prisma.commercialInteraction.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...(isCommercialFullView(session.user.role) ? {} : { responsibleUserId: session.user.id }),
+      },
+    });
+    if (!interaction) {
+      throw new ApiError("NOT_FOUND", "Interacao nao encontrada.");
+    }
+    if (interaction.nextActionStatus !== "PENDING") {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Nao ha follow-up pendente nesta interacao.", {
+        nextActionStatus: interaction.nextActionStatus,
+      });
+    }
+
+    const reschedule = input.action === "reschedule";
+    const targetStatus = input.action === "complete" ? "DONE" : input.action === "cancel" ? "CANCELLED" : "PENDING";
+    const newNextActionAt = reschedule ? input.nextActionAt ?? null : interaction.nextActionAt;
+    const newNextActionType = reschedule ? input.nextActionType ?? interaction.nextActionType : interaction.nextActionType;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Concurrency guard: only resolve a still-PENDING follow-up.
+      const changed = await tx.commercialInteraction.updateMany({
+        where: { id: interaction.id, nextActionStatus: "PENDING" },
+        data: {
+          nextActionStatus: targetStatus,
+          ...(reschedule ? { nextActionAt: newNextActionAt, nextActionType: newNextActionType } : {}),
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Follow-up foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+      const next = await tx.commercialInteraction.findUniqueOrThrow({ where: { id: interaction.id } });
+
+      // Project onto the lead: clear the next action when completed/cancelled, move it when rescheduled.
+      if (interaction.leadId) {
+        await tx.lead.update({
+          where: { id: interaction.leadId },
+          data: reschedule
+            ? { nextActionAt: newNextActionAt, nextActionType: newNextActionType, updatedByUserId: session.user.id }
+            : { nextActionAt: null, nextActionType: null, updatedByUserId: session.user.id },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_interactions",
+          action: "commercial_follow_up_resolved",
+          entityType: "commercial_interaction",
+          entityId: interaction.id,
+          result: "SUCCESS",
+          metadata: {
+            action: input.action,
+            fromStatus: "PENDING",
+            toStatus: targetStatus,
+            newNextActionAt: newNextActionAt?.toISOString() ?? null,
+            reason: input.reason ?? null,
+            cardId: interaction.cardId,
+            leadId: interaction.leadId,
+          },
+        },
+      });
+
+      if (interaction.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_follow_up_resolved",
+            entityType: "lead",
+            entityId: interaction.leadId,
+            result: "SUCCESS",
+            metadata: { interactionId: interaction.id, action: input.action, toStatus: targetStatus },
+          },
+        });
+      }
+
+      return next;
+    });
+
+    return { data: sanitizeInteraction(updated, new Date()) };
   });
 }
