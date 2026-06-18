@@ -5750,6 +5750,70 @@ try {
     headers: { authorization: `Bearer ${sellerInventoryToken}` },
   });
   assert.equal(lostSaleGet.statusCode, 404);
+
+  // --- Close the deal (S2-US04 stage 4): -> DOCUMENTATION queue, no release, own-financing alert ---
+  // SDR cannot mark a deal closed (AC15).
+  const sdrClose = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/close`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: {},
+  });
+  assert.equal(sdrClose.statusCode, 403);
+
+  // Seller closes the deal -> moves to DOCUMENTATION; never releases documents/delivery.
+  const closeDeal = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/close`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {},
+  });
+  assert.equal(closeDeal.statusCode, 200);
+  assert.equal(closeDeal.json().data.status, "DOCUMENTATION");
+  assert.equal(closeDeal.json().data.stageKey, "CLOSED_WON");
+  assert.equal(closeDeal.json().releasesDocuments, false);
+  // Own financing was set in stage 3 -> alert raised.
+  assert.equal(closeDeal.json().financingAlert, true);
+
+  // Closing again is blocked.
+  const reClose = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/close`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {},
+  });
+  assert.equal(reClose.statusCode, 422);
+
+  // Managerial own-financing notification was generated (deduped by active condition).
+  const ownFinancingNotifications = await app.inject({
+    method: "GET",
+    url: "/notifications?entity_type=own_financing_alert&page_size=100",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownFinancingNotifications.statusCode, 200);
+  assert.ok(ownFinancingNotifications.json().items.some((n: { entityId: string }) => n.entityId === transferredSaleId));
+
+  // The seller cannot confer documents (Management/Administrative only).
+  const sellerConfer = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/confer-documents`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {},
+  });
+  assert.equal(sellerConfer.statusCode, 403);
+
+  // Administrative confers the buyer documents -> REAL producer of the US06 prerequisite (checked).
+  const conferDocuments = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/confer-documents`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {},
+  });
+  assert.equal(conferDocuments.statusCode, 200);
+  const buyerDocChecked = await prisma.saleDocumentChecklist.findFirst({
+    where: { saleId: transferredSaleId, itemKey: "buyer_document_checked", isDone: true },
+  });
+  assert.ok(buyerDocChecked);
   checkpoint("commercial-sales");
 
   const sellerDeleteCustomer = await app.inject({

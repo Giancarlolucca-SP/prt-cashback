@@ -11,7 +11,9 @@ import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../sec
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 import {
   CUSTOMER_ARRIVAL_STATUSES,
+  canCloseDeal,
   canTransferToSales,
+  closingRequirementErrors,
   requiresOwnFinancingAlert,
   type CustomerArrivalStatus,
   type FinancingType,
@@ -95,6 +97,19 @@ const initialDocumentsSchema = z.object({
   status: initialDocStatusSchema.default("COLLECTED"),
   notes: notesField,
 });
+
+const closeDealSchema = z.object({
+  negotiatedValue: z.coerce.number().positive().optional(),
+  paymentMethod: z.string().trim().min(1).max(120).optional(),
+  financingType: financingTypeSchema.optional(),
+  hasFinancing: z.boolean().optional(),
+  knownPendencies: z.string().trim().max(500).optional(),
+  closingNotes: notesField,
+});
+
+const conferDocumentsSchema = z.object({ notes: notesField }).default({});
+
+const OWN_FINANCING_ALERT_TYPE = "own_financing_alert";
 
 type SaleRecord = Prisma.SaleGetPayload<Record<string, never>>;
 
@@ -262,6 +277,53 @@ async function getSaleStageKey(saleId: string): Promise<string | null> {
 function mergeSnapshot(snapshot: Prisma.JsonValue | null, patch: Record<string, unknown>): Prisma.InputJsonObject {
   const base = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) ? (snapshot as Record<string, unknown>) : {};
   return { ...base, ...patch } as Prisma.InputJsonObject;
+}
+
+// Best-effort managerial alert for customer-own financing. Deduped by the ACTIVE condition
+// (one alert per sale while it persists, regardless of readAt), like the S2-US03 review fix.
+async function raiseOwnFinancingAlert(session: SalesSession, sale: SaleRecord) {
+  const storeId = session.user.storeId;
+  const existing = await prisma.notification.findFirst({
+    where: { storeId, entityType: OWN_FINANCING_ALERT_TYPE, entityId: sale.id },
+    select: { id: true },
+  });
+  if (existing) {
+    return;
+  }
+  const managers = await prisma.user.findMany({
+    where: { storeId, role: { in: ["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"] }, isActive: true, deletedAt: null },
+    select: { id: true },
+  });
+  const recipientIds = new Set(managers.map((manager) => manager.id));
+  if (sale.sellerUserId) {
+    recipientIds.add(sale.sellerUserId); // alert the seller too
+  }
+  if (recipientIds.size === 0) {
+    return;
+  }
+  await prisma.notification.createMany({
+    data: [...recipientIds].map((userId) => ({
+      storeId,
+      userId,
+      title: "Financeira propria: valor deve cair na conta da loja",
+      body: `O processo de vendas ${sale.id} usa financeira propria do cliente. Nao liberar documento/entrega ate a conferencia administrativa do recebimento.`,
+      entityType: OWN_FINANCING_ALERT_TYPE,
+      entityId: sale.id,
+    })),
+  });
+  await prisma.auditLog.create({
+    data: {
+      storeId,
+      actorId: session.user.id,
+      actorRole: session.user.role,
+      module: "commercial_sales",
+      action: "own_financing_alert",
+      entityType: "sale",
+      entityId: sale.id,
+      result: "SUCCESS",
+      metadata: { financingType: "CUSTOMER_OWN", recipients: recipientIds.size },
+    },
+  });
 }
 
 export async function registerCommercialSalesRoutes(app: FastifyInstance) {
@@ -643,5 +705,177 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
 
     const stageKey = await getSaleStageKey(result.id);
     return { data: sanitizeSale(result, stageKey) };
+  });
+
+  app.post("/:id/close", async (request) => {
+    const session = await requirePermission(request, { module: "leads", action: "update", scope: "STORE", sensitiveArea: "general" });
+    if (!canCloseDeal(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Seu perfil nao pode marcar negocio fechado.");
+    }
+    const params = saleParamsSchema.parse(request.params);
+    const input = closeDealSchema.parse(request.body ?? {});
+    const sale = await loadScopedSale(session, params.id);
+    if (!EDITABLE_SALE_STATUSES.has(sale.status)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Negocio nao pode ser fechado no status atual.", { status: sale.status });
+    }
+
+    // Final values (body can fill what was not set during negotiation).
+    const negotiatedValue = input.negotiatedValue ?? (sale.salePrice ? Number(sale.salePrice) : null);
+    const paymentMethod = input.paymentMethod ?? sale.paymentMethodForecast;
+    const financingType = input.financingType ?? sale.financingType;
+    const missing = closingRequirementErrors({ negotiatedValue, paymentMethod });
+    if (missing.length > 0) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Negocio fechado exige valor negociado e forma de pagamento prevista.", { missing });
+    }
+
+    const closedAt = new Date();
+    const card = await prisma.saleCard.findFirst({ where: { saleId: sale.id } });
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Concurrency guard: only close from the status we validated.
+      const changed = await tx.sale.updateMany({
+        where: { id: sale.id, status: sale.status },
+        data: {
+          status: "DOCUMENTATION",
+          closedAt,
+          salePrice: negotiatedValue,
+          paymentMethodForecast: paymentMethod,
+          ...(financingType ? { financingType } : {}),
+          ...(input.hasFinancing !== undefined ? { hasFinancing: input.hasFinancing } : {}),
+          snapshot: mergeSnapshot(sale.snapshot, {
+            closingNotes: input.closingNotes ?? null,
+            knownPendencies: input.knownPendencies ?? null,
+            closedByUserId: session.user.id,
+          }),
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Processo de vendas foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+      const next = await tx.sale.findUniqueOrThrow({ where: { id: sale.id } });
+
+      if (card) {
+        await tx.saleCard.update({ where: { id: card.id }, data: { stageKey: "CLOSED_WON" } });
+        await tx.saleStageHistory.create({
+          data: { storeId: session.user.storeId, saleId: sale.id, fromStage: card.stageKey, toStage: "CLOSED_WON", actorUserId: session.user.id },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "commercial_sale_closed",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          // Closing moves to the management/documentation queue; it NEVER releases documents/delivery.
+          metadata: { negotiatedValue, paymentMethod, financingType, status: "DOCUMENTATION", releasesDocuments: false },
+        },
+      });
+      if (sale.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_sale_closed",
+            entityType: "lead",
+            entityId: sale.leadId,
+            result: "SUCCESS",
+            metadata: { saleId: sale.id, status: "DOCUMENTATION" },
+          },
+        });
+      }
+
+      return next;
+    });
+
+    // Own-financing alert is a best-effort side effect (outside the close transaction).
+    let financingAlert = false;
+    if (requiresOwnFinancingAlert(result.financingType as FinancingType | null)) {
+      financingAlert = true;
+      try {
+        await raiseOwnFinancingAlert(session, result);
+      } catch (alertError) {
+        request.log.error({ err: alertError }, "Falha ao gerar alerta de financeira propria");
+      }
+    }
+
+    await emitInternalEvent({
+      name: "commercial_sale.closed",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "sale",
+      entityId: result.id,
+      payload: { leadId: result.leadId, sellerUserId: result.sellerUserId, status: "DOCUMENTATION" },
+    });
+
+    return { data: sanitizeSale(result, "CLOSED_WON"), financingAlert, releasesDocuments: false };
+  });
+
+  app.post("/:id/confer-documents", async (request) => {
+    // Conference is a Management/Administrative action (Administrativo has sales:update, not leads:update).
+    const session = await requirePermission(request, { module: "sales", action: "update", scope: "STORE", sensitiveArea: "general" });
+    if (!isCommercialFullView(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Apenas Gestao/Administracao confere a documentacao.");
+    }
+    const params = saleParamsSchema.parse(request.params);
+    conferDocumentsSchema.parse(request.body ?? {});
+    const sale = await loadScopedSale(session, params.id);
+    if (sale.status !== "DOCUMENTATION") {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Processo nao esta na fila de Gestao/Documentacao.", { status: sale.status });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Real producer of the technical-delivery prerequisite (buyer documents checked, S2-US06).
+      await tx.saleDocumentChecklist.upsert({
+        where: { saleId_itemKey: { saleId: sale.id, itemKey: "buyer_document_checked" } },
+        update: { isDone: true, completedAt: new Date() },
+        create: {
+          storeId: session.user.storeId,
+          saleId: sale.id,
+          itemKey: "buyer_document_checked",
+          label: "Documentos do comprador conferidos",
+          isDone: true,
+          completedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "commercial_sale_documents_conferred",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: { itemKey: "buyer_document_checked" },
+        },
+      });
+      if (sale.leadId) {
+        await tx.auditLog.create({
+          data: {
+            storeId: session.user.storeId,
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            module: "leads",
+            action: "commercial_sale_documents_conferred",
+            entityType: "lead",
+            entityId: sale.leadId,
+            result: "SUCCESS",
+            metadata: { saleId: sale.id },
+          },
+        });
+      }
+    });
+
+    const stageKey = await getSaleStageKey(sale.id);
+    return { data: sanitizeSale(sale, stageKey) };
   });
 }
