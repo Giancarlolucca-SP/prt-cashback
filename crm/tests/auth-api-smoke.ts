@@ -5610,6 +5610,85 @@ try {
   assert.ok(!overdueOnlyTrue.json().items.some((it: { id: string }) => it.id === ownerInteractionId));
   checkpoint("commercial-interactions");
 
+  // --- Commercial sales transition (S2-US04): SDR -> Sales creates a DRAFT Sale ---
+  const sdrTransferToSales = await app.inject({
+    method: "POST",
+    url: "/commercial-sales/transfer",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, sellerUserId, customerArrivalStatus: "VISIT_SCHEDULED", transferReason: "Cliente confirmou visita" },
+  });
+  assert.equal(sdrTransferToSales.statusCode, 201);
+  assert.equal(sdrTransferToSales.json().data.status, "DRAFT");
+  assert.equal(sdrTransferToSales.json().data.sellerUserId, sellerUserId);
+  assert.equal(sdrTransferToSales.json().data.leadCardId, agendaCardId);
+  assert.equal(sdrTransferToSales.json().data.stageKey, "ASSUMED");
+  const transferredSaleId = sdrTransferToSales.json().data.id as string;
+
+  // Transfer requires a seller (AC2).
+  const transferNoSeller = await app.inject({
+    method: "POST",
+    url: "/commercial-sales/transfer",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardNoVehicleId, customerArrivalStatus: "AT_STORE" },
+  });
+  assert.equal(transferNoSeller.statusCode, 400);
+
+  // A seller cannot initiate the SDR -> Sales transfer.
+  const sellerTransfer = await app.inject({
+    method: "POST",
+    url: "/commercial-sales/transfer",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { cardId: agendaCardNoVehicleId, sellerUserId, customerArrivalStatus: "AT_STORE" },
+  });
+  assert.equal(sellerTransfer.statusCode, 403);
+
+  // The same card cannot be transferred twice (one active sales process per card).
+  const duplicateTransfer = await app.inject({
+    method: "POST",
+    url: "/commercial-sales/transfer",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, sellerUserId, customerArrivalStatus: "AT_STORE" },
+  });
+  assert.equal(duplicateTransfer.statusCode, 409);
+
+  // Seller creates a sales card directly from their own commercial card (AC5).
+  const sellerOwnCommercialCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { name: "Cliente direto na loja", source: "loja" },
+  });
+  assert.equal(sellerOwnCommercialCard.statusCode, 201);
+  const sellerCommercialCardId = sellerOwnCommercialCard.json().data.id as string;
+
+  const sellerDirectSale = await app.inject({
+    method: "POST",
+    url: "/commercial-sales",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { cardId: sellerCommercialCardId, customerArrivalStatus: "AT_STORE" },
+  });
+  assert.equal(sellerDirectSale.statusCode, 201);
+  assert.equal(sellerDirectSale.json().data.sellerUserId, sellerUserId);
+
+  // SDR does not operate the sales Kanban (direct create forbidden).
+  const sdrDirectSale = await app.inject({
+    method: "POST",
+    url: "/commercial-sales",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: sellerCommercialCardId, customerArrivalStatus: "AT_STORE" },
+  });
+  assert.equal(sdrDirectSale.statusCode, 403);
+
+  // The transferred sale is visible to the seller (own scope).
+  const sellerSalesList = await app.inject({
+    method: "GET",
+    url: "/commercial-sales?page_size=100",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerSalesList.statusCode, 200);
+  assert.ok(sellerSalesList.json().items.some((sale: { id: string }) => sale.id === transferredSaleId));
+  checkpoint("commercial-sales");
+
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,

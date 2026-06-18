@@ -32,6 +32,8 @@ export type InternalEventName =
   | "commercial_appointment.created"
   | "commercial_appointment.status_changed"
   | "commercial_interaction.registered"
+  | "commercial_sale.transferred"
+  | "commercial_sale.created"
   | "appointment.created"
   | "appointment.updated"
   | "appointment.status_changed"

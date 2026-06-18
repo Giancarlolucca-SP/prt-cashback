@@ -812,10 +812,16 @@ model Sale {
   customerId   String?    @map("customer_id")
   vehicleId    String?    @map("vehicle_id")
   sellerUserId String?    @map("seller_user_id")
+  leadId       String?    @map("lead_id")
+  leadCardId   String?    @map("lead_card_id")
   type         SaleType   @default(VEHICLE)
   status       SaleStatus @default(DRAFT)
   salePrice    Decimal?   @map("sale_price") @db.Decimal(14, 2)
   grossMargin  Decimal?   @map("gross_margin") @db.Decimal(14, 2)
+  paymentMethodForecast String?  @map("payment_method_forecast")
+  hasFinancing          Boolean  @default(false) @map("has_financing")
+  financingType         String?  @map("financing_type")
+  initialDocsStatus     String?  @map("initial_docs_status")
   snapshot     Json?
   closedAt     DateTime?  @map("closed_at")
   createdAt    DateTime   @default(now()) @map("created_at")
@@ -826,6 +832,7 @@ model Sale {
   @@index([customerId])
   @@index([vehicleId])
   @@index([sellerUserId])
+  @@index([leadCardId])
   @@map("sales")
 }
 
