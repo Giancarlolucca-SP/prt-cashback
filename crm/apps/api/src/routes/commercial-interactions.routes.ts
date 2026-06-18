@@ -76,6 +76,9 @@ const createInteractionSchema = z
     if (input.nextActionType && !input.nextActionAt) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe a data/hora da proxima acao.", path: ["nextActionAt"] });
     }
+    if (input.nextActionAt && input.nextActionAt.getTime() < Date.now()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A proxima acao deve ser agendada para o futuro.", path: ["nextActionAt"] });
+    }
   });
 
 const interactionParamsSchema = z.object({ id: z.string().uuid() });
@@ -90,6 +93,9 @@ const resolveFollowUpSchema = z
   .superRefine((input, ctx) => {
     if (input.action === "reschedule" && !input.nextActionAt) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe a nova data/hora para reagendar o follow-up.", path: ["nextActionAt"] });
+    }
+    if (input.action === "reschedule" && input.nextActionAt && input.nextActionAt.getTime() < Date.now()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A nova data/hora do follow-up deve ser no futuro.", path: ["nextActionAt"] });
     }
   });
 

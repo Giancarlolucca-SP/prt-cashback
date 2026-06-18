@@ -5441,14 +5441,41 @@ try {
   });
   assert.equal(reCompleteFollowUp.statusCode, 422);
 
-  // Overdue follow-up -> scan generates a deduped managerial notification (review fix #5: real path).
-  const overdueInteraction = await app.inject({
+  // The API rejects a follow-up scheduled in the past (review fix #4).
+  const pastFollowUp = await app.inject({
     method: "POST",
     url: "/commercial-interactions",
     headers: { authorization: `Bearer ${sdrToken}` },
-    payload: { cardId: agendaCardId, interactionType: "CONTACT_ATTEMPT", nextActionType: "CALL", nextActionAt: "2020-01-01T10:00:00.000Z" },
+    payload: { cardId: agendaCardId, interactionType: "CALL", nextActionType: "CALL", nextActionAt: "2020-01-01T10:00:00.000Z" },
   });
-  assert.equal(overdueInteraction.statusCode, 201);
+  assert.equal(pastFollowUp.statusCode, 400);
+
+  // Seed an overdue follow-up directly (past nextActionAt is no longer accepted by the API),
+  // so the scan has an overdue condition to detect.
+  await prisma.commercialInteraction.create({
+    data: {
+      storeId: ownerBody.user.storeId,
+      cardId: agendaCardId,
+      leadId: interactionLeadId,
+      responsibleUserId: sdrUserId,
+      interactionType: "CONTACT_ATTEMPT",
+      occurredAt: new Date(),
+      nextActionType: "CALL",
+      nextActionAt: new Date("2020-01-01T10:00:00.000Z"),
+      nextActionStatus: "PENDING",
+      createdByUserId: sdrUserId,
+    },
+  });
+  await prisma.lead.update({
+    where: { id: interactionLeadId },
+    data: {
+      lastInteractionAt: new Date(),
+      lastInteractionType: "CONTACT_ATTEMPT",
+      lastInteractionResult: "NO_RESPONSE",
+      nextActionAt: new Date("2020-01-01T10:00:00.000Z"),
+      nextActionType: "CALL",
+    },
+  });
 
   // Only management can run the scan.
   const scanForbidden = await app.inject({
