@@ -5266,6 +5266,33 @@ try {
   assert.equal(markCompleted.statusCode, 200);
   assert.equal(markCompleted.json().data.status, "COMPLETED");
 
+  // Confirmation window projection (review fix #3): a visit within 1h is flagged needsConfirmation.
+  const soonStartsAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const soonVisit = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, type: "VISIT", startsAt: soonStartsAt },
+  });
+  assert.equal(soonVisit.statusCode, 201);
+  const soonVisitId = soonVisit.json().data.id as string;
+
+  const soonVisitView = await app.inject({
+    method: "GET",
+    url: `/commercial-agenda/appointments/${soonVisitId}`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(soonVisitView.statusCode, 200);
+  assert.equal(soonVisitView.json().data.needsConfirmation, true);
+  // The far-future visit is not within the confirmation window.
+  const farVisitView = await app.inject({
+    method: "GET",
+    url: `/commercial-agenda/appointments/${attendableAppointmentId}`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(farVisitView.statusCode, 200);
+  assert.equal(farVisitView.json().data.needsConfirmation, false);
+
   const appointmentStatusAudit = await app.inject({
     method: "GET",
     url: `/audit/logs?module=commercial_appointments&action=commercial_appointment_status_changed&entity_type=commercial_appointment&entity_id=${appointmentId}&page=1&page_size=20`,

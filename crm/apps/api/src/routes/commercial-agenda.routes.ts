@@ -21,6 +21,7 @@ import {
   commercialAppointmentLinkErrors,
   commercialAppointmentStatusLabel,
   commercialAppointmentTypeLabel,
+  needsVisitConfirmation,
   type CommercialAppointmentStatus,
   type CommercialAppointmentType,
 } from "../services/commercial-appointment.js";
@@ -103,9 +104,11 @@ function agendaScopeWhere(user: { id: string; role: string }): Prisma.Commercial
   return AGENDA_FULL_VIEW_ROLES.has(user.role) ? {} : { responsibleUserId: user.id };
 }
 
-function sanitizeCommercialAppointment(appointment: CommercialAppointmentRecord) {
+function sanitizeCommercialAppointment(appointment: CommercialAppointmentRecord, now: Date) {
   const type = appointment.type as CommercialAppointmentType;
   const status = appointment.status as CommercialAppointmentStatus;
+  // Production projection of the 1h visit confirmation window (FR-022CC/FR-022CJ).
+  const needsConfirmation = needsVisitConfirmation({ type, status, startsAt: appointment.startsAt, now });
   return {
     id: appointment.id,
     cardId: appointment.cardId,
@@ -118,6 +121,7 @@ function sanitizeCommercialAppointment(appointment: CommercialAppointmentRecord)
     typeLabel: commercialAppointmentTypeLabel(type),
     status,
     statusLabel: commercialAppointmentStatusLabel(status),
+    needsConfirmation,
     startsAt: appointment.startsAt.toISOString(),
     endsAt: appointment.endsAt?.toISOString() ?? null,
     location: appointment.location,
@@ -250,12 +254,13 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
         : {}),
     };
 
+    const now = new Date();
     const [items, total] = await Promise.all([
       prisma.commercialAppointment.findMany({ where, orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }], skip, take }),
       prisma.commercialAppointment.count({ where }),
     ]);
 
-    return listResponse(items.map(sanitizeCommercialAppointment), query, total);
+    return listResponse(items.map((item) => sanitizeCommercialAppointment(item, now)), query, total);
   });
 
   app.get("/appointments/:id", async (request) => {
@@ -274,7 +279,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Agendamento comercial nao encontrado.");
     }
 
-    return { data: sanitizeCommercialAppointment(appointment) };
+    return { data: sanitizeCommercialAppointment(appointment, new Date()) };
   });
 
   app.post("/appointments", async (request, reply) => {
@@ -414,7 +419,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       payload: { cardId: card.id, leadId: card.leadId, type: appointment.type, startsAt: appointment.startsAt.toISOString() },
     });
 
-    return reply.code(201).send({ data: sanitizeCommercialAppointment(appointment) });
+    return reply.code(201).send({ data: sanitizeCommercialAppointment(appointment, new Date()) });
   });
 
   app.post("/appointments/:id/confirm", async (request) => {
@@ -425,7 +430,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser confirmado no status atual.", { status: appointment.status });
     }
     const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "CONFIRMED", action: "confirm" });
-    return { data: sanitizeCommercialAppointment(updated) };
+    return { data: sanitizeCommercialAppointment(updated, new Date()) };
   });
 
   app.post("/appointments/:id/attended", async (request) => {
@@ -436,7 +441,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser marcado como comparecido no status atual.", { status: appointment.status });
     }
     const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "ATTENDED", action: "attended" });
-    return { data: sanitizeCommercialAppointment(updated) };
+    return { data: sanitizeCommercialAppointment(updated, new Date()) };
   });
 
   app.post("/appointments/:id/complete", async (request) => {
@@ -447,7 +452,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser concluido no status atual.", { status: appointment.status });
     }
     const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "COMPLETED", action: "complete" });
-    return { data: sanitizeCommercialAppointment(updated) };
+    return { data: sanitizeCommercialAppointment(updated, new Date()) };
   });
 
   app.post("/appointments/:id/no-response", async (request) => {
@@ -458,7 +463,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser marcado como sem resposta no status atual.", { status: appointment.status });
     }
     const updated = await transitionCommercialAppointment(session, appointment, { toStatus: "NO_RESPONSE", action: "no_response" });
-    return { data: sanitizeCommercialAppointment(updated) };
+    return { data: sanitizeCommercialAppointment(updated, new Date()) };
   });
 
   app.post("/appointments/:id/no-show", async (request) => {
@@ -475,7 +480,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       reason: input.reason,
       data: { noShowReason: input.reason ?? null },
     });
-    return { data: sanitizeCommercialAppointment(updated) };
+    return { data: sanitizeCommercialAppointment(updated, new Date()) };
   });
 
   app.post("/appointments/:id/cancel", async (request) => {
@@ -492,7 +497,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       reason: input.reason,
       data: { cancelReason: input.reason ?? null },
     });
-    return { data: sanitizeCommercialAppointment(updated) };
+    return { data: sanitizeCommercialAppointment(updated, new Date()) };
   });
 
   app.post("/appointments/:id/reschedule", async (request, reply) => {
@@ -590,8 +595,8 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send({
-      data: sanitizeCommercialAppointment(result.created),
-      previous: sanitizeCommercialAppointment(result.previous),
+      data: sanitizeCommercialAppointment(result.created, new Date()),
+      previous: sanitizeCommercialAppointment(result.previous, new Date()),
     });
   });
 }
