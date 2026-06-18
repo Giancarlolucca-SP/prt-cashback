@@ -6,6 +6,8 @@ import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
+import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
+import { commercialAppointmentLinkErrors } from "../services/commercial-appointment.js";
 
 const leadStatusSchema = z.enum(["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "WON", "LOST", "COLD"]);
 const terminalLeadStatuses = new Set(["WON", "LOST", "COLD"]);
@@ -771,6 +773,64 @@ export async function registerLeadRoutes(app: FastifyInstance) {
           },
         },
       });
+
+      // Bridge to the commercial agenda: when the lead has a card on the commercial board,
+      // mirror this converted visit as a CommercialAppointment so the SDR/Vendedor commercial
+      // agenda (S2-US02) sees it. The generic Appointment above remains the source for the
+      // customer-history timeline and analytics; the two are linked via sourceAppointmentId.
+      const commercialCard = await tx.leadCard.findFirst({
+        where: { storeId: session.user.storeId, leadId: lead.id, boardKey: COMMERCIAL_BOARD_KEY },
+        select: { id: true },
+      });
+      if (commercialCard) {
+        const linkErrors = commercialAppointmentLinkErrors({
+          cardId: commercialCard.id,
+          customerId: lead.customerId,
+          leadId: lead.id,
+          vehicleId: lead.vehicleId,
+        });
+        if (linkErrors.length === 0) {
+          const commercialAppointment = await tx.commercialAppointment.create({
+            data: {
+              storeId: session.user.storeId,
+              cardId: commercialCard.id,
+              leadId: lead.id,
+              customerId: lead.customerId,
+              vehicleId: lead.vehicleId,
+              responsibleUserId: assignedUserId,
+              type: "VISIT",
+              status: "SCHEDULED",
+              startsAt: input.startsAt,
+              endsAt: input.endsAt,
+              notes: input.notes ?? current.notes,
+              origin: "follow_up_conversion",
+              sourceAppointmentId: appointment.id,
+              createdByUserId: session.user.id,
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              storeId: session.user.storeId,
+              actorId: session.user.id,
+              actorRole: session.user.role,
+              module: "commercial_appointments",
+              action: "commercial_appointment_created",
+              entityType: "commercial_appointment",
+              entityId: commercialAppointment.id,
+              result: "SUCCESS",
+              metadata: {
+                source: "follow_up_conversion",
+                sourceAppointmentId: appointment.id,
+                cardId: commercialCard.id,
+                leadId: lead.id,
+                type: "VISIT",
+                startsAt: appointment.startsAt.toISOString(),
+              },
+            },
+          });
+        }
+      }
 
       return { appointment, followUp };
     });

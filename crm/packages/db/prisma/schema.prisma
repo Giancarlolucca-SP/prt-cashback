@@ -508,12 +508,50 @@ model LeadCard {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  lead Lead @relation(fields: [leadId], references: [id])
+  lead                   Lead                    @relation(fields: [leadId], references: [id])
+  commercialAppointments CommercialAppointment[]
 
   @@index([storeId, boardKey, stageKey])
   @@index([storeId, boardKey, archivedAt])
   @@index([leadId])
   @@map("lead_cards")
+}
+
+model CommercialAppointment {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  cardId              String    @map("card_id")
+  leadId              String?   @map("lead_id")
+  customerId          String?   @map("customer_id")
+  vehicleId           String?   @map("vehicle_id")
+  vehicleInterest     Json?     @map("vehicle_interest")
+  responsibleUserId   String    @map("responsible_user_id")
+  type                String
+  status              String    @default("SCHEDULED")
+  startsAt            DateTime  @map("starts_at")
+  endsAt              DateTime? @map("ends_at")
+  location            String?
+  origin              String?
+  channel             String?
+  notes               String?
+  cancelReason        String?   @map("cancel_reason")
+  noShowReason        String?   @map("no_show_reason")
+  rescheduleFromId    String?   @map("reschedule_from_id")
+  sourceAppointmentId String?   @map("source_appointment_id")
+  createdByUserId     String?   @map("created_by_user_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  card            LeadCard                @relation(fields: [cardId], references: [id])
+  rescheduledFrom CommercialAppointment?  @relation("CommercialAppointmentReschedule", fields: [rescheduleFromId], references: [id])
+  reschedules     CommercialAppointment[] @relation("CommercialAppointmentReschedule")
+
+  @@index([storeId, startsAt])
+  @@index([storeId, status])
+  @@index([cardId])
+  @@index([responsibleUserId])
+  @@index([leadId])
+  @@map("commercial_appointments")
 }
 
 model LeadStageHistory {
