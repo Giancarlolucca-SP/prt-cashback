@@ -7,7 +7,11 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
-import { commercialAppointmentLinkErrors } from "../services/commercial-appointment.js";
+import {
+  commercialAppointmentLinkErrors,
+  deriveLeadVehicleLink,
+  mapFollowUpTypeToAppointmentType,
+} from "../services/commercial-appointment.js";
 
 const leadStatusSchema = z.enum(["NEW", "CONTACTED", "SCHEDULED", "NEGOTIATION", "WON", "LOST", "COLD"]);
 const terminalLeadStatuses = new Set(["WON", "LOST", "COLD"]);
@@ -774,42 +778,53 @@ export async function registerLeadRoutes(app: FastifyInstance) {
         },
       });
 
-      // Bridge to the commercial agenda: when the lead has a card on the commercial board,
-      // mirror this converted visit as a CommercialAppointment so the SDR/Vendedor commercial
-      // agenda (S2-US02) sees it. The generic Appointment above remains the source for the
-      // customer-history timeline and analytics; the two are linked via sourceAppointmentId.
-      const commercialCard = await tx.leadCard.findFirst({
+      return { appointment, followUp };
+    });
+
+    // Best-effort bridge to the commercial agenda (S2-US02), OUTSIDE the conversion transaction
+    // so a mirror failure never rolls back the conversion. When the lead has a commercial-board
+    // card, mirror the converted visit as a CommercialAppointment (idempotent by sourceAppointmentId).
+    // The generic Appointment above remains the source for the customer-history timeline/analytics.
+    try {
+      const commercialCard = await prisma.leadCard.findFirst({
         where: { storeId: session.user.storeId, leadId: lead.id, boardKey: COMMERCIAL_BOARD_KEY },
         select: { id: true },
       });
       if (commercialCard) {
+        const existingMirror = await prisma.commercialAppointment.findFirst({
+          where: { storeId: session.user.storeId, sourceAppointmentId: result.appointment.id },
+          select: { id: true },
+        });
+        const { vehicleId: linkVehicleId, vehicleInterest } = deriveLeadVehicleLink(lead);
         const linkErrors = commercialAppointmentLinkErrors({
           cardId: commercialCard.id,
           customerId: lead.customerId,
           leadId: lead.id,
-          vehicleId: lead.vehicleId,
+          vehicleId: linkVehicleId,
+          vehicleInterest,
         });
-        if (linkErrors.length === 0) {
-          const commercialAppointment = await tx.commercialAppointment.create({
+        if (!existingMirror && linkErrors.length === 0) {
+          const commercialAppointment = await prisma.commercialAppointment.create({
             data: {
               storeId: session.user.storeId,
               cardId: commercialCard.id,
               leadId: lead.id,
               customerId: lead.customerId,
-              vehicleId: lead.vehicleId,
+              vehicleId: linkVehicleId,
+              ...(vehicleInterest ? { vehicleInterest } : {}),
               responsibleUserId: assignedUserId,
-              type: "VISIT",
+              type: mapFollowUpTypeToAppointmentType(input.type ?? current.type),
               status: "SCHEDULED",
               startsAt: input.startsAt,
               endsAt: input.endsAt,
               notes: input.notes ?? current.notes,
               origin: "follow_up_conversion",
-              sourceAppointmentId: appointment.id,
+              sourceAppointmentId: result.appointment.id,
               createdByUserId: session.user.id,
             },
           });
 
-          await tx.auditLog.create({
+          await prisma.auditLog.create({
             data: {
               storeId: session.user.storeId,
               actorId: session.user.id,
@@ -821,19 +836,19 @@ export async function registerLeadRoutes(app: FastifyInstance) {
               result: "SUCCESS",
               metadata: {
                 source: "follow_up_conversion",
-                sourceAppointmentId: appointment.id,
+                sourceAppointmentId: result.appointment.id,
                 cardId: commercialCard.id,
                 leadId: lead.id,
-                type: "VISIT",
-                startsAt: appointment.startsAt.toISOString(),
+                type: commercialAppointment.type,
+                startsAt: commercialAppointment.startsAt.toISOString(),
               },
             },
           });
         }
       }
-
-      return { appointment, followUp };
-    });
+    } catch (bridgeError) {
+      request.log.error({ err: bridgeError }, "Falha ao espelhar agendamento comercial a partir do follow-up");
+    }
 
     await emitInternalEvent({
       name: "appointment.created",

@@ -12,10 +12,12 @@ import {
   canMarkNoShow,
   canRescheduleAppointment,
   commercialAppointmentLinkErrors,
+  deriveLeadVehicleLink,
   hasVehicleInterest,
   isCommercialAppointmentStatus,
   isCommercialAppointmentType,
   isTerminalAppointmentStatus,
+  mapFollowUpTypeToAppointmentType,
   needsVisitConfirmation,
 } from "../apps/api/src/services/commercial-appointment.js";
 
@@ -102,6 +104,31 @@ test("0km/order interest satisfies the vehicle link without a physical vehicle",
     [],
   );
   assert.deepEqual(commercialAppointmentLinkErrors({ cardId: "c1", leadId: "l1", vehicleInterest: {} }), ["vehicle_or_interest"]);
+});
+
+test("follow-up bridge derives the vehicle link, keeping 0km leads (review fix #4)", () => {
+  // Physical vehicle -> vehicleId, no interest.
+  assert.deepEqual(deriveLeadVehicleLink({ vehicleId: "veh-1", interest: "ignored" }), {
+    vehicleId: "veh-1",
+    vehicleInterest: null,
+  });
+  // No vehicle but a free-text interest -> derive the interest so the 0km lead is not discarded.
+  assert.deepEqual(deriveLeadVehicleLink({ vehicleId: null, interest: "Corolla Cross 0km" }), {
+    vehicleId: null,
+    vehicleInterest: { note: "Corolla Cross 0km" },
+  });
+  // Neither -> nothing to link (mirror will be skipped, not forced).
+  assert.deepEqual(deriveLeadVehicleLink({ vehicleId: null, interest: null }), { vehicleId: null, vehicleInterest: null });
+});
+
+test("follow-up bridge derives the appointment type from the follow-up (review fix #8)", () => {
+  assert.equal(mapFollowUpTypeToAppointmentType("Visita loja"), "VISIT");
+  assert.equal(mapFollowUpTypeToAppointmentType("Test drive Corolla"), "TEST_DRIVE");
+  assert.equal(mapFollowUpTypeToAppointmentType("Confirmar visita"), "VISIT_CONFIRMATION");
+  assert.equal(mapFollowUpTypeToAppointmentType("Ligacao de retorno"), "CALL");
+  assert.equal(mapFollowUpTypeToAppointmentType("Recontato comercial"), "COMMERCIAL_RECONTACT");
+  assert.equal(mapFollowUpTypeToAppointmentType("Retorno WhatsApp"), "FOLLOW_UP");
+  assert.equal(mapFollowUpTypeToAppointmentType(undefined), "FOLLOW_UP");
 });
 
 test("visit confirmation is needed within the 1h window for a still-scheduled visit", () => {

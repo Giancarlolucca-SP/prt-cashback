@@ -189,3 +189,46 @@ export function needsVisitConfirmation(input: {
   const windowStart = input.startsAt.getTime() - windowMinutes * 60 * 1000;
   return input.now.getTime() >= windowStart && input.now.getTime() < input.startsAt.getTime();
 }
+
+// ---------------------------------------------------------------------------
+// Lead → commercial appointment bridge helpers
+// ---------------------------------------------------------------------------
+
+// The Lead model has no structured 0km/order interest; it only has a free-text `interest`.
+// Decision: when the lead has no physical vehicle, derive the appointment's vehicleInterest
+// from that free text so 0km/order leads are not discarded by the mandatory-link rule.
+export function deriveLeadVehicleLink(lead: { vehicleId?: string | null; interest?: string | null }): {
+  vehicleId: string | null;
+  vehicleInterest: { note: string } | null;
+} {
+  if (lead.vehicleId) {
+    return { vehicleId: lead.vehicleId, vehicleInterest: null };
+  }
+  const interest = lead.interest?.trim();
+  if (interest) {
+    return { vehicleId: null, vehicleInterest: { note: interest } };
+  }
+  return { vehicleId: null, vehicleInterest: null };
+}
+
+// Derive a commercial appointment type from a free-text follow-up type (default FOLLOW_UP).
+export function mapFollowUpTypeToAppointmentType(followUpType: string | null | undefined): CommercialAppointmentType {
+  const value = (followUpType ?? "").toLowerCase();
+  if (value.includes("test") && value.includes("drive")) {
+    return "TEST_DRIVE";
+  }
+  // Check confirmation before plain "visit" since "confirmar visita" contains both.
+  if (value.includes("confirm")) {
+    return "VISIT_CONFIRMATION";
+  }
+  if (value.includes("visit")) {
+    return "VISIT";
+  }
+  if (value.includes("recontat")) {
+    return "COMMERCIAL_RECONTACT";
+  }
+  if (value.includes("ligac") || value.includes("call")) {
+    return "CALL";
+  }
+  return "FOLLOW_UP";
+}
