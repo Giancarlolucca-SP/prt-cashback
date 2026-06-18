@@ -53,6 +53,31 @@ const moveCommercialCardSchema = z
     }
   });
 
+// Manual card creation by phone call / direct contact (SDR or Vendedor), without
+// requiring a full customer record yet.
+const createManualCardSchema = z.object({
+  name: z.string().trim().min(2).max(180),
+  phone: z.string().trim().max(40).optional(),
+  vehicleId: z.string().uuid().optional(),
+  source: z.string().trim().min(2).max(80).default("ligacao_loja"),
+  channel: z.string().trim().max(80).optional(),
+  assignedUserId: z.string().uuid().optional(),
+  note: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacao do card comercial") })
+    .optional(),
+});
+
+// Changing the responsible (carteira) requires a reason and is manager-only.
+const reassignCommercialCardSchema = z.object({
+  assignedUserId: z.string().uuid(),
+  reason: z.string().trim().min(8).max(300),
+});
+
+const responsibleChangeRoles = new Set(["OWNER_MANAGER", "ADMIN"]);
+
 const commercialCardsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   page_size: z.coerce.number().int().positive().max(100).default(20),
@@ -413,5 +438,239 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
     });
 
     return { data: sanitizeMovedCommercialCard(result.movedCard, result.updatedLead), unchanged: false };
+  });
+
+  app.post("/cards", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "create",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const input = createManualCardSchema.parse(request.body);
+    const assignedUserId = input.assignedUserId ?? session.user.id;
+
+    const assignedUser = await prisma.user.findFirst({
+      where: { id: assignedUserId, storeId: session.user.storeId, isActive: true, deletedAt: null },
+      select: { id: true },
+    });
+    if (!assignedUser) {
+      throw new ApiError("NOT_FOUND", "Responsavel inicial do card nao encontrado.");
+    }
+
+    if (input.vehicleId) {
+      const vehicle = await prisma.vehicle.findFirst({
+        where: { id: input.vehicleId, storeId: session.user.storeId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!vehicle) {
+        throw new ApiError("NOT_FOUND", "Veiculo de interesse nao encontrado.");
+      }
+    }
+
+    const now = new Date();
+    const cardMetadata = {
+      manualEntry: true,
+      origin: "call",
+      callerName: input.name,
+      callerPhone: input.phone ?? null,
+      note: input.note ?? null,
+    } satisfies Prisma.InputJsonObject;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.create({
+        data: {
+          storeId: session.user.storeId,
+          assignedUserId,
+          vehicleId: input.vehicleId,
+          source: input.source,
+          channel: input.channel,
+          title: input.name,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id,
+          lastInteractionAt: now,
+        },
+      });
+
+      const card = await tx.leadCard.create({
+        data: {
+          storeId: session.user.storeId,
+          leadId: lead.id,
+          boardKey: COMMERCIAL_BOARD_KEY,
+          stageKey: "NEW_LEAD",
+          position: 0,
+          stageEnteredAt: now,
+          metadata: cardMetadata,
+        },
+      });
+
+      await tx.leadStageHistory.create({
+        data: {
+          storeId: session.user.storeId,
+          leadId: lead.id,
+          fromStage: null,
+          toStage: "NEW_LEAD",
+          actorUserId: session.user.id,
+          reason: "Card criado manualmente (ligacao)",
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "commercial_card_created",
+          entityType: "lead_card",
+          entityId: card.id,
+          result: "SUCCESS",
+          metadata: {
+            leadId: lead.id,
+            boardKey: COMMERCIAL_BOARD_KEY,
+            stageKey: "NEW_LEAD",
+            source: input.source,
+            channel: input.channel ?? null,
+            vehicleId: input.vehicleId ?? null,
+            assignedUserId,
+            manualEntry: true,
+          },
+        },
+      });
+
+      // Lead-scoped audit so the manual creation shows up in the lead/customer history.
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "create",
+          entityType: "lead",
+          entityId: lead.id,
+          result: "SUCCESS",
+          metadata: {
+            board: COMMERCIAL_BOARD_KEY,
+            source: input.source,
+            assignedUserId,
+            vehicleId: input.vehicleId ?? null,
+            manualEntry: true,
+          },
+        },
+      });
+
+      return { lead, card };
+    });
+
+    await emitInternalEvent({
+      name: "commercial_card.created",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "lead_card",
+      entityId: result.card.id,
+      payload: { leadId: result.lead.id, assignedUserId, source: input.source },
+    });
+
+    return reply.code(201).send({
+      data: {
+        id: result.card.id,
+        leadId: result.lead.id,
+        stage: "NEW_LEAD",
+        stageLabel: commercialStageLabel("NEW_LEAD"),
+        name: result.lead.title,
+        phone: input.phone ?? null,
+        source: result.lead.source,
+        channel: result.lead.channel,
+        vehicleId: result.lead.vehicleId,
+        assignedUserId: result.lead.assignedUserId,
+        note: input.note ?? null,
+        createdAt: result.lead.createdAt.toISOString(),
+        stageEnteredAt: result.card.stageEnteredAt.toISOString(),
+      },
+    });
+  });
+
+  app.post("/cards/:id/assign", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    if (!responsibleChangeRoles.has(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Apenas Gestor ou Administrador pode alterar o responsavel do card.");
+    }
+    const params = commercialCardParamsSchema.parse(request.params);
+    const input = reassignCommercialCardSchema.parse(request.body);
+
+    const card = await prisma.leadCard.findFirst({
+      where: { id: params.id, storeId: session.user.storeId, boardKey: COMMERCIAL_BOARD_KEY, lead: { deletedAt: null } },
+      include: { lead: true },
+    });
+    if (!card) {
+      throw new ApiError("NOT_FOUND", "Card comercial nao encontrado.");
+    }
+
+    const newResponsible = await prisma.user.findFirst({
+      where: { id: input.assignedUserId, storeId: session.user.storeId, isActive: true, deletedAt: null },
+      select: { id: true },
+    });
+    if (!newResponsible) {
+      throw new ApiError("NOT_FOUND", "Novo responsavel nao encontrado.");
+    }
+
+    const previousAssignedUserId = card.lead.assignedUserId;
+    if (previousAssignedUserId === input.assignedUserId) {
+      return { data: { id: card.id, leadId: card.leadId, assignedUserId: input.assignedUserId }, unchanged: true };
+    }
+
+    const updatedLead = await prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.update({
+        where: { id: card.leadId },
+        data: { assignedUserId: input.assignedUserId, updatedByUserId: session.user.id },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "commercial_responsible_changed",
+          entityType: "lead",
+          entityId: card.leadId,
+          result: "SUCCESS",
+          metadata: {
+            boardKey: COMMERCIAL_BOARD_KEY,
+            cardId: card.id,
+            fromUserId: previousAssignedUserId,
+            toUserId: input.assignedUserId,
+            reason: input.reason,
+          },
+        },
+      });
+
+      return lead;
+    });
+
+    await emitInternalEvent({
+      name: "commercial_card.reassigned",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "lead_card",
+      entityId: card.id,
+      payload: { leadId: card.leadId, fromUserId: previousAssignedUserId, toUserId: input.assignedUserId },
+    });
+
+    return {
+      data: {
+        id: card.id,
+        leadId: card.leadId,
+        assignedUserId: updatedLead.assignedUserId,
+        previousAssignedUserId,
+        reason: input.reason,
+      },
+      unchanged: false,
+    };
   });
 }
