@@ -466,6 +466,82 @@ async function seedDemoData(store, userByRole) {
     }
   }
 
+  // Commercial interactions + follow-ups (S2-US03), projected onto the lead/card.
+  const owner = userByRole.get("OWNER_MANAGER");
+  const demoInteractionSeeds = [
+    { title: "Comercial Demo - Em contato", interactionType: "CALL", channel: "PHONE", result: "CONTACT_MADE", occurredAt: daysFromNow(-1, 10) },
+    { title: "Comercial Demo - Novo lead", interactionType: "WHATSAPP_MANUAL", channel: "WHATSAPP", result: "CUSTOMER_REQUESTED_RETURN", occurredAt: daysFromNow(0, 9) },
+    { title: "Comercial Demo - Visitou loja", interactionType: "VISIT", channel: "IN_PERSON", result: "VISIT_CONFIRMED", occurredAt: daysFromNow(-1, 15) },
+    { title: "Comercial Demo - Em negociacao", interactionType: "PROPOSAL", channel: "EMAIL", result: "PROPOSAL_SENT", occurredAt: daysFromNow(-1, 16), nextActionType: "AWAIT_RETURN", nextActionAt: daysFromNow(2, 10) },
+    { title: "Comercial Demo - Aguardando retorno", interactionType: "CONTACT_ATTEMPT", channel: "PHONE", result: "NO_RESPONSE", occurredAt: daysFromNow(-3, 11), nextActionType: "CALL", nextActionAt: daysFromNow(-1, 11) },
+  ];
+  for (const interactionSeed of demoInteractionSeeds) {
+    const entry = findDemoCard(interactionSeed.title);
+    if (!entry) {
+      continue;
+    }
+    const responsibleUserId = entry.lead.assignedUserId ?? seller?.id ?? admin?.id;
+    if (!responsibleUserId) {
+      continue;
+    }
+    const hasNextAction = Boolean(interactionSeed.nextActionAt);
+    await findOrCreate(
+      "commercialInteraction",
+      { storeId: store.id, cardId: entry.card.id, interactionType: interactionSeed.interactionType },
+      {
+        storeId: store.id,
+        cardId: entry.card.id,
+        leadId: entry.lead.id,
+        customerId: entry.lead.customerId,
+        vehicleId: entry.lead.vehicleId,
+        responsibleUserId,
+        interactionType: interactionSeed.interactionType,
+        channel: interactionSeed.channel,
+        result: interactionSeed.result,
+        occurredAt: interactionSeed.occurredAt,
+        nextActionType: interactionSeed.nextActionType ?? null,
+        nextActionAt: interactionSeed.nextActionAt ?? null,
+        nextActionOwnerId: hasNextAction ? responsibleUserId : null,
+        nextActionStatus: hasNextAction ? "PENDING" : null,
+        createdByUserId: responsibleUserId,
+      },
+      { result: interactionSeed.result, occurredAt: interactionSeed.occurredAt, nextActionAt: interactionSeed.nextActionAt ?? null, nextActionStatus: hasNextAction ? "PENDING" : null },
+    );
+
+    // Project the interaction onto the lead (mirrors the production endpoint).
+    await prisma.lead.update({
+      where: { id: entry.lead.id },
+      data: {
+        lastInteractionAt: interactionSeed.occurredAt,
+        lastInteractionType: interactionSeed.interactionType,
+        lastInteractionResult: interactionSeed.result,
+        ...(hasNextAction ? { nextActionAt: interactionSeed.nextActionAt, nextActionType: interactionSeed.nextActionType } : {}),
+      },
+    });
+  }
+
+  // Pending managerial notification (follow-up overdue) for Administrador/Dono-Gestor.
+  const overdueCardEntry = findDemoCard("Comercial Demo - Aguardando retorno");
+  if (overdueCardEntry) {
+    for (const manager of [owner, admin]) {
+      if (!manager) {
+        continue;
+      }
+      await findOrCreate(
+        "notification",
+        { storeId: store.id, userId: manager.id, entityType: "follow_up_overdue", entityId: overdueCardEntry.card.id },
+        {
+          storeId: store.id,
+          userId: manager.id,
+          title: "Follow-up vencido",
+          body: "Card comercial requer atencao da gestao.",
+          entityType: "follow_up_overdue",
+          entityId: overdueCardEntry.card.id,
+        },
+      );
+    }
+  }
+
   await Promise.all([
     findOrCreate("appointment", { storeId: store.id, title: "Visita Marina - Corolla" }, { storeId: store.id, customerId: marina.id, leadId: leads[0].id, vehicleId: corolla.id, assignedUserId: seller?.id, type: "Visita", title: "Visita Marina - Corolla", startsAt: daysFromNow(0, 16), endsAt: daysFromNow(0, 17), status: "CONFIRMED", notes: "Cliente pediu simulacao com entrada." }, { startsAt: daysFromNow(0, 16), status: "CONFIRMED" }),
     findOrCreate("appointment", { storeId: store.id, title: "Avaliacao HR-V consignado" }, { storeId: store.id, customerId: paulo.id, leadId: leads[1].id, vehicleId: hrv.id, assignedUserId: appraiser?.id, type: "Avaliacao", title: "Avaliacao HR-V consignado", startsAt: daysFromNow(1, 10), endsAt: daysFromNow(1, 11), status: "SCHEDULED", notes: "Conferir contrato de consignacao." }, { startsAt: daysFromNow(1, 10), status: "SCHEDULED" }),
