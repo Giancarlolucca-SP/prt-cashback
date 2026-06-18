@@ -166,14 +166,19 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
     const { skip, take } = getPagination(query);
     const now = new Date();
 
-    // Scope guard: SDR/Vendedor only see their own interactions; the responsible_user_id
-    // filter is honored only for full-view roles (cannot widen scope).
-    const scopedResponsibleUserId = isCommercialFullView(session.user.role) ? query.responsible_user_id : session.user.id;
+    // Scope by CARD OWNERSHIP, not by responsibleUserId: the owner of a card must see ALL
+    // interactions on it (including those a manager registered). The responsible_user_id filter
+    // is honored only for full-view roles and never widens a limited role's scope.
+    const fullView = isCommercialFullView(session.user.role);
 
     const where: Prisma.CommercialInteractionWhereInput = {
       storeId: session.user.storeId,
       deletedAt: null,
-      ...(scopedResponsibleUserId ? { responsibleUserId: scopedResponsibleUserId } : {}),
+      ...(fullView
+        ? query.responsible_user_id
+          ? { responsibleUserId: query.responsible_user_id }
+          : {}
+        : { card: { lead: { assignedUserId: session.user.id } } }),
       ...(query.card_id ? { cardId: query.card_id } : {}),
       ...(query.lead_id ? { leadId: query.lead_id } : {}),
       ...(query.customer_id ? { customerId: query.customer_id } : {}),

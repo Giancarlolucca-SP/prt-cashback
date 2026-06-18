@@ -5395,6 +5395,25 @@ try {
     interactionLeadAudit.json().items.some((log: { metadata: { interactionId?: string } }) => log.metadata.interactionId === interactionId),
   );
 
+  // Scope axis (review fix #2): the card owner sees interactions a manager registered on the card.
+  const ownerInteractionOnSdrCard = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { cardId: agendaCardId, interactionType: "NOTE", notes: "Gestor registrou observacao no card do SDR." },
+  });
+  assert.equal(ownerInteractionOnSdrCard.statusCode, 201);
+  assert.equal(ownerInteractionOnSdrCard.json().data.responsibleUserId, ownerBody.user.id);
+  const ownerInteractionId = ownerInteractionOnSdrCard.json().data.id as string;
+
+  const sdrSeesOwnerInteraction = await app.inject({
+    method: "GET",
+    url: `/commercial-interactions?card_id=${agendaCardId}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrSeesOwnerInteraction.statusCode, 200);
+  assert.ok(sdrSeesOwnerInteraction.json().items.some((it: { id: string }) => it.id === ownerInteractionId));
+
   // Resolve the follow-up (complete); a second resolve is blocked (no pending follow-up).
   const completeFollowUp = await app.inject({
     method: "POST",
