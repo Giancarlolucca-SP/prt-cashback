@@ -26,6 +26,7 @@ export type InternalEventName =
   | "lead.follow_up_converted"
   | "lead.follow_up_scheduled"
   | "lead.stage_changed"
+  | "commercial_card.moved"
   | "appointment.created"
   | "appointment.updated"
   | "appointment.status_changed"

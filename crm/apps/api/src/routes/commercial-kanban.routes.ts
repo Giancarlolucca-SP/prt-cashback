@@ -1,15 +1,20 @@
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { requirePermission } from "../api/auth-guards.js";
+import { ApiError } from "../api/errors.js";
+import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
+import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import {
   COMMERCIAL_BOARD_KEY,
   COMMERCIAL_STAGES,
   TEMPERATURE_THRESHOLDS_HOURS,
+  canRoleMoveToStage,
   commercialStageLabel,
   computeTemperatureStatus,
+  isActiveStage,
   isCommercialStage,
   timeInStageHours,
   timeInStageMs,
@@ -20,6 +25,33 @@ const stageKeys = COMMERCIAL_STAGES.map((stage) => stage.key) as [CommercialStag
 const commercialStageSchema = z.enum(stageKeys);
 
 const cardOrderSchema = z.enum(["stage_time", "next_action", "created_recent", "interaction_oldest", "origin"]).default("stage_time");
+
+const commercialCardParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const moveCommercialCardSchema = z
+  .object({
+    toStage: commercialStageSchema,
+    reason: z.string().trim().max(300).optional(),
+    notes: z
+      .string()
+      .trim()
+      .max(1000)
+      .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Observacoes do card comercial") })
+      .optional(),
+    position: z.number().int().min(0).default(0),
+  })
+  .superRefine((input, context) => {
+    // Moving a card to LOST archives it; a reason is mandatory for the lost history.
+    if (input.toStage === "LOST" && (!input.reason || input.reason.trim().length < 8)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe um motivo com pelo menos 8 caracteres para perder/encerrar o card.",
+        path: ["reason"],
+      });
+    }
+  });
 
 const commercialCardsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -109,6 +141,29 @@ function sanitizeCommercialCard(
     temperatureStatus,
     archivedAt: card.archivedAt?.toISOString() ?? null,
     lostReason: card.lostReason,
+  };
+}
+
+function sanitizeMovedCommercialCard(
+  card: { id: string; leadId: string; stageKey: string; position: number; stageEnteredAt: Date; archivedAt: Date | null; lostReason: string | null },
+  lead: { assignedUserId: string | null; customerId: string | null; vehicleId: string | null; lastInteractionAt: Date | null; contactedAt: Date | null },
+) {
+  const stage = card.stageKey as CommercialStageKey;
+  return {
+    id: card.id,
+    leadId: card.leadId,
+    stage,
+    stageLabel: commercialStageLabel(stage),
+    position: card.position,
+    stageEnteredAt: card.stageEnteredAt.toISOString(),
+    archived: !isActiveStage(stage),
+    archivedAt: card.archivedAt?.toISOString() ?? null,
+    lostReason: card.lostReason,
+    assignedUserId: lead.assignedUserId,
+    customerId: lead.customerId,
+    vehicleId: lead.vehicleId,
+    lastInteractionAt: lead.lastInteractionAt?.toISOString() ?? null,
+    contactedAt: lead.contactedAt?.toISOString() ?? null,
   };
 }
 
@@ -209,5 +264,154 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
     );
 
     return listResponse(items, query, total);
+  });
+
+  app.post("/cards/:id/move", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = commercialCardParamsSchema.parse(request.params);
+    const input = moveCommercialCardSchema.parse(request.body);
+
+    const card = await prisma.leadCard.findFirst({
+      where: {
+        id: params.id,
+        storeId: session.user.storeId,
+        boardKey: COMMERCIAL_BOARD_KEY,
+        lead: { deletedAt: null, ...leadScopeWhere(session.user) },
+      },
+      include: { lead: true },
+    });
+
+    if (!card) {
+      return denyOwnershipAccess({
+        action: "commercial_card_moved",
+        entityId: params.id,
+        entityType: "lead_card",
+        message: "Card comercial nao encontrado.",
+        module: "leads",
+        request,
+        session,
+      });
+    }
+
+    // Role-based movement rule (SDR limited to early stages + forwarding to negotiation;
+    // seller/managers drive the full flow).
+    if (!canRoleMoveToStage(session.user.role, input.toStage)) {
+      throw new ApiError("FORBIDDEN", "Seu perfil nao pode mover o card para esta etapa.", {
+        role: session.user.role,
+        toStage: input.toStage,
+      });
+    }
+
+    const fromStage = card.stageKey;
+    if (fromStage === input.toStage) {
+      return { data: sanitizeMovedCommercialCard(card, card.lead), unchanged: true };
+    }
+
+    const now = new Date();
+    const movingToLost = input.toStage === "LOST";
+    const firstContact = input.toStage === "IN_CONTACT" && !card.lead.contactedAt;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const movedCard = await tx.leadCard.update({
+        where: { id: card.id },
+        data: {
+          stageKey: input.toStage,
+          position: input.position,
+          stageEnteredAt: now,
+          archivedAt: movingToLost ? now : null,
+          lostReason: movingToLost ? input.reason : null,
+        },
+      });
+
+      const updatedLead = await tx.lead.update({
+        where: { id: card.leadId },
+        data: {
+          lastInteractionAt: now,
+          updatedByUserId: session.user.id,
+          ...(firstContact ? { contactedAt: now } : {}),
+        },
+      });
+
+      await tx.leadStageHistory.create({
+        data: {
+          storeId: session.user.storeId,
+          leadId: card.leadId,
+          fromStage,
+          toStage: input.toStage,
+          actorUserId: session.user.id,
+          reason: input.reason,
+        },
+      });
+
+      // Lead-scoped audit so the move shows up in the lead/customer operational history.
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "commercial_stage_changed",
+          entityType: "lead",
+          entityId: card.leadId,
+          result: "SUCCESS",
+          metadata: {
+            boardKey: COMMERCIAL_BOARD_KEY,
+            fromStage,
+            toStage: input.toStage,
+            reason: input.reason ?? null,
+            notes: input.notes ?? null,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "leads",
+          action: "commercial_card_moved",
+          entityType: "lead_card",
+          entityId: movedCard.id,
+          result: "SUCCESS",
+          metadata: {
+            leadId: card.leadId,
+            customerId: updatedLead.customerId,
+            vehicleId: updatedLead.vehicleId,
+            boardKey: COMMERCIAL_BOARD_KEY,
+            fromStage,
+            toStage: input.toStage,
+            fromPosition: card.position,
+            toPosition: movedCard.position,
+            archived: !isActiveStage(input.toStage),
+            reason: input.reason ?? null,
+            notes: input.notes ?? null,
+          },
+        },
+      });
+
+      return { movedCard, updatedLead };
+    });
+
+    await emitInternalEvent({
+      name: "commercial_card.moved",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "lead_card",
+      entityId: result.movedCard.id,
+      payload: {
+        leadId: card.leadId,
+        fromStage,
+        toStage: input.toStage,
+        archived: !isActiveStage(input.toStage),
+      },
+    });
+
+    return { data: sanitizeMovedCommercialCard(result.movedCard, result.updatedLead), unchanged: false };
   });
 }
