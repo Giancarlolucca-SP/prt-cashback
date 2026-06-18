@@ -228,10 +228,16 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
     const query = commercialAppointmentsQuerySchema.parse(request.query);
     const { skip, take } = getPagination(query);
 
+    // Scope guard: SDR/Vendedor are always restricted to their own agenda. The
+    // responsible_user_id filter is only honored for full-view roles, so a limited
+    // role cannot widen scope via the param (no data leak).
+    const scopedResponsibleUserId = AGENDA_FULL_VIEW_ROLES.has(session.user.role)
+      ? query.responsible_user_id
+      : session.user.id;
+
     const where: Prisma.CommercialAppointmentWhereInput = {
       storeId: session.user.storeId,
-      ...agendaScopeWhere(session.user),
-      ...(query.responsible_user_id ? { responsibleUserId: query.responsible_user_id } : {}),
+      ...(scopedResponsibleUserId ? { responsibleUserId: scopedResponsibleUserId } : {}),
       ...(query.type ? { type: query.type } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.card_id ? { cardId: query.card_id } : {}),
@@ -328,7 +334,11 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       }
     }
 
-    const responsibleUserId = input.responsibleUserId ?? card.lead.assignedUserId ?? session.user.id;
+    // Limited roles cannot place an appointment on someone else's agenda: force self.
+    // Full-view roles (manager/admin/administrative) may assign to another responsible.
+    const responsibleUserId = AGENDA_FULL_VIEW_ROLES.has(session.user.role)
+      ? input.responsibleUserId ?? card.lead.assignedUserId ?? session.user.id
+      : session.user.id;
     await ensureUserInStore(session.user.storeId, responsibleUserId);
 
     const appointment = await prisma.$transaction(async (tx) => {

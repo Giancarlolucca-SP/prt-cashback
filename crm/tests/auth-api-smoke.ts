@@ -5172,6 +5172,27 @@ try {
   assert.equal(ownerAgenda.statusCode, 200);
   assert.ok(ownerAgenda.json().items.some((appointment: { id: string }) => appointment.id === appointmentId));
 
+  // Scope guard (review fix #1): a limited role cannot widen scope via responsible_user_id.
+  const sdrAgendaSpoofed = await app.inject({
+    method: "GET",
+    url: `/commercial-agenda/appointments?page_size=100&responsible_user_id=${ownerBody.user.id}`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrAgendaSpoofed.statusCode, 200);
+  assert.ok(
+    sdrAgendaSpoofed.json().items.every((appointment: { responsibleUserId: string }) => appointment.responsibleUserId === sdrUserId),
+  );
+
+  // Permission guard (review fix #2): a limited role cannot assign to someone else's agenda.
+  const sdrCreateForOther = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, type: "CALL", startsAt: "2027-05-02T10:00:00.000Z", responsibleUserId: ownerBody.user.id },
+  });
+  assert.equal(sdrCreateForOther.statusCode, 201);
+  assert.equal(sdrCreateForOther.json().data.responsibleUserId, sdrUserId);
+
   // A seller from another portfolio cannot transition this appointment (out of scope -> 404).
   const otherSellerConfirm = await app.inject({
     method: "POST",
