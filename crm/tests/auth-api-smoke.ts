@@ -5467,6 +5467,55 @@ try {
   assert.ok(projectedCard);
   assert.equal(projectedCard.lastInteractionType, "CONTACT_ATTEMPT");
   assert.equal(projectedCard.followUpOverdue, true);
+
+  // Multi follow-up projection (review fix #1): the card reflects the EARLIEST pending follow-up,
+  // and resolving one pending follow-up must not hide the other.
+  const multiFollowUpCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { name: "Card Multi Follow-up", source: "ligacao_loja" },
+  });
+  assert.equal(multiFollowUpCard.statusCode, 201);
+  const multiFollowUpCardId = multiFollowUpCard.json().data.id as string;
+
+  const followUpFar = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: multiFollowUpCardId, interactionType: "CALL", nextActionType: "CALL", nextActionAt: "2030-01-10T10:00:00.000Z" },
+  });
+  assert.equal(followUpFar.statusCode, 201);
+
+  const followUpNear = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: multiFollowUpCardId, interactionType: "CONTACT_ATTEMPT", nextActionType: "CONFIRM_VISIT", nextActionAt: "2029-01-10T10:00:00.000Z" },
+  });
+  assert.equal(followUpNear.statusCode, 201);
+  const followUpNearId = followUpNear.json().data.id as string;
+
+  const readMultiFollowUpCard = async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/commercial-kanban/cards?stage=NEW_LEAD&page_size=100",
+      headers: { authorization: `Bearer ${sdrToken}` },
+    });
+    return res.json().items.find((card: { id: string }) => card.id === multiFollowUpCardId);
+  };
+  const cardBeforeResolve = await readMultiFollowUpCard();
+  assert.equal(cardBeforeResolve.nextActionAt, "2029-01-10T10:00:00.000Z");
+
+  const resolveNearFollowUp = await app.inject({
+    method: "POST",
+    url: `/commercial-interactions/${followUpNearId}/follow-up`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { action: "complete" },
+  });
+  assert.equal(resolveNearFollowUp.statusCode, 200);
+  const cardAfterResolve = await readMultiFollowUpCard();
+  assert.equal(cardAfterResolve.nextActionAt, "2030-01-10T10:00:00.000Z");
   checkpoint("commercial-interactions");
 
   const sellerDeleteCustomer = await app.inject({

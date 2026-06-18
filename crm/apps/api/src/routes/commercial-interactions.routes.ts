@@ -143,6 +143,17 @@ async function ensureUserInStore(storeId: string, userId: string) {
   }
 }
 
+// Project the lead's next action from the EARLIEST pending follow-up across the lead's
+// interactions, so creating/resolving one follow-up never hides another pending (overdue) one.
+async function recomputeLeadNextAction(tx: Prisma.TransactionClient, storeId: string, leadId: string) {
+  const earliest = await tx.commercialInteraction.findFirst({
+    where: { storeId, leadId, deletedAt: null, nextActionStatus: "PENDING", nextActionAt: { not: null } },
+    orderBy: { nextActionAt: "asc" },
+    select: { nextActionAt: true, nextActionType: true },
+  });
+  return { nextActionAt: earliest?.nextActionAt ?? null, nextActionType: earliest?.nextActionType ?? null };
+}
+
 export async function registerCommercialInteractionRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const session = await requirePermission(request, {
@@ -245,15 +256,17 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
         },
       });
 
-      // Project the latest interaction (and next action, when present) onto the lead/card.
+      // Project the latest interaction + the earliest pending follow-up onto the lead/card.
+      const projectedNextAction = await recomputeLeadNextAction(tx, session.user.storeId, card.leadId);
       await tx.lead.update({
         where: { id: card.leadId },
         data: {
           lastInteractionAt: occurredAt,
           lastInteractionType: input.interactionType,
           lastInteractionResult: input.result ?? null,
+          nextActionAt: projectedNextAction.nextActionAt,
+          nextActionType: projectedNextAction.nextActionType,
           updatedByUserId: session.user.id,
-          ...(hasNextAction ? { nextActionAt: input.nextActionAt, nextActionType: input.nextActionType } : {}),
         },
       });
 
@@ -358,13 +371,17 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
       }
       const next = await tx.commercialInteraction.findUniqueOrThrow({ where: { id: interaction.id } });
 
-      // Project onto the lead: clear the next action when completed/cancelled, move it when rescheduled.
+      // Re-project the lead's next action from the remaining earliest pending follow-up
+      // (so resolving one follow-up never hides another still-pending one).
       if (interaction.leadId) {
+        const projectedNextAction = await recomputeLeadNextAction(tx, session.user.storeId, interaction.leadId);
         await tx.lead.update({
           where: { id: interaction.leadId },
-          data: reschedule
-            ? { nextActionAt: newNextActionAt, nextActionType: newNextActionType, updatedByUserId: session.user.id }
-            : { nextActionAt: null, nextActionType: null, updatedByUserId: session.user.id },
+          data: {
+            nextActionAt: projectedNextAction.nextActionAt,
+            nextActionType: projectedNextAction.nextActionType,
+            updatedByUserId: session.user.id,
+          },
         });
       }
 
