@@ -4187,6 +4187,200 @@ try {
       ),
   );
 
+  // --- Technical delivery lifecycle: cancel, document, print, signed copy (S2-US06) ---
+
+  // Cancel: permission by role (seller forbidden) + happy path (administrative).
+  const sellerCancelTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/cancel`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { reason: "Tentativa de cancelamento pelo vendedor em QA" },
+  });
+  assert.equal(sellerCancelTechnicalDelivery.statusCode, 403);
+
+  const cancelTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/cancel`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { reason: "Cliente desistiu da entrega tecnica em QA" },
+  });
+  assert.equal(cancelTechnicalDelivery.statusCode, 200);
+  assert.equal(cancelTechnicalDelivery.json().data.status, "CANCELLED");
+
+  // Rescheduling revives a cancelled delivery (clears the cancellation).
+  const reviveTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { saleId, scheduledAt: rescheduledTechnicalDeliveryAt, responsibleUserId: administrativeBody.user.id },
+  });
+  assert.equal(reviveTechnicalDelivery.statusCode, 200);
+  assert.equal(reviveTechnicalDelivery.json().data.status, "RESCHEDULED");
+
+  // Generate document: not found (404), seller forbidden (403), administrative happy path (201).
+  const generateUnknownDelivery = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/00000000-0000-4000-8000-000000000000/generate-document",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+  });
+  assert.equal(generateUnknownDelivery.statusCode, 404);
+
+  const sellerGenerateDocument = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/generate-document`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerGenerateDocument.statusCode, 403);
+
+  const generateTechnicalDeliveryDocument = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/generate-document`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+  });
+  assert.equal(generateTechnicalDeliveryDocument.statusCode, 201);
+  assert.equal(generateTechnicalDeliveryDocument.json().data.status, "DOCUMENT_GENERATED");
+  assert.ok(generateTechnicalDeliveryDocument.json().data.documentFileId);
+  assert.ok((generateTechnicalDeliveryDocument.json().document.number as string).startsWith("ET-"));
+
+  const documentGeneratedAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=technical_deliveries&action=technical_delivery_document_generated&entity_type=technical_delivery&entity_id=${technicalDeliveryId}&page=1&page_size=5`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(documentGeneratedAudit.statusCode, 200);
+  assert.ok(documentGeneratedAudit.json().items.some((log: { metadata: { documentId?: string } }) => Boolean(log.metadata.documentId)));
+
+  // Get document: unauthenticated (401), not found (404), seller views own (200), print-ready HTML.
+  const unauthenticatedDocument = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries/${technicalDeliveryId}/document`,
+  });
+  assert.equal(unauthenticatedDocument.statusCode, 401);
+
+  const unknownDeliveryDocument = await app.inject({
+    method: "GET",
+    url: "/technical-deliveries/00000000-0000-4000-8000-000000000000/document",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+  });
+  assert.equal(unknownDeliveryDocument.statusCode, 404);
+
+  const sellerViewDocument = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries/${technicalDeliveryId}/document`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerViewDocument.statusCode, 200);
+  assert.equal(sellerViewDocument.json().document.customer.name, "Cliente Contrato API");
+  assert.ok((sellerViewDocument.json().html as string).includes("Piscas/setas"));
+
+  const documentHtml = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries/${technicalDeliveryId}/document?format=html`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+  });
+  assert.equal(documentHtml.statusCode, 200);
+  assert.match(documentHtml.headers["content-type"] as string, /text\/html/);
+  assert.ok(documentHtml.body.includes("Entrega Tecnica"));
+
+  // Print: seller forbidden (403), administrative happy path (200, manual PDF when no printer).
+  const sellerPrintTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/print`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {},
+  });
+  assert.equal(sellerPrintTechnicalDelivery.statusCode, 403);
+
+  const printTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/print`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {},
+  });
+  assert.equal(printTechnicalDelivery.statusCode, 200);
+  assert.equal(printTechnicalDelivery.json().data.status, "PRINTED_PENDING_SIGNATURE");
+  assert.equal(printTechnicalDelivery.json().data.printStatus, "PRINTED");
+  assert.equal(printTechnicalDelivery.json().print.mode, "manual_pdf");
+
+  // Signed copy: upload the scanned page, then register it (links to the vehicle digital folder).
+  const signedCopyUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "vehicle-documents",
+      originalName: "via-assinada-entrega-tecnica.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 23456,
+      classification: "signed_copy",
+      link: { entityType: "vehicle", entityId: inventoryVehicleId },
+    },
+  });
+  assert.equal(signedCopyUpload.statusCode, 201);
+  const signedCopyFileId = signedCopyUpload.json().data.id as string;
+
+  const sellerRegisterSignedCopy = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/signed-copy`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { signedCopyFileId },
+  });
+  assert.equal(sellerRegisterSignedCopy.statusCode, 403);
+
+  const registerSignedCopy = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/signed-copy`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { signedCopyFileId },
+  });
+  assert.equal(registerSignedCopy.statusCode, 200);
+  assert.equal(registerSignedCopy.json().data.status, "COMPLETED_SIGNED");
+  assert.equal(registerSignedCopy.json().data.signedCopyStatus, "RECEIVED");
+  assert.equal(registerSignedCopy.json().data.signedCopyFileId, signedCopyFileId);
+
+  const signedCopyVehicleLink = await prisma.fileAttachmentLink.findFirst({
+    where: {
+      attachmentId: signedCopyFileId,
+      entityType: "vehicle",
+      entityId: inventoryVehicleId,
+      purpose: "technical_delivery_signed_copy",
+    },
+  });
+  assert.ok(signedCopyVehicleLink);
+
+  const signedCopyTransitionAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=technical_deliveries&action=technical_delivery_status_changed&entity_type=technical_delivery&entity_id=${technicalDeliveryId}&page=1&page_size=20`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(signedCopyTransitionAudit.statusCode, 200);
+  assert.ok(
+    signedCopyTransitionAudit
+      .json()
+      .items.some(
+        (log: { metadata: { toStatus?: string; action?: string } }) =>
+          log.metadata.toStatus === "COMPLETED_SIGNED" && log.metadata.action === "register_signed_copy",
+      ),
+  );
+
+  // Blocked transitions once completed: signed copy again (422) and cancel (422, terminal).
+  const duplicateSignedCopy = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/signed-copy`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { signedCopyFileId },
+  });
+  assert.equal(duplicateSignedCopy.statusCode, 422);
+
+  const cancelCompletedTechnicalDelivery = await app.inject({
+    method: "POST",
+    url: `/technical-deliveries/${technicalDeliveryId}/cancel`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { reason: "Tentativa de cancelar entrega ja concluida em QA" },
+  });
+  assert.equal(cancelCompletedTechnicalDelivery.statusCode, 422);
+  checkpoint("technical-deliveries/lifecycle");
+
   const sellerDispatch = await app.inject({
     method: "GET",
     url: "/dispatch/processes",
