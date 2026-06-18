@@ -5455,6 +5455,18 @@ try {
   });
   assert.equal(scanFollowUpsAgain.statusCode, 200);
   assert.ok(scanFollowUpsAgain.json().data.deduped >= 1);
+
+  // Card projection: last interaction + overdue follow-up indicator surface on the Kanban card.
+  const cardWithInteraction = await app.inject({
+    method: "GET",
+    url: "/commercial-kanban/cards?stage=NEW_LEAD&page_size=100",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(cardWithInteraction.statusCode, 200);
+  const projectedCard = cardWithInteraction.json().items.find((card: { id: string }) => card.id === agendaCardId);
+  assert.ok(projectedCard);
+  assert.equal(projectedCard.lastInteractionType, "CONTACT_ATTEMPT");
+  assert.equal(projectedCard.followUpOverdue, true);
   checkpoint("commercial-interactions");
 
   const sellerDeleteCustomer = await app.inject({

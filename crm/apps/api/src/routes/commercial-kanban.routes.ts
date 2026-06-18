@@ -6,6 +6,7 @@ import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { isCommercialFullView } from "../auth/commercial-scope.js";
+import { isFollowUpOverdue } from "../services/commercial-interaction.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import {
@@ -158,7 +159,11 @@ function sanitizeCommercialCard(
     createdAt: lead.createdAt.toISOString(),
     contactedAt: lead.contactedAt?.toISOString() ?? null,
     lastInteractionAt: lead.lastInteractionAt?.toISOString() ?? null,
+    lastInteractionType: lead.lastInteractionType,
+    lastInteractionResult: lead.lastInteractionResult,
     nextActionAt: lead.nextActionAt?.toISOString() ?? null,
+    nextActionType: lead.nextActionType,
+    followUpOverdue: isFollowUpOverdue({ nextActionAt: lead.nextActionAt, resolved: false, now: context.now }),
     stageEnteredAt: card.stageEnteredAt.toISOString(),
     timeInStageHours: timeInStageHours(card.stageEnteredAt, context.now),
     timeInStageMs: timeInStageMs(card.stageEnteredAt, context.now),
