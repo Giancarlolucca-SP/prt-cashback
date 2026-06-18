@@ -474,9 +474,12 @@ model Lead {
   temperature       Int?
   channel           String?
   campaign          String?
-  contactedAt       DateTime?  @map("contacted_at")
-  lastInteractionAt DateTime?  @map("last_interaction_at")
-  nextActionAt      DateTime?  @map("next_action_at")
+  contactedAt           DateTime?  @map("contacted_at")
+  lastInteractionAt     DateTime?  @map("last_interaction_at")
+  lastInteractionType   String?    @map("last_interaction_type")
+  lastInteractionResult String?    @map("last_interaction_result")
+  nextActionAt          DateTime?  @map("next_action_at")
+  nextActionType        String?    @map("next_action_type")
   createdByUserId   String?    @map("created_by_user_id")
   updatedByUserId   String?    @map("updated_by_user_id")
   createdAt         DateTime   @default(now()) @map("created_at")
@@ -510,11 +513,45 @@ model LeadCard {
 
   lead                   Lead                    @relation(fields: [leadId], references: [id])
   commercialAppointments CommercialAppointment[]
+  commercialInteractions CommercialInteraction[]
 
   @@index([storeId, boardKey, stageKey])
   @@index([storeId, boardKey, archivedAt])
   @@index([leadId])
   @@map("lead_cards")
+}
+
+model CommercialInteraction {
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  cardId            String    @map("card_id")
+  leadId            String?   @map("lead_id")
+  customerId        String?   @map("customer_id")
+  vehicleId         String?   @map("vehicle_id")
+  vehicleInterest   Json?     @map("vehicle_interest")
+  responsibleUserId String    @map("responsible_user_id")
+  interactionType   String    @map("interaction_type")
+  channel           String?
+  result            String?
+  notes             String?
+  occurredAt        DateTime  @default(now()) @map("occurred_at")
+  nextActionType    String?   @map("next_action_type")
+  nextActionAt      DateTime? @map("next_action_at")
+  nextActionOwnerId String?   @map("next_action_owner_id")
+  nextActionStatus  String?   @map("next_action_status")
+  createdByUserId   String?   @map("created_by_user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  card LeadCard @relation(fields: [cardId], references: [id])
+
+  @@index([storeId, occurredAt])
+  @@index([cardId])
+  @@index([leadId])
+  @@index([responsibleUserId])
+  @@index([storeId, nextActionAt])
+  @@map("commercial_interactions")
 }
 
 model CommercialAppointment {

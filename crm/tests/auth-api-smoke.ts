@@ -5323,6 +5323,79 @@ try {
   assert.ok(appointmentStatusAudit.json().items.some((log: { metadata: { toStatus?: string } }) => log.metadata.toStatus === "RESCHEDULED"));
   checkpoint("commercial-agenda");
 
+  // --- Commercial interactions (S2-US03): register, write-permission scope, list scope ---
+  const sdrInteraction = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: {
+      cardId: agendaCardId,
+      interactionType: "CALL",
+      channel: "WHATSAPP",
+      result: "CONTACT_MADE",
+      notes: "Cliente pediu retorno a tarde.",
+      nextActionType: "CALL",
+      nextActionAt: "2027-07-01T13:00:00.000Z",
+    },
+  });
+  assert.equal(sdrInteraction.statusCode, 201);
+  assert.equal(sdrInteraction.json().data.interactionType, "CALL");
+  assert.equal(sdrInteraction.json().data.channel, "WHATSAPP");
+  assert.equal(sdrInteraction.json().data.nextActionStatus, "PENDING");
+  const interactionId = sdrInteraction.json().data.id as string;
+  const interactionLeadId = sdrInteraction.json().data.leadId as string;
+
+  // Validation: card is required.
+  const invalidInteraction = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { interactionType: "CALL" },
+  });
+  assert.equal(invalidInteraction.statusCode, 400);
+
+  // Appraiser has no leads:update -> forbidden.
+  const appraiserInteraction = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${appraiserToken}` },
+    payload: { cardId: agendaCardId, interactionType: "CALL" },
+  });
+  assert.equal(appraiserInteraction.statusCode, 403);
+
+  // Write-permission scope: SDR cannot register on a card outside its portfolio (404).
+  const sdrInteractionForeign = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: reassignCardId, interactionType: "CALL" },
+  });
+  assert.equal(sdrInteractionForeign.statusCode, 404);
+
+  // Scope guard on list: responsible_user_id cannot widen scope for SDR.
+  const sdrInteractionsSpoofed = await app.inject({
+    method: "GET",
+    url: `/commercial-interactions?page_size=100&responsible_user_id=${ownerBody.user.id}`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrInteractionsSpoofed.statusCode, 200);
+  assert.ok(
+    sdrInteractionsSpoofed.json().items.every((it: { responsibleUserId: string }) => it.responsibleUserId === sdrUserId),
+  );
+  assert.ok(sdrInteractionsSpoofed.json().items.some((it: { id: string }) => it.id === interactionId));
+
+  // Interaction appears in the lead history (lead-scoped audit).
+  const interactionLeadAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=leads&action=commercial_interaction_registered&entity_type=lead&entity_id=${interactionLeadId}&page=1&page_size=5`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(interactionLeadAudit.statusCode, 200);
+  assert.ok(
+    interactionLeadAudit.json().items.some((log: { metadata: { interactionId?: string } }) => log.metadata.interactionId === interactionId),
+  );
+  checkpoint("commercial-interactions");
+
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,
