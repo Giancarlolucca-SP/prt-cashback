@@ -5293,6 +5293,27 @@ try {
   assert.equal(farVisitView.statusCode, 200);
   assert.equal(farVisitView.json().data.needsConfirmation, false);
 
+  // Reschedule preserves the original duration when no endsAt is provided (review fix #9).
+  const timedAppointment = await app.inject({
+    method: "POST",
+    url: "/commercial-agenda/appointments",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { cardId: agendaCardId, type: "VISIT", startsAt: "2027-06-01T10:00:00.000Z", endsAt: "2027-06-01T11:00:00.000Z" },
+  });
+  assert.equal(timedAppointment.statusCode, 201);
+  const timedAppointmentId = timedAppointment.json().data.id as string;
+
+  const rescheduleTimed = await app.inject({
+    method: "POST",
+    url: `/commercial-agenda/appointments/${timedAppointmentId}/reschedule`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { startsAt: "2027-06-02T15:00:00.000Z" },
+  });
+  assert.equal(rescheduleTimed.statusCode, 201);
+  assert.equal(rescheduleTimed.json().data.startsAt, "2027-06-02T15:00:00.000Z");
+  // 1h duration preserved -> ends at 16:00.
+  assert.equal(rescheduleTimed.json().data.endsAt, "2027-06-02T16:00:00.000Z");
+
   const appointmentStatusAudit = await app.inject({
     method: "GET",
     url: `/audit/logs?module=commercial_appointments&action=commercial_appointment_status_changed&entity_type=commercial_appointment&entity_id=${appointmentId}&page=1&page_size=20`,

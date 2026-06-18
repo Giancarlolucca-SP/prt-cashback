@@ -171,10 +171,15 @@ async function transitionCommercialAppointment(
 ) {
   const fromStatus = appointment.status;
   const updated = await prisma.$transaction(async (tx) => {
-    const next = await tx.commercialAppointment.update({
-      where: { id: appointment.id },
+    // Optimistic concurrency: only transition if the status is still the one we gated on.
+    const changed = await tx.commercialAppointment.updateMany({
+      where: { id: appointment.id, status: fromStatus },
       data: { status: options.toStatus, ...(options.data ?? {}) },
     });
+    if (changed.count !== 1) {
+      throw new ApiError("CONFLICT", "Agendamento foi alterado por outra acao. Recarregue e tente novamente.");
+    }
+    const next = await tx.commercialAppointment.findUniqueOrThrow({ where: { id: appointment.id } });
 
     await tx.auditLog.create({
       data: {
@@ -509,6 +514,12 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento nao pode ser reagendado no status atual.", { status: appointment.status });
     }
 
+    // Validate the carried-over responsible still belongs to the store.
+    await ensureUserInStore(session.user.storeId, appointment.responsibleUserId);
+    // Preserve the original duration when no explicit endsAt is provided.
+    const previousDurationMs = appointment.endsAt ? appointment.endsAt.getTime() - appointment.startsAt.getTime() : null;
+    const newEndsAt = input.endsAt ?? (previousDurationMs !== null ? new Date(input.startsAt.getTime() + previousDurationMs) : null);
+
     const result = await prisma.$transaction(async (tx) => {
       // The new appointment preserves the link to the previous one (reschedule chain).
       const created = await tx.commercialAppointment.create({
@@ -523,20 +534,26 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
           type: appointment.type,
           status: "SCHEDULED",
           startsAt: input.startsAt,
-          endsAt: input.endsAt,
+          endsAt: newEndsAt,
           location: appointment.location,
           origin: appointment.origin,
           channel: appointment.channel,
           notes: appointment.notes,
           rescheduleFromId: appointment.id,
+          ...(appointment.sourceAppointmentId ? { sourceAppointmentId: appointment.sourceAppointmentId } : {}),
           createdByUserId: session.user.id,
         },
       });
 
-      const previous = await tx.commercialAppointment.update({
-        where: { id: appointment.id },
+      // Optimistic concurrency: only mark RESCHEDULED if the status hasn't changed meanwhile.
+      const changedPrevious = await tx.commercialAppointment.updateMany({
+        where: { id: appointment.id, status: appointment.status },
         data: { status: "RESCHEDULED" },
       });
+      if (changedPrevious.count !== 1) {
+        throw new ApiError("CONFLICT", "Agendamento foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+      const previous = await tx.commercialAppointment.findUniqueOrThrow({ where: { id: appointment.id } });
 
       await tx.auditLog.create({
         data: {
