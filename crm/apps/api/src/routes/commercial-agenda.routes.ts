@@ -5,6 +5,7 @@ import { ApiError } from "../api/errors.js";
 import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
+import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
@@ -30,9 +31,6 @@ const typeKeys = COMMERCIAL_APPOINTMENT_TYPES.map((entry) => entry.key) as [Comm
 const statusKeys = COMMERCIAL_APPOINTMENT_STATUSES.map((entry) => entry.key) as [CommercialAppointmentStatus, ...CommercialAppointmentStatus[]];
 const appointmentTypeSchema = z.enum(typeKeys);
 const appointmentStatusSchema = z.enum(statusKeys);
-
-// Roles that see/operate the whole agenda; everyone else is scoped to their own.
-const AGENDA_FULL_VIEW_ROLES = new Set(["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"]);
 
 const vehicleInterestSchema = z
   .object({
@@ -101,7 +99,7 @@ const rescheduleAppointmentSchema = z
 type CommercialAppointmentRecord = Prisma.CommercialAppointmentGetPayload<Record<string, never>>;
 
 function agendaScopeWhere(user: { id: string; role: string }): Prisma.CommercialAppointmentWhereInput {
-  return AGENDA_FULL_VIEW_ROLES.has(user.role) ? {} : { responsibleUserId: user.id };
+  return isCommercialFullView(user.role) ? {} : { responsibleUserId: user.id };
 }
 
 function sanitizeCommercialAppointment(appointment: CommercialAppointmentRecord, now: Date) {
@@ -240,7 +238,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
     // Scope guard: SDR/Vendedor are always restricted to their own agenda. The
     // responsible_user_id filter is only honored for full-view roles, so a limited
     // role cannot widen scope via the param (no data leak).
-    const scopedResponsibleUserId = AGENDA_FULL_VIEW_ROLES.has(session.user.role)
+    const scopedResponsibleUserId = isCommercialFullView(session.user.role)
       ? query.responsible_user_id
       : session.user.id;
 
@@ -297,7 +295,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
     const input = createCommercialAppointmentSchema.parse(request.body);
 
     // SDR/Vendedor can only schedule for cards in their own portfolio; managers/administrative any.
-    const cardScope: Prisma.LeadCardWhereInput = AGENDA_FULL_VIEW_ROLES.has(session.user.role)
+    const cardScope: Prisma.LeadCardWhereInput = isCommercialFullView(session.user.role)
       ? {}
       : { lead: { assignedUserId: session.user.id } };
     const card = await prisma.leadCard.findFirst({
@@ -346,7 +344,7 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
 
     // Limited roles cannot place an appointment on someone else's agenda: force self.
     // Full-view roles (manager/admin/administrative) may assign to another responsible.
-    const responsibleUserId = AGENDA_FULL_VIEW_ROLES.has(session.user.role)
+    const responsibleUserId = isCommercialFullView(session.user.role)
       ? input.responsibleUserId ?? card.lead.assignedUserId ?? session.user.id
       : session.user.id;
     await ensureUserInStore(session.user.storeId, responsibleUserId);

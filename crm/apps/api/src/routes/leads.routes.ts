@@ -6,6 +6,7 @@ import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
+import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 import {
   commercialAppointmentLinkErrors,
@@ -304,19 +305,11 @@ function defaultOutcomeReasonItems() {
 }
 
 function leadScopeWhere(user: { id: string; role: string }) {
-  if (user.role === "SELLER" || user.role === "SDR") {
-    return { assignedUserId: user.id };
-  }
-
-  return {};
+  return isCommercialFullView(user.role) ? {} : { assignedUserId: user.id };
 }
 
 function followUpScopeWhere(user: { id: string; role: string }) {
-  if (user.role === "SELLER" || user.role === "SDR") {
-    return { assignedUserId: user.id };
-  }
-
-  return {};
+  return isCommercialFullView(user.role) ? {} : { assignedUserId: user.id };
 }
 
 function todayRange() {

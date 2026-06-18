@@ -5,6 +5,7 @@ import { ApiError } from "../api/errors.js";
 import { denyOwnershipAccess, requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
+import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import {
@@ -97,10 +98,7 @@ const commercialCardsQuerySchema = z.object({
 type CommercialCardWithLead = Prisma.LeadCardGetPayload<{ include: { lead: true } }>;
 
 function leadScopeWhere(user: { id: string; role: string }): Prisma.LeadWhereInput {
-  if (user.role === "SELLER" || user.role === "SDR") {
-    return { assignedUserId: user.id };
-  }
-  return {};
+  return isCommercialFullView(user.role) ? {} : { assignedUserId: user.id };
 }
 
 function cardOrderBy(order: z.infer<typeof cardOrderSchema>): Prisma.LeadCardOrderByWithRelationInput[] {
