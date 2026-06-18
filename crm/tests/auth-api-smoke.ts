@@ -5372,17 +5372,25 @@ try {
   });
   assert.equal(sdrInteractionForeign.statusCode, 404);
 
-  // Scope guard on list: responsible_user_id cannot widen scope for SDR.
+  // Scope guard on list: responsible_user_id cannot widen scope; the SDR is scoped to its OWN cards
+  // and never sees interactions on cards it does not own (a manager interaction on a foreign card).
+  const ownerForeignInteraction = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { cardId: reassignCardId, interactionType: "NOTE", notes: "Interacao em card de outro responsavel." },
+  });
+  assert.equal(ownerForeignInteraction.statusCode, 201);
+  const ownerForeignInteractionId = ownerForeignInteraction.json().data.id as string;
+
   const sdrInteractionsSpoofed = await app.inject({
     method: "GET",
     url: `/commercial-interactions?page_size=100&responsible_user_id=${ownerBody.user.id}`,
     headers: { authorization: `Bearer ${sdrToken}` },
   });
   assert.equal(sdrInteractionsSpoofed.statusCode, 200);
-  assert.ok(
-    sdrInteractionsSpoofed.json().items.every((it: { responsibleUserId: string }) => it.responsibleUserId === sdrUserId),
-  );
   assert.ok(sdrInteractionsSpoofed.json().items.some((it: { id: string }) => it.id === interactionId));
+  assert.ok(!sdrInteractionsSpoofed.json().items.some((it: { id: string }) => it.id === ownerForeignInteractionId));
 
   // Interaction appears in the lead history (lead-scoped audit).
   const interactionLeadAudit = await app.inject({
@@ -5474,6 +5482,25 @@ try {
   });
   assert.equal(scanFollowUpsAgain.statusCode, 200);
   assert.ok(scanFollowUpsAgain.json().data.deduped >= 1);
+
+  // Dedup by active condition, not readAt (review fix #3): reading the alert must NOT recreate it.
+  await prisma.notification.updateMany({
+    where: { storeId: ownerBody.user.storeId, entityType: "follow_up_overdue", entityId: agendaCardId },
+    data: { readAt: new Date() },
+  });
+  const overdueNotifCountBefore = await prisma.notification.count({
+    where: { storeId: ownerBody.user.storeId, entityType: "follow_up_overdue", entityId: agendaCardId },
+  });
+  const scanAfterRead = await app.inject({
+    method: "POST",
+    url: "/commercial-interactions/scan-followups",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(scanAfterRead.statusCode, 200);
+  const overdueNotifCountAfter = await prisma.notification.count({
+    where: { storeId: ownerBody.user.storeId, entityType: "follow_up_overdue", entityId: agendaCardId },
+  });
+  assert.equal(overdueNotifCountAfter, overdueNotifCountBefore);
 
   // Card projection: last interaction + overdue follow-up indicator surface on the Kanban card.
   const cardWithInteraction = await app.inject({

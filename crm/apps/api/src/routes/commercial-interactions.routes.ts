@@ -357,6 +357,7 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
       });
     }
 
+    const now = new Date();
     const reschedule = input.action === "reschedule";
     const targetStatus = input.action === "complete" ? "DONE" : input.action === "cancel" ? "CANCELLED" : "PENDING";
     const newNextActionAt = reschedule ? input.nextActionAt ?? null : interaction.nextActionAt;
@@ -388,6 +389,15 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
             updatedByUserId: session.user.id,
           },
         });
+
+        // The overdue condition is cleared when no pending follow-up remains overdue; remove the
+        // card's overdue notifications so a future overdue can alert again (dedup by condition).
+        const overdueCleared = !projectedNextAction.nextActionAt || projectedNextAction.nextActionAt.getTime() > now.getTime();
+        if (overdueCleared) {
+          await tx.notification.deleteMany({
+            where: { storeId: session.user.storeId, entityType: "follow_up_overdue", entityId: interaction.cardId },
+          });
+        }
       }
 
       await tx.auditLog.create({
@@ -496,11 +506,13 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
       }
     }
 
-    // Dedup against existing UNREAD notifications for the same card + reason (production use of the dedup key).
+    // Dedup by the ACTIVE condition, not by readAt: while the follow-up is still overdue / the lead
+    // still has no continuity, do not recreate the alert (reading it must not trigger a re-create).
+    // Notifications are removed when the underlying condition is resolved (see the resolve endpoint).
     const candidateCardIds = [...new Set(alerts.map((alert) => alert.cardId))];
     const existing = candidateCardIds.length
       ? await prisma.notification.findMany({
-          where: { storeId, readAt: null, entityType: { in: [...COMMERCIAL_NOTIFICATION_TYPES] }, entityId: { in: candidateCardIds } },
+          where: { storeId, entityType: { in: [...COMMERCIAL_NOTIFICATION_TYPES] }, entityId: { in: candidateCardIds } },
           select: { entityType: true, entityId: true },
         })
       : [];
