@@ -303,6 +303,41 @@ async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
   };
 }
 
+// Uniform audit trail for every status transition, on top of the richer
+// action-specific audit entries. Gives a single queryable transition log (NFR-003).
+async function auditStatusTransition(
+  tx: Prisma.TransactionClient,
+  input: {
+    storeId: string;
+    actorId: string;
+    actorRole: string;
+    deliveryId: string;
+    fromStatus: string | null;
+    toStatus: string;
+    action: string;
+    reason?: string | null;
+  },
+) {
+  await tx.auditLog.create({
+    data: {
+      storeId: input.storeId,
+      actorId: input.actorId,
+      actorRole: input.actorRole,
+      module: "technical_deliveries",
+      action: "technical_delivery_status_changed",
+      entityType: "technical_delivery",
+      entityId: input.deliveryId,
+      result: "SUCCESS",
+      metadata: {
+        fromStatus: input.fromStatus,
+        toStatus: input.toStatus,
+        action: input.action,
+        reason: input.reason ?? null,
+      },
+    },
+  });
+}
+
 export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const session = await requirePermission(request, {
@@ -419,6 +454,16 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
             prerequisites,
           },
         },
+      });
+
+      await auditStatusTransition(tx, {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        deliveryId: delivery.id,
+        fromStatus: existing?.status ?? null,
+        toStatus: delivery.status,
+        action: existing ? "reschedule" : "schedule",
       });
 
       return { delivery, created: !existing };
@@ -578,6 +623,16 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
         },
       });
 
+      await auditStatusTransition(tx, {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        deliveryId: delivery.id,
+        fromStatus: delivery.status,
+        toStatus: "DOCUMENT_GENERATED",
+        action: "generate_document",
+      });
+
       return updated;
     });
 
@@ -710,6 +765,16 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
         },
       });
 
+      await auditStatusTransition(tx, {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        deliveryId: delivery.id,
+        fromStatus: delivery.status,
+        toStatus: "PRINTED_PENDING_SIGNATURE",
+        action: "print",
+      });
+
       return next;
     });
 
@@ -803,6 +868,16 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
         },
       });
 
+      await auditStatusTransition(tx, {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        deliveryId: delivery.id,
+        fromStatus: delivery.status,
+        toStatus: "COMPLETED_SIGNED",
+        action: "register_signed_copy",
+      });
+
       return next;
     });
 
@@ -814,5 +889,71 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
         completedAt: completedAt.toISOString(),
       },
     });
+  });
+
+  app.post("/:id/cancel", async (request, reply) => {
+    const session = await requirePermission(request, {
+      module: "sales",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    assertCanScheduleTechnicalDelivery(session.user.role);
+    const params = technicalDeliveryParamsSchema.parse(request.params);
+    const input = cancelTechnicalDeliverySchema.parse(request.body);
+
+    const delivery = await prisma.technicalDelivery.findFirst({
+      where: { id: params.id, storeId: session.user.storeId },
+    });
+
+    if (!delivery) {
+      throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
+    }
+
+    if (!canCancel(delivery.status as TechnicalDeliveryStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica finalizada nao pode ser cancelada.", {
+        status: delivery.status,
+      });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.technicalDelivery.update({
+        where: { id: delivery.id },
+        data: { status: "CANCELLED", cancelReason: input.reason },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "technical_deliveries",
+          action: "technical_delivery_cancelled",
+          entityType: "technical_delivery",
+          entityId: delivery.id,
+          result: "SUCCESS",
+          metadata: {
+            previousStatus: delivery.status,
+            status: next.status,
+            reason: input.reason,
+          },
+        },
+      });
+
+      await auditStatusTransition(tx, {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        deliveryId: delivery.id,
+        fromStatus: delivery.status,
+        toStatus: "CANCELLED",
+        action: "cancel",
+        reason: input.reason,
+      });
+
+      return next;
+    });
+
+    return reply.code(200).send({ data: sanitizeTechnicalDelivery(updated) });
   });
 }
