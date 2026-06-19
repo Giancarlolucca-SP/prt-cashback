@@ -9,6 +9,7 @@ import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
+import { activeStoreUserIdsByRoles, notifyActiveUsers } from "../services/internal-notifications.js";
 import {
   CUSTOMER_ARRIVAL_STATUSES,
   canCloseDeal,
@@ -284,7 +285,7 @@ function mergeSnapshot(snapshot: Prisma.JsonValue | null, patch: Record<string, 
 async function raiseOwnFinancingAlert(session: SalesSession, sale: SaleRecord) {
   const storeId = session.user.storeId;
   const existing = await prisma.notification.findFirst({
-    where: { storeId, entityType: OWN_FINANCING_ALERT_TYPE, entityId: sale.id },
+    where: { storeId, entityType: OWN_FINANCING_ALERT_TYPE, entityId: sale.id, status: { in: ["NEW", "SEEN"] } },
     select: { id: true },
   });
   if (existing) {
@@ -301,15 +302,16 @@ async function raiseOwnFinancingAlert(session: SalesSession, sale: SaleRecord) {
   if (recipientIds.size === 0) {
     return;
   }
-  await prisma.notification.createMany({
-    data: [...recipientIds].map((userId) => ({
-      storeId,
-      userId,
-      title: "Financeira propria: valor deve cair na conta da loja",
-      body: `O processo de vendas ${sale.id} usa financeira propria do cliente. Nao liberar documento/entrega ate a conferencia administrativa do recebimento.`,
-      entityType: OWN_FINANCING_ALERT_TYPE,
-      entityId: sale.id,
-    })),
+  await notifyActiveUsers({
+    storeId,
+    userIds: [...recipientIds],
+    title: "Financeira propria: valor deve cair na conta da loja",
+    body: `O processo de vendas ${sale.id} usa financeira propria do cliente. Nao liberar documento/entrega ate a conferencia administrativa do recebimento.`,
+    entityType: OWN_FINANCING_ALERT_TYPE,
+    entityId: sale.id,
+    priority: "CRITICAL",
+    sourceModule: "commercial_sales",
+    actionUrl: `/commercial-sales/${sale.id}`,
   });
   await prisma.auditLog.create({
     data: {
@@ -433,6 +435,22 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       entityId: sale.id,
       payload: { sourceCardId: card.id, leadId: card.leadId, sellerUserId: input.sellerUserId },
     });
+
+    try {
+      await notifyActiveUsers({
+        storeId: session.user.storeId,
+        userIds: [input.sellerUserId],
+        entityType: "commercial_sale_assigned",
+        entityId: sale.id,
+        title: "Lead transferido para Vendas",
+        body: `Um lead foi transferido para seu Kanban de Vendas. Processo ${sale.id}.`,
+        priority: "HIGH",
+        sourceModule: "commercial_sales",
+        actionUrl: `/commercial-sales/${sale.id}`,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao gerar notificacao de transferencia para Vendas");
+    }
 
     return reply.code(201).send({ data: sanitizeSale(sale, saleCard.stageKey) });
   });
@@ -808,6 +826,23 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       } catch (alertError) {
         request.log.error({ err: alertError }, "Falha ao gerar alerta de financeira propria");
       }
+    }
+
+    try {
+      const managementUserIds = await activeStoreUserIdsByRoles(session.user.storeId, ["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"]);
+      await notifyActiveUsers({
+        storeId: session.user.storeId,
+        userIds: managementUserIds,
+        entityType: "commercial_sale_documentation_pending",
+        entityId: result.id,
+        title: "Venda fechada aguardando Gestao/Documentacao",
+        body: `O processo de vendas ${result.id} foi fechado e precisa de conferencia documental e acompanhamento administrativo.`,
+        priority: "HIGH",
+        sourceModule: "commercial_sales",
+        actionUrl: `/commercial-sales/${result.id}`,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao gerar notificacao de venda para Gestao/Documentacao");
     }
 
     await emitInternalEvent({

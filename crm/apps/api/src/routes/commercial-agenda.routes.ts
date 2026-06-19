@@ -9,6 +9,7 @@ import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
+import { notifyActiveUsers, resolveActiveNotificationsForEntity } from "../services/internal-notifications.js";
 import {
   COMMERCIAL_APPOINTMENT_STATUSES,
   COMMERCIAL_APPOINTMENT_TYPES,
@@ -422,6 +423,23 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       payload: { cardId: card.id, leadId: card.leadId, type: appointment.type, startsAt: appointment.startsAt.toISOString() },
     });
 
+    try {
+      await notifyActiveUsers({
+        storeId: session.user.storeId,
+        userIds: [appointment.responsibleUserId],
+        entityType: "commercial_appointment_scheduled",
+        entityId: appointment.id,
+        title: "Agendamento comercial criado",
+        body: `${commercialAppointmentTypeLabel(appointment.type as CommercialAppointmentType)} agendado para ${appointment.startsAt.toISOString()}.`,
+        priority: "HIGH",
+        sourceModule: "commercial_agenda",
+        actionUrl: `/commercial-agenda/appointments/${appointment.id}`,
+        dueAt: appointment.startsAt,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao gerar notificacao de agendamento comercial");
+    }
+
     return reply.code(201).send({ data: sanitizeCommercialAppointment(appointment, new Date()) });
   });
 
@@ -608,6 +626,29 @@ export async function registerCommercialAgendaRoutes(app: FastifyInstance) {
       entityId: appointment.id,
       payload: { fromStatus: appointment.status, toStatus: "RESCHEDULED", action: "reschedule", newAppointmentId: result.created.id },
     });
+
+    try {
+      await resolveActiveNotificationsForEntity({
+        storeId: session.user.storeId,
+        entityType: "commercial_appointment_scheduled",
+        entityId: appointment.id,
+        resolvedByUserId: session.user.id,
+      });
+      await notifyActiveUsers({
+        storeId: session.user.storeId,
+        userIds: [result.created.responsibleUserId],
+        entityType: "commercial_appointment_scheduled",
+        entityId: result.created.id,
+        title: "Agendamento comercial reagendado",
+        body: `${commercialAppointmentTypeLabel(result.created.type as CommercialAppointmentType)} reagendado para ${result.created.startsAt.toISOString()}.`,
+        priority: "HIGH",
+        sourceModule: "commercial_agenda",
+        actionUrl: `/commercial-agenda/appointments/${result.created.id}`,
+        dueAt: result.created.startsAt,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao atualizar notificacoes do reagendamento comercial");
+    }
 
     return reply.code(201).send({
       data: sanitizeCommercialAppointment(result.created, new Date()),

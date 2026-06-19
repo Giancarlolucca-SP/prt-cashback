@@ -4143,6 +4143,25 @@ try {
   assert.equal(scheduleTechnicalDelivery.json().data.customerId, createdCustomerId);
   const technicalDeliveryId = scheduleTechnicalDelivery.json().data.id as string;
 
+  const sellerTechnicalDeliveryNotification = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=technical_delivery_scheduled&entity_id=${technicalDeliveryId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerTechnicalDeliveryNotification.statusCode, 200);
+  assert.ok(
+    sellerTechnicalDeliveryNotification
+      .json()
+      .items.some(
+        (notification: { actionUrl: string; dueAt: string; priority: string; sourceModule: string; status: string }) =>
+          notification.priority === "HIGH" &&
+          notification.status === "NEW" &&
+          notification.sourceModule === "technical_deliveries" &&
+          notification.actionUrl === `/technical-deliveries/${technicalDeliveryId}` &&
+          notification.dueAt === technicalDeliveryAt,
+      ),
+  );
+
   const sellerTechnicalDeliveries = await app.inject({
     method: "GET",
     url: `/technical-deliveries?sale_id=${saleId}`,
@@ -4169,6 +4188,21 @@ try {
   assert.equal(rescheduleTechnicalDelivery.statusCode, 200);
   assert.equal(rescheduleTechnicalDelivery.json().data.status, "RESCHEDULED");
   assert.equal(rescheduleTechnicalDelivery.json().data.scheduledAt, rescheduledTechnicalDeliveryAt);
+
+  const sellerTechnicalDeliveryRescheduledNotification = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=technical_delivery_scheduled&entity_id=${technicalDeliveryId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerTechnicalDeliveryRescheduledNotification.statusCode, 200);
+  assert.ok(
+    sellerTechnicalDeliveryRescheduledNotification
+      .json()
+      .items.some(
+        (notification: { dueAt: string; title: string }) =>
+          notification.dueAt === rescheduledTechnicalDeliveryAt && notification.title === "Entrega tecnica reagendada",
+      ),
+  );
 
   const technicalDeliveryAudit = await app.inject({
     method: "GET",
@@ -4304,6 +4338,24 @@ try {
   assert.equal(printTechnicalDelivery.json().data.printStatus, "PRINTED");
   assert.equal(printTechnicalDelivery.json().print.mode, "manual_pdf");
 
+  const signedCopyPendingNotification = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=technical_delivery_signed_copy_pending&entity_id=${technicalDeliveryId}&status=NEW&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(signedCopyPendingNotification.statusCode, 200);
+  assert.ok(
+    signedCopyPendingNotification
+      .json()
+      .items.some(
+        (notification: { actionUrl: string; priority: string; sourceModule: string; userId: string }) =>
+          notification.userId === ownerBody.user.id &&
+          notification.priority === "HIGH" &&
+          notification.sourceModule === "technical_deliveries" &&
+          notification.actionUrl === `/technical-deliveries/${technicalDeliveryId}`,
+      ),
+  );
+
   // Signed copy: upload the scanned page, then register it (links to the vehicle digital folder).
   const signedCopyUpload = await app.inject({
     method: "POST",
@@ -4339,6 +4391,33 @@ try {
   assert.equal(registerSignedCopy.json().data.status, "COMPLETED_SIGNED");
   assert.equal(registerSignedCopy.json().data.signedCopyStatus, "RECEIVED");
   assert.equal(registerSignedCopy.json().data.signedCopyFileId, signedCopyFileId);
+
+  const signedCopyResolvedNotification = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=technical_delivery_signed_copy_pending&entity_id=${technicalDeliveryId}&status=RESOLVED&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(signedCopyResolvedNotification.statusCode, 200);
+  assert.ok(
+    signedCopyResolvedNotification
+      .json()
+      .items.some(
+        (notification: { resolvedByUserId: string; status: string }) =>
+          notification.status === "RESOLVED" && notification.resolvedByUserId === administrativeBody.user.id,
+      ),
+  );
+
+  const sellerDeliveryResolvedNotification = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=technical_delivery_scheduled&entity_id=${technicalDeliveryId}&status=RESOLVED&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerDeliveryResolvedNotification.statusCode, 200);
+  assert.ok(
+    sellerDeliveryResolvedNotification
+      .json()
+      .items.some((notification: { resolvedByUserId: string; status: string }) => notification.status === "RESOLVED" && notification.resolvedByUserId === administrativeBody.user.id),
+  );
 
   const signedCopyVehicleLink = await prisma.fileAttachmentLink.findFirst({
     where: {
@@ -5140,6 +5219,32 @@ try {
   assert.equal(createCommercialAppointment.json().data.vehicleId, inventoryVehicleId);
   const appointmentId = createCommercialAppointment.json().data.id as string;
 
+  const sdrAppointmentNotification = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=commercial_appointment_scheduled&entity_id=${appointmentId}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrAppointmentNotification.statusCode, 200);
+  assert.ok(
+    sdrAppointmentNotification
+      .json()
+      .items.some(
+        (notification: { actionUrl: string; priority: string; sourceModule: string; status: string }) =>
+          notification.priority === "HIGH" &&
+          notification.status === "NEW" &&
+          notification.sourceModule === "commercial_agenda" &&
+          notification.actionUrl === `/commercial-agenda/appointments/${appointmentId}`,
+      ),
+  );
+
+  const sellerAppointmentNotificationScope = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=commercial_appointment_scheduled&entity_id=${appointmentId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerAppointmentNotificationScope.statusCode, 200);
+  assert.equal(sellerAppointmentNotificationScope.json().items.length, 0);
+
   // Next appointment shows up on the Kanban card.
   const cardWithNextAppointment = await app.inject({
     method: "GET",
@@ -5155,7 +5260,7 @@ try {
   // Scope: SDR sees own agenda; another seller does not.
   const sdrAgenda = await app.inject({
     method: "GET",
-    url: "/commercial-agenda/appointments?page_size=100",
+    url: `/commercial-agenda/appointments?card_id=${agendaCardId}&page_size=100`,
     headers: { authorization: `Bearer ${sdrToken}` },
   });
   assert.equal(sdrAgenda.statusCode, 200);
@@ -5163,7 +5268,7 @@ try {
 
   const sellerAgenda = await app.inject({
     method: "GET",
-    url: "/commercial-agenda/appointments?page_size=100",
+    url: `/commercial-agenda/appointments?card_id=${agendaCardId}&page_size=100`,
     headers: { authorization: `Bearer ${sellerInventoryToken}` },
   });
   assert.equal(sellerAgenda.statusCode, 200);
@@ -5171,7 +5276,7 @@ try {
 
   const ownerAgenda = await app.inject({
     method: "GET",
-    url: "/commercial-agenda/appointments?page_size=100",
+    url: `/commercial-agenda/appointments?card_id=${agendaCardId}&page_size=100`,
     headers: { authorization: `Bearer ${ownerBody.token}` },
   });
   assert.equal(ownerAgenda.statusCode, 200);
@@ -5851,6 +5956,23 @@ try {
   assert.equal(sdrTransferToSales.json().data.stageKey, "ASSUMED");
   const transferredSaleId = sdrTransferToSales.json().data.id as string;
 
+  const sellerAssignedSaleNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=commercial_sale_assigned&entity_id=${transferredSaleId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerAssignedSaleNotifications.statusCode, 200);
+  assert.ok(
+    sellerAssignedSaleNotifications
+      .json()
+      .items.some(
+        (notification: { actionUrl: string; priority: string; sourceModule: string }) =>
+          notification.priority === "HIGH" &&
+          notification.sourceModule === "commercial_sales" &&
+          notification.actionUrl === `/commercial-sales/${transferredSaleId}`,
+      ),
+  );
+
   // Transfer requires a seller (AC2).
   const transferNoSeller = await app.inject({
     method: "POST",
@@ -6015,6 +6137,32 @@ try {
   assert.equal(closeDeal.json().releasesDocuments, false);
   // Own financing was set in stage 3 -> alert raised.
   assert.equal(closeDeal.json().financingAlert, true);
+
+  const documentationNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=commercial_sale_documentation_pending&entity_id=${transferredSaleId}&status=NEW&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(documentationNotifications.statusCode, 200);
+  assert.ok(
+    documentationNotifications
+      .json()
+      .items.some(
+        (notification: { actionUrl: string; priority: string; sourceModule: string; userId: string }) =>
+          notification.userId === ownerBody.user.id &&
+          notification.priority === "HIGH" &&
+          notification.sourceModule === "commercial_sales" &&
+          notification.actionUrl === `/commercial-sales/${transferredSaleId}`,
+      ),
+  );
+
+  const sellerDocumentationNotificationScope = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=commercial_sale_documentation_pending&entity_id=${transferredSaleId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerDocumentationNotificationScope.statusCode, 200);
+  assert.equal(sellerDocumentationNotificationScope.json().items.length, 0);
 
   // Closing again is blocked.
   const reClose = await app.inject({

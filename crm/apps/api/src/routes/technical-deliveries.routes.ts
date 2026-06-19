@@ -22,6 +22,7 @@ import {
   TECHNICAL_DELIVERY_SIGNED_COPY_PURPOSE,
   technicalDeliveryLinkTargets,
 } from "../services/technical-delivery-attachments.js";
+import { activeStoreUserIdsByRoles, notifyActiveUsers, resolveActiveNotificationsForEntity } from "../services/internal-notifications.js";
 
 const deliveryStatusSchema = z.enum([
   "AWAITING_PREREQUISITES",
@@ -473,6 +474,23 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       return { delivery, created: !existing };
     });
 
+    try {
+      await notifyActiveUsers({
+        storeId: session.user.storeId,
+        userIds: [result.delivery.sellerUserId],
+        entityType: "technical_delivery_scheduled",
+        entityId: result.delivery.id,
+        title: result.created ? "Entrega tecnica agendada" : "Entrega tecnica reagendada",
+        body: `Entrega tecnica da venda ${result.delivery.saleId} agendada para ${result.delivery.scheduledAt.toISOString()}.`,
+        priority: "HIGH",
+        sourceModule: "technical_deliveries",
+        actionUrl: `/technical-deliveries/${result.delivery.id}`,
+        dueAt: result.delivery.scheduledAt,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao gerar notificacao de entrega tecnica agendada");
+    }
+
     return reply.code(result.created ? 201 : 200).send({ data: sanitizeTechnicalDelivery(result.delivery) });
   });
 
@@ -782,6 +800,23 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       return next;
     });
 
+    try {
+      const managementUserIds = await activeStoreUserIdsByRoles(session.user.storeId, ["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"]);
+      await notifyActiveUsers({
+        storeId: session.user.storeId,
+        userIds: managementUserIds,
+        entityType: "technical_delivery_signed_copy_pending",
+        entityId: updated.id,
+        title: "Entrega tecnica pendente de via assinada",
+        body: `Entrega tecnica ${updated.id} foi impressa e aguarda anexo da via assinada.`,
+        priority: "HIGH",
+        sourceModule: "technical_deliveries",
+        actionUrl: `/technical-deliveries/${updated.id}`,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao gerar notificacao de via assinada pendente");
+    }
+
     return reply.code(200).send({
       data: sanitizeTechnicalDelivery(updated),
       print: {
@@ -891,6 +926,23 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       return next;
     });
 
+    try {
+      await resolveActiveNotificationsForEntity({
+        storeId: session.user.storeId,
+        entityType: "technical_delivery_signed_copy_pending",
+        entityId: updated.id,
+        resolvedByUserId: session.user.id,
+      });
+      await resolveActiveNotificationsForEntity({
+        storeId: session.user.storeId,
+        entityType: "technical_delivery_scheduled",
+        entityId: updated.id,
+        resolvedByUserId: session.user.id,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao resolver notificacoes da entrega tecnica assinada");
+    }
+
     return reply.code(200).send({
       data: sanitizeTechnicalDelivery(updated),
       signedCopy: {
@@ -963,6 +1015,23 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
 
       return next;
     });
+
+    try {
+      await resolveActiveNotificationsForEntity({
+        storeId: session.user.storeId,
+        entityType: "technical_delivery_signed_copy_pending",
+        entityId: updated.id,
+        resolvedByUserId: session.user.id,
+      });
+      await resolveActiveNotificationsForEntity({
+        storeId: session.user.storeId,
+        entityType: "technical_delivery_scheduled",
+        entityId: updated.id,
+        resolvedByUserId: session.user.id,
+      });
+    } catch (notificationError) {
+      request.log.error({ err: notificationError }, "Falha ao resolver notificacoes da entrega tecnica cancelada");
+    }
 
     return reply.code(200).send({ data: sanitizeTechnicalDelivery(updated) });
   });
