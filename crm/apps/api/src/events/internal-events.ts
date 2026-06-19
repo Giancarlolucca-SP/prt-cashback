@@ -64,6 +64,7 @@ export type InternalEventName =
   | "notification.read"
   | "notification.resolved"
   | "notification.dismissed"
+  | "notification.responsible_reassigned"
   | "ocr.status_changed"
   | "ocr.field_extracted"
   | "ocr.field_reviewed"

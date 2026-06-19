@@ -5612,6 +5612,42 @@ try {
     },
   });
 
+  const notificationReassignSource = uniqueToken("notification-reassign");
+  const notificationReassignCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { name: "Lead para reatribuicao via notificacao", source: notificationReassignSource },
+  });
+  assert.equal(notificationReassignCard.statusCode, 201);
+  const notificationReassignCardId = notificationReassignCard.json().data.id as string;
+  const notificationReassignLeadId = notificationReassignCard.json().data.leadId as string;
+
+  await prisma.commercialInteraction.create({
+    data: {
+      storeId: ownerBody.user.storeId,
+      cardId: notificationReassignCardId,
+      leadId: notificationReassignLeadId,
+      responsibleUserId: sdrUserId,
+      interactionType: "CONTACT_ATTEMPT",
+      occurredAt: new Date(),
+      nextActionType: "CALL",
+      nextActionAt: new Date("2020-01-01T10:00:00.000Z"),
+      nextActionStatus: "PENDING",
+      createdByUserId: sdrUserId,
+    },
+  });
+  await prisma.lead.update({
+    where: { id: notificationReassignLeadId },
+    data: {
+      lastInteractionAt: new Date(),
+      lastInteractionType: "CONTACT_ATTEMPT",
+      lastInteractionResult: "NO_RESPONSE",
+      nextActionAt: new Date("2020-01-01T10:00:00.000Z"),
+      nextActionType: "CALL",
+    },
+  });
+
   // Only management can run the scan.
   const scanForbidden = await app.inject({
     method: "POST",
@@ -5635,6 +5671,72 @@ try {
   });
   assert.equal(ownerOverdueNotifications.statusCode, 200);
   assert.ok(ownerOverdueNotifications.json().items.some((n: { entityId: string }) => n.entityId === agendaCardId));
+  const notificationReassignAlert = ownerOverdueNotifications
+    .json()
+    .items.find((n: { id: string; entityId: string }) => n.entityId === notificationReassignCardId);
+  assert.ok(notificationReassignAlert);
+
+  const sellerNotificationReassign = await app.inject({
+    method: "POST",
+    url: `/notifications/${notificationReassignAlert.id}/reassign`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { assignedUserId: sellerUserId, reason: "Tentativa sem permissao pela notificacao" },
+  });
+  assert.equal(sellerNotificationReassign.statusCode, 403);
+
+  const ownerNotificationReassign = await app.inject({
+    method: "POST",
+    url: `/notifications/${notificationReassignAlert.id}/reassign`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { assignedUserId: sellerUserId, reason: "Redistribuicao operacional via notificacao" },
+  });
+  assert.equal(ownerNotificationReassign.statusCode, 200);
+  assert.equal(ownerNotificationReassign.json().reassignment.entityType, "lead_card");
+  assert.equal(ownerNotificationReassign.json().reassignment.entityId, notificationReassignCardId);
+  assert.equal(ownerNotificationReassign.json().reassignment.previousAssignedUserId, sdrUserId);
+  assert.equal(ownerNotificationReassign.json().reassignment.assignedUserId, sellerUserId);
+
+  const sellerReassignedNotificationCard = await app.inject({
+    method: "GET",
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(notificationReassignSource)}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerReassignedNotificationCard.statusCode, 200);
+  assert.ok(
+    sellerReassignedNotificationCard
+      .json()
+      .items.some((card: { id: string; assignedUserId: string }) => card.id === notificationReassignCardId && card.assignedUserId === sellerUserId),
+  );
+
+  const notificationReassignAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=notifications&action=notification_responsible_reassigned&entity_type=notification&entity_id=${notificationReassignAlert.id}&page=1&page_size=5`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(notificationReassignAudit.statusCode, 200);
+  assert.ok(
+    notificationReassignAudit
+      .json()
+      .items.some(
+        (log: { metadata: { targetEntityId?: string; toUserId?: string } }) =>
+          log.metadata.targetEntityId === notificationReassignCardId && log.metadata.toUserId === sellerUserId,
+      ),
+  );
+
+  const leadNotificationReassignAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=leads&action=commercial_responsible_changed&entity_type=lead&entity_id=${notificationReassignLeadId}&page=1&page_size=5`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(leadNotificationReassignAudit.statusCode, 200);
+  assert.ok(
+    leadNotificationReassignAudit
+      .json()
+      .items.some(
+        (log: { metadata: { notificationId?: string; toUserId?: string; source?: string } }) =>
+          log.metadata.notificationId === notificationReassignAlert.id && log.metadata.toUserId === sellerUserId && log.metadata.source === "notification",
+      ),
+  );
 
   // Re-running dedups: no new notification for the same card+reason while still unread.
   const scanFollowUpsAgain = await app.inject({

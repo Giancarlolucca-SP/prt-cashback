@@ -8,6 +8,7 @@ import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
+import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 
 const notificationPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 const notificationStatusSchema = z.enum(["NEW", "SEEN", "RESOLVED", "DISMISSED"]);
@@ -57,6 +58,19 @@ const dismissNotificationSchema = z.object({
     .max(240)
     .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Motivo") }),
 });
+const reassignNotificationSchema = z.object({
+  assignedUserId: z.string().uuid(),
+  reason: z
+    .string()
+    .trim()
+    .min(8)
+    .max(300)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Motivo da reatribuicao") }),
+});
+
+const responsibleChangeRoles = new Set(["OWNER_MANAGER", "ADMIN"]);
+const reassignableCommercialAppointmentStatuses = new Set(["SCHEDULED", "CONFIRMED"]);
+const terminalTechnicalDeliveryStatuses = new Set(["COMPLETED_SIGNED", "CANCELLED"]);
 
 type NotificationRecord = {
   id: string;
@@ -79,6 +93,17 @@ type NotificationRecord = {
   dismissedReason: string | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+type NotificationSession = Awaited<ReturnType<typeof requirePermission>>;
+type NotificationReassignInput = z.infer<typeof reassignNotificationSchema>;
+type NotificationReassignment = {
+  entityType: "lead_card" | "commercial_appointment" | "technical_delivery";
+  entityId: string;
+  assignedUserId: string;
+  previousAssignedUserId: string | null;
+  reason: string;
+  unchanged: boolean;
 };
 
 function sanitizeNotification(notification: NotificationRecord) {
@@ -112,6 +137,11 @@ async function ensureUser(storeId: string, userId?: string | null) {
   if (!user) throw new ApiError("NOT_FOUND", "Usuario da notificacao nao encontrado.");
 }
 
+async function ensureResponsibleInStore(storeId: string, userId: string) {
+  const user = await prisma.user.findFirst({ where: { id: userId, storeId, isActive: true, deletedAt: null }, select: { id: true } });
+  if (!user) throw new ApiError("NOT_FOUND", "Novo responsavel nao encontrado.");
+}
+
 function notificationVisibilityWhere(user: { id: string; role: string }): Prisma.NotificationWhereInput {
   return isCommercialFullView(user.role) ? {} : { OR: [{ userId: user.id }, { userId: null }] };
 }
@@ -126,6 +156,321 @@ async function getNotificationOrThrow(storeId: string, user: { id: string; role:
   });
   if (!notification) throw new ApiError("NOT_FOUND", "Notificacao nao encontrada.");
   return notification;
+}
+
+function assertReassignableNotification(notification: NotificationRecord) {
+  if (terminalNotificationStatuses.includes(notification.status as (typeof terminalNotificationStatuses)[number])) {
+    throw new ApiError("CONFLICT", "Notificacao finalizada nao pode reatribuir responsavel.");
+  }
+  if (!notification.entityType || !notification.entityId) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Notificacao nao possui entidade operacional para reatribuicao.");
+  }
+}
+
+async function reassignLeadCardFromNotification(
+  session: NotificationSession,
+  notification: NotificationRecord,
+  input: NotificationReassignInput,
+): Promise<NotificationReassignment> {
+  const card = await prisma.leadCard.findFirst({
+    where: {
+      id: notification.entityId ?? "",
+      storeId: session.user.storeId,
+      boardKey: COMMERCIAL_BOARD_KEY,
+      archivedAt: null,
+      lead: { deletedAt: null },
+    },
+    include: { lead: true },
+  });
+  if (!card) {
+    throw new ApiError("NOT_FOUND", "Card comercial nao encontrado.");
+  }
+
+  const previousAssignedUserId = card.lead.assignedUserId;
+  if (previousAssignedUserId === input.assignedUserId) {
+    return {
+      entityType: "lead_card",
+      entityId: card.id,
+      assignedUserId: input.assignedUserId,
+      previousAssignedUserId,
+      reason: input.reason,
+      unchanged: true,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.lead.update({
+      where: { id: card.leadId },
+      data: { assignedUserId: input.assignedUserId, updatedByUserId: session.user.id },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "leads",
+        action: "commercial_responsible_changed",
+        entityType: "lead",
+        entityId: card.leadId,
+        result: "SUCCESS",
+        metadata: {
+          boardKey: COMMERCIAL_BOARD_KEY,
+          cardId: card.id,
+          notificationId: notification.id,
+          fromUserId: previousAssignedUserId,
+          toUserId: input.assignedUserId,
+          reason: input.reason,
+          source: "notification",
+        },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "notifications",
+        action: "notification_responsible_reassigned",
+        entityType: "notification",
+        entityId: notification.id,
+        result: "SUCCESS",
+        metadata: {
+          targetEntityType: "lead_card",
+          targetEntityId: card.id,
+          leadId: card.leadId,
+          fromUserId: previousAssignedUserId,
+          toUserId: input.assignedUserId,
+          reason: input.reason,
+        },
+      },
+    });
+  });
+
+  return {
+    entityType: "lead_card",
+    entityId: card.id,
+    assignedUserId: input.assignedUserId,
+    previousAssignedUserId,
+    reason: input.reason,
+    unchanged: false,
+  };
+}
+
+async function reassignCommercialAppointmentFromNotification(
+  session: NotificationSession,
+  notification: NotificationRecord,
+  input: NotificationReassignInput,
+): Promise<NotificationReassignment> {
+  const appointment = await prisma.commercialAppointment.findFirst({
+    where: { id: notification.entityId ?? "", storeId: session.user.storeId },
+  });
+  if (!appointment) {
+    throw new ApiError("NOT_FOUND", "Agendamento comercial nao encontrado.");
+  }
+  if (!reassignableCommercialAppointmentStatuses.has(appointment.status)) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Agendamento comercial nao pode ser reatribuido no status atual.", {
+      status: appointment.status,
+    });
+  }
+
+  const previousAssignedUserId = appointment.responsibleUserId;
+  if (previousAssignedUserId === input.assignedUserId) {
+    return {
+      entityType: "commercial_appointment",
+      entityId: appointment.id,
+      assignedUserId: input.assignedUserId,
+      previousAssignedUserId,
+      reason: input.reason,
+      unchanged: true,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const changed = await tx.commercialAppointment.updateMany({
+      where: { id: appointment.id, status: appointment.status },
+      data: { responsibleUserId: input.assignedUserId },
+    });
+    if (changed.count !== 1) {
+      throw new ApiError("CONFLICT", "Agendamento foi alterado por outra acao. Recarregue e tente novamente.");
+    }
+
+    await tx.notification.updateMany({
+      where: {
+        storeId: session.user.storeId,
+        entityType: notification.entityType,
+        entityId: appointment.id,
+        userId: previousAssignedUserId,
+        status: { in: ["NEW", "SEEN"] },
+      },
+      data: { userId: input.assignedUserId },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "commercial_appointments",
+        action: "commercial_appointment_responsible_changed",
+        entityType: "commercial_appointment",
+        entityId: appointment.id,
+        result: "SUCCESS",
+        metadata: {
+          notificationId: notification.id,
+          cardId: appointment.cardId,
+          leadId: appointment.leadId,
+          fromUserId: previousAssignedUserId,
+          toUserId: input.assignedUserId,
+          reason: input.reason,
+          source: "notification",
+        },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "notifications",
+        action: "notification_responsible_reassigned",
+        entityType: "notification",
+        entityId: notification.id,
+        result: "SUCCESS",
+        metadata: {
+          targetEntityType: "commercial_appointment",
+          targetEntityId: appointment.id,
+          fromUserId: previousAssignedUserId,
+          toUserId: input.assignedUserId,
+          reason: input.reason,
+        },
+      },
+    });
+  });
+
+  return {
+    entityType: "commercial_appointment",
+    entityId: appointment.id,
+    assignedUserId: input.assignedUserId,
+    previousAssignedUserId,
+    reason: input.reason,
+    unchanged: false,
+  };
+}
+
+async function reassignTechnicalDeliveryFromNotification(
+  session: NotificationSession,
+  notification: NotificationRecord,
+  input: NotificationReassignInput,
+): Promise<NotificationReassignment> {
+  const delivery = await prisma.technicalDelivery.findFirst({
+    where: { id: notification.entityId ?? "", storeId: session.user.storeId },
+  });
+  if (!delivery) {
+    throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
+  }
+  if (terminalTechnicalDeliveryStatuses.has(delivery.status)) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica nao pode ser reatribuida no status atual.", {
+      status: delivery.status,
+    });
+  }
+
+  const previousAssignedUserId = delivery.responsibleUserId;
+  if (previousAssignedUserId === input.assignedUserId) {
+    return {
+      entityType: "technical_delivery",
+      entityId: delivery.id,
+      assignedUserId: input.assignedUserId,
+      previousAssignedUserId,
+      reason: input.reason,
+      unchanged: true,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const changed = await tx.technicalDelivery.updateMany({
+      where: { id: delivery.id, status: delivery.status },
+      data: { responsibleUserId: input.assignedUserId },
+    });
+    if (changed.count !== 1) {
+      throw new ApiError("CONFLICT", "Entrega tecnica foi alterada por outra acao. Recarregue e tente novamente.");
+    }
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "technical_deliveries",
+        action: "technical_delivery_responsible_changed",
+        entityType: "technical_delivery",
+        entityId: delivery.id,
+        result: "SUCCESS",
+        metadata: {
+          notificationId: notification.id,
+          saleId: delivery.saleId,
+          fromUserId: previousAssignedUserId,
+          toUserId: input.assignedUserId,
+          reason: input.reason,
+          source: "notification",
+        },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "notifications",
+        action: "notification_responsible_reassigned",
+        entityType: "notification",
+        entityId: notification.id,
+        result: "SUCCESS",
+        metadata: {
+          targetEntityType: "technical_delivery",
+          targetEntityId: delivery.id,
+          saleId: delivery.saleId,
+          fromUserId: previousAssignedUserId,
+          toUserId: input.assignedUserId,
+          reason: input.reason,
+        },
+      },
+    });
+  });
+
+  return {
+    entityType: "technical_delivery",
+    entityId: delivery.id,
+    assignedUserId: input.assignedUserId,
+    previousAssignedUserId,
+    reason: input.reason,
+    unchanged: false,
+  };
+}
+
+async function reassignNotificationTarget(
+  session: NotificationSession,
+  notification: NotificationRecord,
+  input: NotificationReassignInput,
+): Promise<NotificationReassignment> {
+  assertReassignableNotification(notification);
+
+  if (notification.entityType === "follow_up_overdue" || notification.entityType === "lead_no_continuity") {
+    return reassignLeadCardFromNotification(session, notification, input);
+  }
+  if (notification.entityType === "commercial_appointment_scheduled") {
+    return reassignCommercialAppointmentFromNotification(session, notification, input);
+  }
+  if (notification.entityType === "technical_delivery_scheduled" || notification.entityType === "technical_delivery_signed_copy_pending") {
+    return reassignTechnicalDeliveryFromNotification(session, notification, input);
+  }
+
+  throw new ApiError("BUSINESS_RULE_ERROR", "Notificacao nao suporta reatribuicao de responsavel.", {
+    entityType: notification.entityType,
+  });
 }
 
 export async function registerNotificationRoutes(app: FastifyInstance) {
@@ -267,6 +612,42 @@ export async function registerNotificationRoutes(app: FastifyInstance) {
         sourceModule: notification.sourceModule,
       },
     };
+  });
+
+  app.post("/:id/reassign", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    if (!responsibleChangeRoles.has(session.user.role)) {
+      throw new ApiError("FORBIDDEN", "Apenas Gestor ou Administrador pode reatribuir responsavel pela notificacao.");
+    }
+
+    const params = notificationParamsSchema.parse(request.params);
+    const input = reassignNotificationSchema.parse(request.body);
+    const current = await getNotificationOrThrow(session.user.storeId, session.user, params.id);
+    await ensureResponsibleInStore(session.user.storeId, input.assignedUserId);
+    const reassignment = await reassignNotificationTarget(session, current, input);
+    const notification = await prisma.notification.findUniqueOrThrow({ where: { id: current.id } });
+
+    await emitInternalEvent({
+      name: "notification.responsible_reassigned",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "notification",
+      entityId: notification.id,
+      payload: {
+        targetEntityType: reassignment.entityType,
+        targetEntityId: reassignment.entityId,
+        fromUserId: reassignment.previousAssignedUserId,
+        toUserId: reassignment.assignedUserId,
+        unchanged: reassignment.unchanged,
+      },
+    });
+
+    return { data: sanitizeNotification(notification), reassignment };
   });
 
   app.post("/:id/resolve", async (request) => {
