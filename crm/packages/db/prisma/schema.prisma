@@ -961,6 +961,48 @@ model Contract {
   @@map("contracts")
 }
 
+model ContractDocumentPackage {
+  id                              String   @id @default(uuid())
+  storeId                         String   @map("store_id")
+  saleId                          String   @map("sale_id")
+  contractId                      String?  @unique @map("contract_id")
+  documentType                    String   @default("SALE_CONTRACT_PACKAGE") @map("document_type")
+  status                          String   @default("DRAFT")
+  generatedFileId                 String?  @map("generated_file_id")
+  signedFileId                    String?  @map("signed_file_id")
+  signatureProvider               String?  @map("signature_provider")
+  sellerSignatureStatus           String   @default("PENDING") @map("seller_signature_status")
+  buyerSignatureStatus            String   @default("PENDING") @map("buyer_signature_status")
+  sentAt                          DateTime? @map("sent_at")
+  signedAt                        DateTime? @map("signed_at")
+  buyerNotifiedAt                 DateTime? @map("buyer_notified_at")
+  buyerNotificationChannel        String?  @map("buyer_notification_channel")
+  buyerNotificationRecipient      String?  @map("buyer_notification_recipient")
+  vehicleTransferMode             String?  @map("vehicle_transfer_mode")
+  atpveStatus                     String   @default("NOT_STARTED") @map("atpve_status")
+  atpveFileId                     String?  @map("atpve_file_id")
+  atpveEvidenceFileId             String?  @map("atpve_evidence_file_id")
+  govbrLevelRequired              String?  @map("govbr_level_required")
+  vehicleDocumentEligibleForAtpve Boolean? @map("vehicle_document_eligible_for_atpve")
+  observationsReviewed            Boolean  @default(false) @map("observations_reviewed")
+  reviewedByUserId                String?  @map("reviewed_by_user_id")
+  reviewedAt                      DateTime? @map("reviewed_at")
+  reviewNotes                     String?  @map("review_notes")
+  signatureHash                   String?  @map("signature_hash")
+  guidance                        Json?
+  metadata                        Json?
+  createdAt                       DateTime @default(now()) @map("created_at")
+  updatedAt                       DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId, saleId])
+  @@index([storeId, status])
+  @@index([signatureProvider])
+  @@index([signedFileId])
+  @@index([atpveFileId])
+  @@index([atpveEvidenceFileId])
+  @@map("contract_document_packages")
+}
+
 model WarrantyTerm {
   id        String   @id @default(uuid())
   storeId   String   @map("store_id")

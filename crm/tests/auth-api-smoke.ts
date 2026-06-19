@@ -6582,18 +6582,136 @@ try {
   assert.equal(commercialGateContract.json().data.saleId, transferredSaleId);
   const commercialGateContractId = commercialGateContract.json().data.id as string;
 
-  const signedCommercialGateContract = await app.inject({
+  const commercialGateContractPackage = await app.inject({
     method: "POST",
-    url: `/contracts/${commercialGateContractId}/sign`,
+    url: "/contracts/packages",
     headers: { authorization: `Bearer ${ownerBody.token}` },
     payload: {
-      signedAt: financeDueAt,
-      reason: "Gate US04-US06 validado em QA",
+      saleId: transferredSaleId,
+      contractId: commercialGateContractId,
+      signatureProvider: "CDT_DIGITAL",
+      vehicleTransferMode: "CDT_DIGITAL",
+      vehicleDocumentEligibleForAtpve: true,
+      metadata: { source: "s3-us03-assisted-signature" },
     },
+  });
+  assert.equal(commercialGateContractPackage.statusCode, 201);
+  assert.equal(commercialGateContractPackage.json().data.saleId, transferredSaleId);
+  assert.equal(commercialGateContractPackage.json().data.contractId, commercialGateContractId);
+  assert.equal(commercialGateContractPackage.json().data.observationsReviewed, false);
+  const commercialGatePackageId = commercialGateContractPackage.json().data.id as string;
+
+  const blockedPackageWithoutReview = await app.inject({
+    method: "POST",
+    url: `/contracts/packages/${commercialGatePackageId}/send-signature`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      signatureProvider: "CDT_DIGITAL",
+      vehicleTransferMode: "CDT_DIGITAL",
+      govbrLevelRequired: "PRATA_OURO",
+      vehicleDocumentEligibleForAtpve: true,
+      buyerNotificationChannel: "WHATSAPP",
+      buyerNotificationRecipient: "+5511999999999",
+    },
+  });
+  assert.equal(blockedPackageWithoutReview.statusCode, 422);
+  assert.equal(blockedPackageWithoutReview.json().error.code, "BUSINESS_RULE_ERROR");
+  assert.ok(blockedPackageWithoutReview.json().error.details.missing.includes("observations_reviewed"));
+
+  const reviewedCommercialGatePackage = await app.inject({
+    method: "POST",
+    url: `/contracts/packages/${commercialGatePackageId}/review`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      observationsReviewed: true,
+      reviewNotes: "Dados e observacoes revisados para assinatura assistida CDT",
+    },
+  });
+  assert.equal(reviewedCommercialGatePackage.statusCode, 200);
+  assert.equal(reviewedCommercialGatePackage.json().data.status, "READY_FOR_SIGNATURE");
+  assert.equal(reviewedCommercialGatePackage.json().data.observationsReviewed, true);
+
+  const sentCommercialGatePackage = await app.inject({
+    method: "POST",
+    url: `/contracts/packages/${commercialGatePackageId}/send-signature`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      signatureProvider: "CDT_DIGITAL",
+      vehicleTransferMode: "CDT_DIGITAL",
+      govbrLevelRequired: "PRATA_OURO",
+      vehicleDocumentEligibleForAtpve: true,
+      buyerNotificationChannel: "WHATSAPP",
+      buyerNotificationRecipient: "+5511999999999",
+    },
+  });
+  assert.equal(sentCommercialGatePackage.statusCode, 200);
+  assert.equal(sentCommercialGatePackage.json().data.status, "SENT_TO_CDT");
+  assert.equal(sentCommercialGatePackage.json().data.sellerSignatureStatus, "AWAITING");
+  assert.equal(sentCommercialGatePackage.json().data.buyerSignatureStatus, "AWAITING");
+  assert.equal(sentCommercialGatePackage.json().data.govbrLevelRequired, "PRATA_OURO");
+  assert.ok(sentCommercialGatePackage.json().data.buyerNotifiedAt);
+
+  const signedContractUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "contrato-assinado-cdt.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 34567,
+      classification: "signed_contract",
+      link: { entityType: "contract", entityId: commercialGateContractId, purpose: "signed_contract" },
+    },
+  });
+  assert.equal(signedContractUpload.statusCode, 201);
+  const signedContractFileId = signedContractUpload.json().data.id as string;
+
+  const atpveEvidenceUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "evidencia-atpve-cdt.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 23456,
+      classification: "atpve_evidence",
+      link: { entityType: "sale", entityId: transferredSaleId, purpose: "atpve_evidence" },
+    },
+  });
+  assert.equal(atpveEvidenceUpload.statusCode, 201);
+  const atpveEvidenceFileId = atpveEvidenceUpload.json().data.id as string;
+
+  const signedCommercialGatePackage = await app.inject({
+    method: "POST",
+    url: `/contracts/packages/${commercialGatePackageId}/signed-document`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      signedFileId: signedContractFileId,
+      atpveEvidenceFileId,
+      sellerSignatureStatus: "SIGNED",
+      buyerSignatureStatus: "SIGNED",
+      atpveStatus: "COMPLETED",
+      signedAt: financeDueAt,
+      signatureHash: "qa-s3-us03-signature-hash",
+      notes: "Contrato e ATPV-e assinados via fluxo assistido CDT",
+    },
+  });
+  assert.equal(signedCommercialGatePackage.statusCode, 200);
+  assert.equal(signedCommercialGatePackage.json().data.status, "SIGNED_ALL");
+  assert.equal(signedCommercialGatePackage.json().data.signedFileId, signedContractFileId);
+  assert.equal(signedCommercialGatePackage.json().data.atpveEvidenceFileId, atpveEvidenceFileId);
+
+  const signedCommercialGateContract = await app.inject({
+    method: "GET",
+    url: `/contracts/${commercialGateContractId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
   });
   assert.equal(signedCommercialGateContract.statusCode, 200);
   assert.equal(signedCommercialGateContract.json().data.saleId, transferredSaleId);
   assert.equal(signedCommercialGateContract.json().data.status, "SIGNED");
+  assert.equal(signedCommercialGateContract.json().data.signedAt, financeDueAt);
 
   const blockedWithoutPaidIncome = await app.inject({
     method: "POST",
