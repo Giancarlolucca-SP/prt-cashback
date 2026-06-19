@@ -60,6 +60,18 @@ const commercialAlertsQuerySchema = z.object({
   triggered_to: z.coerce.date().optional(),
 });
 
+const commercialAlertParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const commercialAlertActionSchema = z
+  .object({
+    reason: z.string().trim().max(300).optional(),
+  })
+  .default({});
+
+type CommercialAlertSession = Awaited<ReturnType<typeof requirePermission>>;
+
 function alertKey(alert: { type: string; cardId: string }) {
   return `${alert.type}:${alert.cardId}`;
 }
@@ -146,6 +158,133 @@ function sanitizeCommercialAlert(alert: CommercialAlertWithCard) {
     createdAt: alert.createdAt.toISOString(),
     updatedAt: alert.updatedAt.toISOString(),
   };
+}
+
+function commercialAlertVisibleWhere(user: { id: string; role: string }): Prisma.CommercialAlertWhereInput {
+  return isCommercialFullView(user.role) ? {} : { OR: [{ targetUserId: user.id }, { responsibleUserId: user.id }] };
+}
+
+async function loadScopedCommercialAlert(session: CommercialAlertSession, id: string) {
+  const alert = await prisma.commercialAlert.findFirst({
+    where: {
+      id,
+      storeId: session.user.storeId,
+      ...commercialAlertVisibleWhere(session.user),
+    },
+    include: { card: { include: { lead: true } } },
+  });
+  if (!alert) {
+    throw new ApiError("NOT_FOUND", "Alerta comercial nao encontrado.");
+  }
+  return alert;
+}
+
+function assertAlertIsActive(alert: CommercialAlertWithCard) {
+  if (!ACTIVE_COMMERCIAL_ALERT_STATUSES.includes(alert.status as (typeof ACTIVE_COMMERCIAL_ALERT_STATUSES)[number])) {
+    throw new ApiError("CONFLICT", "Alerta comercial ja esta encerrado.", { status: alert.status });
+  }
+}
+
+async function auditCommercialAlertTransition(
+  tx: Prisma.TransactionClient,
+  session: CommercialAlertSession,
+  alert: CommercialAlertWithCard,
+  input: {
+    action: string;
+    fromStatus: string;
+    toStatus: CommercialAlertStatus;
+    reason?: string | null;
+  },
+) {
+  const metadata = {
+    alertType: alert.alertType,
+    severity: alert.severity,
+    cardId: alert.cardId,
+    leadId: alert.leadId,
+    fromStatus: input.fromStatus,
+    toStatus: input.toStatus,
+    reason: input.reason ?? null,
+    source: "manual",
+  } satisfies Prisma.InputJsonObject;
+
+  await tx.auditLog.create({
+    data: {
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      actorRole: session.user.role,
+      module: "commercial_alerts",
+      action: input.action,
+      entityType: "commercial_alert",
+      entityId: alert.id,
+      result: "SUCCESS",
+      metadata,
+    },
+  });
+
+  if (alert.leadId) {
+    await tx.auditLog.create({
+      data: {
+        storeId: session.user.storeId,
+        actorId: session.user.id,
+        actorRole: session.user.role,
+        module: "leads",
+        action: input.action,
+        entityType: "lead",
+        entityId: alert.leadId,
+        result: "SUCCESS",
+        metadata: { ...metadata, alertId: alert.id },
+      },
+    });
+  }
+}
+
+async function transitionCommercialAlert(
+  session: CommercialAlertSession,
+  alert: CommercialAlertWithCard,
+  input: {
+    toStatus: "VIEWED" | "RESOLVED" | "DISMISSED";
+    action: string;
+    reason?: string | null;
+  },
+) {
+  if (input.toStatus === "VIEWED" && alert.status === "VIEWED") {
+    return alert;
+  }
+  assertAlertIsActive(alert);
+
+  const fromStatus = alert.status;
+  const now = new Date();
+  const terminalData =
+    input.toStatus === "RESOLVED" || input.toStatus === "DISMISSED"
+      ? { resolvedAt: now, resolvedByUserId: session.user.id }
+      : {};
+
+  return prisma.$transaction(async (tx) => {
+    const changed = await tx.commercialAlert.updateMany({
+      where: { id: alert.id, status: fromStatus },
+      data: {
+        status: input.toStatus,
+        ...terminalData,
+      },
+    });
+    if (changed.count !== 1) {
+      throw new ApiError("CONFLICT", "Alerta comercial foi alterado por outra acao. Recarregue e tente novamente.");
+    }
+
+    const updated = await tx.commercialAlert.findUniqueOrThrow({
+      where: { id: alert.id },
+      include: { card: { include: { lead: true } } },
+    });
+
+    await auditCommercialAlertTransition(tx, session, alert, {
+      action: input.action,
+      fromStatus,
+      toStatus: input.toStatus,
+      reason: input.reason ?? null,
+    });
+
+    return updated;
+  });
 }
 
 function enrichCandidate(storeId: string, candidate: CommercialAlertCandidate, card: CommercialCardWithLead): PersistCommercialAlertInput {
@@ -301,7 +440,7 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
         : query.target === "mine"
           ? { OR: [{ targetUserId: session.user.id }, { responsibleUserId: session.user.id }] }
           : {}
-      : { OR: [{ targetUserId: session.user.id }, { responsibleUserId: session.user.id }] };
+      : commercialAlertVisibleWhere(session.user);
     const responsibleWhere: Prisma.CommercialAlertWhereInput =
       fullView && query.responsible_user_id ? { responsibleUserId: query.responsible_user_id } : {};
 
@@ -435,5 +574,59 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
         byType: countByType(candidates),
       },
     };
+  });
+
+  app.post("/:id/view", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = commercialAlertParamsSchema.parse(request.params);
+    const input = commercialAlertActionSchema.parse(request.body);
+    const alert = await loadScopedCommercialAlert(session, params.id);
+    const updated = await transitionCommercialAlert(session, alert, {
+      toStatus: "VIEWED",
+      action: "commercial_alert_viewed",
+      reason: input.reason ?? null,
+    });
+    return { data: sanitizeCommercialAlert(updated) };
+  });
+
+  app.post("/:id/resolve", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = commercialAlertParamsSchema.parse(request.params);
+    const input = commercialAlertActionSchema.parse(request.body);
+    const alert = await loadScopedCommercialAlert(session, params.id);
+    const updated = await transitionCommercialAlert(session, alert, {
+      toStatus: "RESOLVED",
+      action: "commercial_alert_resolved",
+      reason: input.reason ?? null,
+    });
+    return { data: sanitizeCommercialAlert(updated) };
+  });
+
+  app.post("/:id/dismiss", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "update",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = commercialAlertParamsSchema.parse(request.params);
+    const input = commercialAlertActionSchema.parse(request.body);
+    const alert = await loadScopedCommercialAlert(session, params.id);
+    const updated = await transitionCommercialAlert(session, alert, {
+      toStatus: "DISMISSED",
+      action: "commercial_alert_dismissed",
+      reason: input.reason ?? null,
+    });
+    return { data: sanitizeCommercialAlert(updated) };
   });
 }

@@ -3272,6 +3272,7 @@ try {
   assert.equal(sellNoPriceRepasse.statusCode, 400);
   assert.equal(sellNoPriceRepasse.json().error.code, "VALIDATION_ERROR");
 
+  const cancelRepassePlate = uniquePlate("RC");
   const cancelRepasseInventory = await app.inject({
     method: "POST",
     url: "/inventory",
@@ -3284,7 +3285,7 @@ try {
         model: "Pulse",
         version: "Drive Repasse",
         yearModel: 2020,
-        plate: uniquePlate("RC"),
+        plate: cancelRepassePlate,
       },
       ownershipType: "TRADE_IN",
       status: "IN_PREPARATION",
@@ -3356,7 +3357,7 @@ try {
 
   const defaultInventoryAfterRepasseCancel = await app.inject({
     method: "GET",
-    url: "/inventory?page=1&page_size=100&search=Pulse",
+    url: `/inventory?page=1&page_size=20&search=${encodeURIComponent(cancelRepassePlate)}`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -5670,6 +5671,128 @@ try {
   assert.equal(managementCommercialAlerts.statusCode, 200);
   assert.ok(managementCommercialAlerts.json().items.some((item: { id: string }) => item.id === activeFollowUpAlert.id));
   assert.ok(managementCommercialAlerts.json().items.every((item: { targetRole: string | null }) => item.targetRole === "MANAGEMENT"));
+
+  const otherSellerCannotViewCommercialAlert = await app.inject({
+    method: "POST",
+    url: `/commercial-alerts/${activeFollowUpAlert.id}/view`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { reason: "Tentativa fora da carteira" },
+  });
+  assert.equal(otherSellerCannotViewCommercialAlert.statusCode, 404);
+
+  const viewCommercialAlert = await app.inject({
+    method: "POST",
+    url: `/commercial-alerts/${activeFollowUpAlert.id}/view`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { reason: "Alerta assumido pelo responsavel" },
+  });
+  assert.equal(viewCommercialAlert.statusCode, 200);
+  assert.equal(viewCommercialAlert.json().data.status, "VIEWED");
+  assert.equal(viewCommercialAlert.json().data.resolvedAt, null);
+  const viewedAlertAudit = await prisma.auditLog.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      module: "commercial_alerts",
+      action: "commercial_alert_viewed",
+      entityType: "commercial_alert",
+      entityId: activeFollowUpAlert.id,
+    },
+  });
+  assert.ok(viewedAlertAudit);
+  assert.equal(viewedAlertAudit.actorId, sdrUserId);
+
+  const manualAlertCard = await app.inject({
+    method: "POST",
+    url: "/commercial-kanban/cards",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { name: "Card Alertas Manuais QA", source: uniqueToken("manual-alert-card") },
+  });
+  assert.equal(manualAlertCard.statusCode, 201);
+  const manualAlertCardId = manualAlertCard.json().data.id as string;
+  const manualAlertLeadId = manualAlertCard.json().data.leadId as string;
+  const manualResolveAlert = await prisma.commercialAlert.create({
+    data: {
+      storeId: ownerBody.user.storeId,
+      alertType: "lead_attention",
+      severity: "LOW",
+      status: "PENDING",
+      card: { connect: { id: manualAlertCardId } },
+      leadId: manualAlertLeadId,
+      responsibleUserId: sdrUserId,
+      targetUserId: sdrUserId,
+      reason: "Smoke de resolucao manual.",
+      suggestedAction: "Resolver manualmente no teste.",
+      triggeredAt: new Date(),
+      metadata: { source: "auth-smoke", action: "manual-resolve" },
+    },
+  });
+  const manualDismissAlert = await prisma.commercialAlert.create({
+    data: {
+      storeId: ownerBody.user.storeId,
+      alertType: "missing_next_action",
+      severity: "MEDIUM",
+      status: "PENDING",
+      card: { connect: { id: manualAlertCardId } },
+      leadId: manualAlertLeadId,
+      responsibleUserId: sdrUserId,
+      targetUserId: sdrUserId,
+      reason: "Smoke de dispensa manual.",
+      suggestedAction: "Dispensar manualmente no teste.",
+      triggeredAt: new Date(),
+      metadata: { source: "auth-smoke", action: "manual-dismiss" },
+    },
+  });
+
+  const resolveCommercialAlert = await app.inject({
+    method: "POST",
+    url: `/commercial-alerts/${manualResolveAlert.id}/resolve`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { reason: "Pendencia conferida pela gestao" },
+  });
+  assert.equal(resolveCommercialAlert.statusCode, 200);
+  assert.equal(resolveCommercialAlert.json().data.status, "RESOLVED");
+  assert.equal(resolveCommercialAlert.json().data.resolvedByUserId, ownerBody.user.id);
+
+  const resolveCommercialAlertAgain = await app.inject({
+    method: "POST",
+    url: `/commercial-alerts/${manualResolveAlert.id}/resolve`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { reason: "Tentativa duplicada" },
+  });
+  assert.equal(resolveCommercialAlertAgain.statusCode, 409);
+
+  const dismissCommercialAlert = await app.inject({
+    method: "POST",
+    url: `/commercial-alerts/${manualDismissAlert.id}/dismiss`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { reason: "Alerta nao se aplica apos contato manual" },
+  });
+  assert.equal(dismissCommercialAlert.statusCode, 200);
+  assert.equal(dismissCommercialAlert.json().data.status, "DISMISSED");
+  assert.equal(dismissCommercialAlert.json().data.resolvedByUserId, sdrUserId);
+
+  const resolvedManualAudit = await prisma.auditLog.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      module: "commercial_alerts",
+      action: "commercial_alert_resolved",
+      entityType: "commercial_alert",
+      entityId: manualResolveAlert.id,
+    },
+  });
+  assert.ok(resolvedManualAudit);
+  assert.equal(resolvedManualAudit.actorId, ownerBody.user.id);
+  const dismissedManualAudit = await prisma.auditLog.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      module: "commercial_alerts",
+      action: "commercial_alert_dismissed",
+      entityType: "commercial_alert",
+      entityId: manualDismissAlert.id,
+    },
+  });
+  assert.ok(dismissedManualAudit);
+  assert.equal(dismissedManualAudit.actorId, sdrUserId);
 
   const commercialAlertScanAgain = await app.inject({
     method: "POST",
