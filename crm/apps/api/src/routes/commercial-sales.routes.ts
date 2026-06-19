@@ -506,8 +506,8 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
     if (input.notes !== undefined) snapshotPatch.observationNotes = input.notes;
 
     const updated = await prisma.$transaction(async (tx) => {
-      const next = await tx.sale.update({
-        where: { id: sale.id },
+      const changed = await tx.sale.updateMany({
+        where: { id: sale.id, status: sale.status },
         data: {
           ...(input.salePrice !== undefined ? { salePrice: input.salePrice } : {}),
           ...(input.paymentMethodForecast !== undefined ? { paymentMethodForecast: input.paymentMethodForecast } : {}),
@@ -517,6 +517,11 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
           ...(Object.keys(snapshotPatch).length ? { snapshot: mergeSnapshot(sale.snapshot, snapshotPatch) } : {}),
         },
       });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Processo de vendas foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+
+      const next = await tx.sale.findUniqueOrThrow({ where: { id: sale.id } });
 
       await tx.auditLog.create({
         data: {

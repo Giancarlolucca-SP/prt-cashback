@@ -60,6 +60,7 @@ const moveCommercialCardSchema = z
 const createManualCardSchema = z.object({
   name: z.string().trim().min(2).max(180),
   phone: z.string().trim().max(40).optional(),
+  customerId: z.string().uuid().optional(),
   vehicleId: z.string().uuid().optional(),
   source: z.string().trim().min(2).max(80).default("ligacao_loja"),
   channel: z.string().trim().max(80).optional(),
@@ -492,6 +493,16 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Responsavel inicial do card nao encontrado.");
     }
 
+    if (input.customerId) {
+      const customer = await prisma.customer.findFirst({
+        where: { id: input.customerId, storeId: session.user.storeId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new ApiError("NOT_FOUND", "Cliente vinculado ao card nao encontrado.");
+      }
+    }
+
     if (input.vehicleId) {
       const vehicle = await prisma.vehicle.findFirst({
         where: { id: input.vehicleId, storeId: session.user.storeId, deletedAt: null },
@@ -515,6 +526,7 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
       const lead = await tx.lead.create({
         data: {
           storeId: session.user.storeId,
+          customerId: input.customerId,
           assignedUserId,
           vehicleId: input.vehicleId,
           source: input.source,
@@ -565,6 +577,7 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
             stageKey: "NEW_LEAD",
             source: input.source,
             channel: input.channel ?? null,
+            customerId: input.customerId ?? null,
             vehicleId: input.vehicleId ?? null,
             assignedUserId,
             manualEntry: true,
@@ -587,6 +600,7 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
             board: COMMERCIAL_BOARD_KEY,
             source: input.source,
             assignedUserId,
+            customerId: input.customerId ?? null,
             vehicleId: input.vehicleId ?? null,
             manualEntry: true,
           },
@@ -615,6 +629,7 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
         phone: input.phone ?? null,
         source: result.lead.source,
         channel: result.lead.channel,
+        customerId: result.lead.customerId,
         vehicleId: result.lead.vehicleId,
         assignedUserId: result.lead.assignedUserId,
         note: input.note ?? null,

@@ -615,6 +615,56 @@ async function seedDemoData(store, userByRole) {
     findOrCreate("financialTransaction", { storeId: store.id, description: "Pagamento PPF Compass" }, { storeId: store.id, accountId: account.id, categoryId: expenseCategory.id, type: "EXPENSE", status: "PENDING", description: "Pagamento PPF Compass", amount: 2600, dueAt: daysFromNow(4), entityType: "service_order", entityId: serviceOrders[0].id, snapshot: { source: "seed-demo" } }, { accountId: account.id, categoryId: expenseCategory.id, status: "PENDING", amount: 2600, entityId: serviceOrders[0].id }),
   ]);
 
+  await Promise.all([
+    findOrCreate(
+      "saleDocumentChecklist",
+      { saleId: sales[0].id, itemKey: "buyer_document_delivered" },
+      { storeId: store.id, saleId: sales[0].id, itemKey: "buyer_document_delivered", label: "Documentos do comprador entregues", isDone: true, completedAt: daysFromNow(-2) },
+      { label: "Documentos do comprador entregues", isDone: true, completedAt: daysFromNow(-2) },
+    ),
+    findOrCreate(
+      "saleDocumentChecklist",
+      { saleId: sales[0].id, itemKey: "buyer_document_checked" },
+      { storeId: store.id, saleId: sales[0].id, itemKey: "buyer_document_checked", label: "Documentos do comprador conferidos", isDone: true, completedAt: daysFromNow(-2) },
+      { label: "Documentos do comprador conferidos", isDone: true, completedAt: daysFromNow(-2) },
+    ),
+  ]);
+
+  await findOrCreate(
+    "technicalDelivery",
+    { storeId: store.id, saleId: sales[0].id },
+    {
+      storeId: store.id,
+      saleId: sales[0].id,
+      vehicleId: corolla.id,
+      customerId: marina.id,
+      sellerUserId: seller?.id,
+      scheduledByUserId: admin.id,
+      responsibleUserId: admin.id,
+      scheduledAt: daysFromNow(1, 15),
+      status: "SCHEDULED",
+      checklistSnapshot: [
+        { key: "documents", label: "Documentos entregues" },
+        { key: "vehicle_orientation", label: "Orientacao do veiculo" },
+      ],
+      printStatus: "PENDING",
+      signedCopyStatus: "PENDING",
+    },
+    {
+      sellerUserId: seller?.id,
+      scheduledByUserId: admin.id,
+      responsibleUserId: admin.id,
+      scheduledAt: daysFromNow(1, 15),
+      status: "SCHEDULED",
+      checklistSnapshot: [
+        { key: "documents", label: "Documentos entregues" },
+        { key: "vehicle_orientation", label: "Orientacao do veiculo" },
+      ],
+      printStatus: "PENDING",
+      signedCopyStatus: "PENDING",
+    },
+  );
+
   const channel = await findOrCreate(
     "communicationChannel",
     { storeId: store.id, type: "whatsapp", name: "WhatsApp Loja" },

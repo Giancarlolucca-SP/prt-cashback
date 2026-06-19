@@ -5075,9 +5075,10 @@ try {
     method: "POST",
     url: "/commercial-kanban/cards",
     headers: { authorization: `Bearer ${sdrToken}` },
-    payload: { name: "Agenda Card Veiculo", phone: "11990002222", vehicleId: inventoryVehicleId, source: "ligacao_loja" },
+    payload: { name: "Agenda Card Veiculo", phone: "11990002222", customerId: createdCustomerId, vehicleId: inventoryVehicleId, source: "ligacao_loja" },
   });
   assert.equal(agendaCardWithVehicle.statusCode, 201);
+  assert.equal(agendaCardWithVehicle.json().data.customerId, createdCustomerId);
   const agendaCardId = agendaCardWithVehicle.json().data.id as string;
 
   const agendaCardNoVehicle = await app.inject({
@@ -5723,6 +5724,7 @@ try {
     where: { saleId: transferredSaleId, itemKey: "buyer_document_delivered", isDone: true },
   });
   assert.ok(buyerDocDelivered);
+  assert.equal(buyerDocDelivered.saleId, transferredSaleId);
 
   // Move the sales stage (negotiation).
   const moveToNegotiation = await app.inject({
@@ -5735,6 +5737,12 @@ try {
   assert.equal(moveToNegotiation.json().data.stageKey, "IN_NEGOTIATION");
 
   // LOST cancels/soft-deletes the sale and removes it from lists/open-sales count.
+  const openSalesBeforeLost = await app.inject({
+    method: "GET",
+    url: "/analytics/executive-summary",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(openSalesBeforeLost.statusCode, 200);
   const directSaleId = sellerDirectSale.json().data.id as string;
   const lostMove = await app.inject({
     method: "POST",
@@ -5750,6 +5758,13 @@ try {
     headers: { authorization: `Bearer ${sellerInventoryToken}` },
   });
   assert.equal(lostSaleGet.statusCode, 404);
+  const openSalesAfterLost = await app.inject({
+    method: "GET",
+    url: "/analytics/executive-summary",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(openSalesAfterLost.statusCode, 200);
+  assert.equal(openSalesAfterLost.json().totals.openSales, openSalesBeforeLost.json().totals.openSales - 1);
 
   // --- Close the deal (S2-US04 stage 4): -> DOCUMENTATION queue, no release, own-financing alert ---
   // SDR cannot mark a deal closed (AC15).
@@ -5814,6 +5829,135 @@ try {
     where: { saleId: transferredSaleId, itemKey: "buyer_document_checked", isDone: true },
   });
   assert.ok(buyerDocChecked);
+  assert.equal(buyerDocChecked.saleId, transferredSaleId);
+
+  // --- US04 -> US06 final gate (stage 5): real producers unlock technical delivery ---
+  const commercialGateContract = await app.inject({
+    method: "POST",
+    url: "/contracts/generate",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      saleId: transferredSaleId,
+      status: "GENERATED",
+      snapshot: {
+        qa: true,
+        source: "s2-us04-us06-gate",
+      },
+    },
+  });
+  assert.equal(commercialGateContract.statusCode, 201);
+  assert.equal(commercialGateContract.json().data.saleId, transferredSaleId);
+  const commercialGateContractId = commercialGateContract.json().data.id as string;
+
+  const signedCommercialGateContract = await app.inject({
+    method: "POST",
+    url: `/contracts/${commercialGateContractId}/sign`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      signedAt: financeDueAt,
+      reason: "Gate US04-US06 validado em QA",
+    },
+  });
+  assert.equal(signedCommercialGateContract.statusCode, 200);
+  assert.equal(signedCommercialGateContract.json().data.saleId, transferredSaleId);
+  assert.equal(signedCommercialGateContract.json().data.status, "SIGNED");
+
+  const blockedWithoutPaidIncome = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {
+      saleId: transferredSaleId,
+      scheduledAt: new Date(new Date(financeDueAt).getTime() + 14400000).toISOString(),
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(blockedWithoutPaidIncome.statusCode, 422);
+  assert.equal(blockedWithoutPaidIncome.json().error.code, "BUSINESS_RULE_ERROR");
+  assert.deepEqual(blockedWithoutPaidIncome.json().error.details.pendingPrerequisites, ["payment_confirmed"]);
+
+  const commercialGateIncome = await app.inject({
+    method: "POST",
+    url: "/finance/transactions",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      type: "INCOME",
+      status: "SCHEDULED",
+      description: "Recebimento gate US04 US06",
+      amount: 95000,
+      dueAt: financeDueAt,
+      entityType: "sale",
+      entityId: transferredSaleId,
+      snapshot: { source: "s2-us04-us06-gate" },
+    },
+  });
+  assert.equal(commercialGateIncome.statusCode, 201);
+  assert.equal(commercialGateIncome.json().data.entityId, transferredSaleId);
+  const commercialGateIncomeId = commercialGateIncome.json().data.id as string;
+
+  const paidCommercialGateIncome = await app.inject({
+    method: "POST",
+    url: `/finance/transactions/${commercialGateIncomeId}/settle`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      status: "PAID",
+      paidAt: financeDueAt,
+      reason: "Gate US04-US06 validado em QA",
+    },
+  });
+  assert.equal(paidCommercialGateIncome.statusCode, 200);
+  assert.equal(paidCommercialGateIncome.json().data.entityId, transferredSaleId);
+  assert.equal(paidCommercialGateIncome.json().data.status, "PAID");
+
+  const commercialGateDeliveryAt = new Date(new Date(financeDueAt).getTime() + 18000000).toISOString();
+  const scheduledCommercialGateDelivery = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {
+      saleId: transferredSaleId,
+      scheduledAt: commercialGateDeliveryAt,
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(scheduledCommercialGateDelivery.statusCode, 201);
+  assert.equal(scheduledCommercialGateDelivery.json().data.saleId, transferredSaleId);
+  assert.equal(scheduledCommercialGateDelivery.json().data.vehicleId, inventoryVehicleId);
+  assert.equal(scheduledCommercialGateDelivery.json().data.customerId, createdCustomerId);
+  assert.equal(scheduledCommercialGateDelivery.json().data.status, "SCHEDULED");
+  const commercialGateDeliveryId = scheduledCommercialGateDelivery.json().data.id as string;
+
+  const sellerCommercialSalesDocumentation = await app.inject({
+    method: "GET",
+    url: "/commercial-sales?status=DOCUMENTATION&page_size=100",
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerCommercialSalesDocumentation.statusCode, 200);
+  assert.ok(sellerCommercialSalesDocumentation.json().items.some((sale: { id: string }) => sale.id === transferredSaleId));
+
+  const managerCommercialSalesDocumentation = await app.inject({
+    method: "GET",
+    url: "/commercial-sales?status=DOCUMENTATION&page_size=100",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(managerCommercialSalesDocumentation.statusCode, 200);
+  assert.ok(managerCommercialSalesDocumentation.json().items.some((sale: { id: string }) => sale.id === transferredSaleId));
+
+  const managementTechnicalDeliveryQueue = await app.inject({
+    method: "GET",
+    url: "/technical-deliveries?status=SCHEDULED&page_size=100",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+  });
+  assert.equal(managementTechnicalDeliveryQueue.statusCode, 200);
+  assert.ok(managementTechnicalDeliveryQueue.json().items.some((delivery: { id: string }) => delivery.id === commercialGateDeliveryId));
+
+  const sellerCommercialGateDeliveries = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries?sale_id=${transferredSaleId}`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerCommercialGateDeliveries.statusCode, 200);
+  assert.ok(sellerCommercialGateDeliveries.json().items.some((delivery: { id: string }) => delivery.id === commercialGateDeliveryId));
   checkpoint("commercial-sales");
 
   const sellerDeleteCustomer = await app.inject({
