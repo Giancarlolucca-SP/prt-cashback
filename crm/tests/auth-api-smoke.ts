@@ -6565,6 +6565,7 @@ try {
       priority: "HIGH",
       sourceModule: "commercial",
       actionUrl: `/customers/${createdCustomerId}`,
+      dueAt: "2030-01-15T10:00:00.000Z",
     },
   });
   assert.equal(createNotification.statusCode, 201);
@@ -6573,6 +6574,7 @@ try {
   assert.equal(createNotification.json().data.status, "NEW");
   assert.equal(createNotification.json().data.sourceModule, "commercial");
   assert.equal(createNotification.json().data.actionUrl, `/customers/${createdCustomerId}`);
+  assert.equal(createNotification.json().data.dueAt, "2030-01-15T10:00:00.000Z");
   assert.equal(createNotification.json().data.readAt, null);
   const notificationId = createNotification.json().data.id as string;
 
@@ -6585,6 +6587,38 @@ try {
   });
   assert.equal(sellerNotifications.statusCode, 200);
   assert.ok(sellerNotifications.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const sellerNotificationsByCreatedPeriod = await app.inject({
+    method: "GET",
+    url: "/notifications?created_from=2000-01-01T00%3A00%3A00.000Z&created_to=2100-01-01T00%3A00%3A00.000Z&page_size=100",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerNotificationsByCreatedPeriod.statusCode, 200);
+  assert.ok(sellerNotificationsByCreatedPeriod.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const sellerNotificationsOutsideCreatedPeriod = await app.inject({
+    method: "GET",
+    url: "/notifications?created_to=2000-01-01T00%3A00%3A00.000Z&page_size=100",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerNotificationsOutsideCreatedPeriod.statusCode, 200);
+  assert.ok(!sellerNotificationsOutsideCreatedPeriod.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const sellerNotificationsByDuePeriod = await app.inject({
+    method: "GET",
+    url: "/notifications?due_from=2030-01-01T00%3A00%3A00.000Z&due_to=2030-01-31T23%3A59%3A59.999Z&page_size=100",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerNotificationsByDuePeriod.statusCode, 200);
+  assert.ok(sellerNotificationsByDuePeriod.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const sellerNotificationsOutsideDuePeriod = await app.inject({
+    method: "GET",
+    url: "/notifications?due_from=2030-02-01T00%3A00%3A00.000Z&page_size=100",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerNotificationsOutsideDuePeriod.statusCode, 200);
+  assert.ok(!sellerNotificationsOutsideDuePeriod.json().items.some((notification: { id: string }) => notification.id === notificationId));
 
   const sdrNotificationScope = await app.inject({
     method: "GET",

@@ -30,6 +30,10 @@ const notificationsQuerySchema = z.object({
   priority: notificationPrioritySchema.optional(),
   status: notificationStatusSchema.optional(),
   source_module: z.string().trim().max(80).optional(),
+  created_from: z.coerce.date().optional(),
+  created_to: z.coerce.date().optional(),
+  due_from: z.coerce.date().optional(),
+  due_to: z.coerce.date().optional(),
 });
 
 const notificationSchema = z.object({
@@ -499,6 +503,12 @@ export async function registerNotificationRoutes(app: FastifyInstance) {
       ...(query.priority ? { priority: query.priority } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.source_module ? { sourceModule: query.source_module } : {}),
+      ...(query.created_from || query.created_to
+        ? { createdAt: { ...(query.created_from ? { gte: query.created_from } : {}), ...(query.created_to ? { lte: query.created_to } : {}) } }
+        : {}),
+      ...(query.due_from || query.due_to
+        ? { dueAt: { ...(query.due_from ? { gte: query.due_from } : {}), ...(query.due_to ? { lte: query.due_to } : {}) } }
+        : {}),
     };
 
     const [items, total] = await Promise.all([
