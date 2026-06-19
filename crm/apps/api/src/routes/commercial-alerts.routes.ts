@@ -29,6 +29,12 @@ import {
 } from "../services/commercial-alert-persistence.js";
 import { COMMERCIAL_BOARD_KEY, type CommercialStageKey } from "../services/commercial-kanban.js";
 import type { CommercialAppointmentStatus, CommercialAppointmentType } from "../services/commercial-appointment.js";
+import {
+  activeStoreUserIdsByRoles,
+  notifyActiveUsers,
+  resolveActiveNotificationsForEntity,
+  type InternalNotificationPriority,
+} from "../services/internal-notifications.js";
 
 type CommercialCardWithLead = Prisma.LeadCardGetPayload<{ include: { lead: true } }>;
 type CommercialAlertWithCard = Prisma.CommercialAlertGetPayload<{ include: { card: { include: { lead: true } } } }>;
@@ -69,6 +75,16 @@ const commercialAlertActionSchema = z
     reason: z.string().trim().max(300).optional(),
   })
   .default({});
+
+const commercialAlertManagementNotificationRoles = ["OWNER_MANAGER", "ADMIN", "ADMINISTRATIVE"] as const;
+const appointmentAlertNotificationTypes: ReadonlySet<CommercialAlertType> = new Set([
+  "visit_confirmation_due",
+  "appointment_upcoming",
+  "no_show_recovery",
+]);
+const commercialAlertNotificationTypes: ReadonlySet<CommercialAlertType> = new Set(
+  COMMERCIAL_ALERT_RULES.map((rule) => rule.type).filter((type) => type !== "follow_up_overdue"),
+);
 
 type CommercialAlertSession = Awaited<ReturnType<typeof requirePermission>>;
 
@@ -283,6 +299,24 @@ async function transitionCommercialAlert(
       reason: input.reason ?? null,
     });
 
+    if (input.toStatus === "RESOLVED" || input.toStatus === "DISMISSED") {
+      const notificationTarget = commercialAlertNotificationTargetFromPersistedAlert(alert);
+      if (notificationTarget) {
+        await tx.notification.updateMany({
+          where: {
+            storeId: session.user.storeId,
+            entityType: notificationTarget.entityType,
+            entityId: notificationTarget.entityId,
+            status: { in: ["NEW", "SEEN"] },
+          },
+          data:
+            input.toStatus === "DISMISSED"
+              ? { status: "DISMISSED", readAt: now, dismissedAt: now, dismissedByUserId: session.user.id }
+              : { status: "RESOLVED", readAt: now, resolvedAt: now, resolvedByUserId: session.user.id },
+        });
+      }
+    }
+
     return updated;
   });
 }
@@ -299,6 +333,91 @@ function enrichCandidate(storeId: string, candidate: CommercialAlertCandidate, c
     targetUserId: candidate.audiences.includes("RESPONSIBLE") ? responsibleUserId : null,
     targetRole: candidate.audiences.includes("MANAGEMENT") ? "MANAGEMENT" : null,
   };
+}
+
+function notificationPriorityFromSeverity(severity: CommercialAlertSeverity): InternalNotificationPriority {
+  return severity;
+}
+
+function commercialAlertNotificationTarget(input: {
+  alertType: CommercialAlertType;
+  appointmentId?: string | null;
+  cardId: string;
+}) {
+  if (!commercialAlertNotificationTypes.has(input.alertType)) {
+    return null;
+  }
+  if (appointmentAlertNotificationTypes.has(input.alertType)) {
+    return input.appointmentId
+      ? {
+          actionUrl: `/commercial-agenda/appointments/${input.appointmentId}`,
+          entityId: input.appointmentId,
+          entityType: input.alertType,
+        }
+      : null;
+  }
+  return {
+    actionUrl: `/commercial-kanban/cards/${input.cardId}`,
+    entityId: input.cardId,
+    entityType: input.alertType,
+  };
+}
+
+function appointmentIdFromMetadata(metadata: Prisma.JsonValue | null | undefined) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+  const appointmentId = (metadata as Prisma.JsonObject).appointmentId;
+  return typeof appointmentId === "string" ? appointmentId : null;
+}
+
+function commercialAlertNotificationTargetFromPersistedAlert(alert: {
+  alertType: string;
+  cardId: string;
+  metadata?: Prisma.JsonValue | null;
+}) {
+  if (!isCommercialAlertType(alert.alertType)) {
+    return null;
+  }
+  return commercialAlertNotificationTarget({
+    alertType: alert.alertType,
+    appointmentId: appointmentIdFromMetadata(alert.metadata),
+    cardId: alert.cardId,
+  });
+}
+
+async function notifyCommercialAlertCandidate(input: {
+  candidate: CommercialAlertCandidate;
+  managementUserIds: string[];
+  persisted: PersistCommercialAlertInput;
+  storeId: string;
+}) {
+  const target = commercialAlertNotificationTarget({
+    alertType: input.candidate.type,
+    appointmentId: input.candidate.appointmentId,
+    cardId: input.candidate.cardId,
+  });
+  if (!target) {
+    return { created: 0, refreshed: 0 };
+  }
+
+  const userIds = [
+    ...(input.candidate.audiences.includes("RESPONSIBLE") ? [input.persisted.responsibleUserId] : []),
+    ...(input.candidate.audiences.includes("MANAGEMENT") ? input.managementUserIds : []),
+  ];
+
+  return notifyActiveUsers({
+    storeId: input.storeId,
+    userIds,
+    title: input.candidate.title,
+    body: `${input.candidate.reason} Acao sugerida: ${input.candidate.suggestedAction}`,
+    entityType: target.entityType,
+    entityId: target.entityId,
+    priority: notificationPriorityFromSeverity(input.candidate.severity),
+    sourceModule: "commercial_alerts",
+    actionUrl: target.actionUrl,
+    dueAt: input.candidate.dueAt,
+  });
 }
 
 async function buildAlertCandidates(storeId: string, now: Date) {
@@ -489,13 +608,18 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
     const candidateKeys = new Set(candidates.map(alertKey));
     let alertsCreated = 0;
     let alertsRefreshed = 0;
+    let notificationsCreated = 0;
+    let notificationsRefreshed = 0;
+    let notificationsFailed = 0;
+    const managementNotificationUserIds = await activeStoreUserIdsByRoles(storeId, commercialAlertManagementNotificationRoles);
 
     for (const candidate of candidates) {
       const card = cardById.get(candidate.cardId);
       if (!card) {
         continue;
       }
-      const result = await persistCommercialAlert(prisma, enrichCandidate(storeId, candidate, card));
+      const persisted = enrichCandidate(storeId, candidate, card);
+      const result = await persistCommercialAlert(prisma, persisted);
       if (result.created) {
         alertsCreated += 1;
         await prisma.auditLog.create({
@@ -519,6 +643,23 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
       } else {
         alertsRefreshed += 1;
       }
+
+      try {
+        const notificationResult = await notifyCommercialAlertCandidate({
+          candidate,
+          managementUserIds: managementNotificationUserIds,
+          persisted,
+          storeId,
+        });
+        notificationsCreated += notificationResult.created;
+        notificationsRefreshed += notificationResult.refreshed;
+      } catch (notificationError) {
+        notificationsFailed += 1;
+        request.log.error(
+          { err: notificationError, alertType: candidate.type, cardId: candidate.cardId },
+          "Falha ao gerar notificacao de alerta comercial",
+        );
+      }
     }
 
     const scannedCardIds = cards.map((card) => card.id);
@@ -530,12 +671,13 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
             alertType: { in: scannedAlertTypes },
             status: { in: [...ACTIVE_COMMERCIAL_ALERT_STATUSES] },
           },
-          select: { id: true, cardId: true, alertType: true, leadId: true, severity: true },
+          select: { id: true, cardId: true, alertType: true, leadId: true, metadata: true, severity: true },
         })
       : [];
     const staleAlerts = activeExisting.filter((alert) => !candidateKeys.has(`${alert.alertType}:${alert.cardId}`));
 
     let alertsResolved = 0;
+    let notificationsResolved = 0;
     if (staleAlerts.length > 0) {
       const staleIds = staleAlerts.map((alert) => alert.id);
       const resolved = await prisma.commercialAlert.updateMany({
@@ -543,6 +685,19 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
         data: { status: "RESOLVED", resolvedAt: now, resolvedByUserId: session.user.id },
       });
       alertsResolved = resolved.count;
+      for (const alert of staleAlerts) {
+        const notificationTarget = commercialAlertNotificationTargetFromPersistedAlert(alert);
+        if (!notificationTarget) {
+          continue;
+        }
+        const notificationResult = await resolveActiveNotificationsForEntity({
+          storeId,
+          entityType: notificationTarget.entityType,
+          entityId: notificationTarget.entityId,
+          resolvedByUserId: session.user.id,
+        });
+        notificationsResolved += notificationResult.count;
+      }
       await prisma.auditLog.createMany({
         data: staleAlerts.map((alert) => ({
           storeId,
@@ -571,6 +726,10 @@ export async function registerCommercialAlertRoutes(app: FastifyInstance) {
         alertsCreated,
         alertsRefreshed,
         alertsResolved,
+        notificationsCreated,
+        notificationsRefreshed,
+        notificationsResolved,
+        notificationsFailed,
         byType: countByType(candidates),
       },
     };

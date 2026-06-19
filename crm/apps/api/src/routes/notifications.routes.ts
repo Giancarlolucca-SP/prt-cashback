@@ -9,6 +9,12 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
+import {
+  COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES,
+  LEAD_CARD_NOTIFICATION_ENTITY_TYPES,
+  isCommercialAppointmentNotificationEntityType,
+  isLeadCardNotificationEntityType,
+} from "../services/internal-notifications.js";
 
 const notificationPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 const notificationStatusSchema = z.enum(["NEW", "SEEN", "RESOLVED", "DISMISSED"]);
@@ -205,8 +211,8 @@ async function buildNotificationContexts(storeId: string, notifications: Notific
   for (const notification of notifications) {
     if (!notification.entityId || !notification.entityType) continue;
     if (notification.entityType === "customer") directCustomerIds.add(notification.entityId);
-    if (notification.entityType === "follow_up_overdue" || notification.entityType === "lead_no_continuity") cardIds.add(notification.entityId);
-    if (notification.entityType === "commercial_appointment_scheduled") appointmentIds.add(notification.entityId);
+    if (isLeadCardNotificationEntityType(notification.entityType)) cardIds.add(notification.entityId);
+    if (isCommercialAppointmentNotificationEntityType(notification.entityType)) appointmentIds.add(notification.entityId);
     if (
       notification.entityType === "commercial_sale_assigned" ||
       notification.entityType === "commercial_sale_documentation_pending" ||
@@ -432,10 +438,8 @@ async function buildNotificationContexts(storeId: string, notifications: Notific
   for (const notification of notifications) {
     if (!notification.entityType || !notification.entityId) continue;
     if (notification.entityType === "customer") setNotificationContext(notification, contextByCustomerId.get(notification.entityId));
-    if (notification.entityType === "follow_up_overdue" || notification.entityType === "lead_no_continuity") {
-      setNotificationContext(notification, contextByCardId.get(notification.entityId));
-    }
-    if (notification.entityType === "commercial_appointment_scheduled") {
+    if (isLeadCardNotificationEntityType(notification.entityType)) setNotificationContext(notification, contextByCardId.get(notification.entityId));
+    if (isCommercialAppointmentNotificationEntityType(notification.entityType)) {
       setNotificationContext(notification, contextByAppointmentId.get(notification.entityId));
     }
     if (
@@ -502,7 +506,7 @@ async function reassignLeadCardFromNotification(
     await tx.notification.updateMany({
       where: {
         storeId: session.user.storeId,
-        entityType: { in: ["follow_up_overdue", "lead_no_continuity"] },
+        entityType: { in: [...LEAD_CARD_NOTIFICATION_ENTITY_TYPES] },
         entityId: card.id,
         userId: previousAssignedUserId,
         status: { in: ["NEW", "SEEN"] },
@@ -605,7 +609,7 @@ async function reassignCommercialAppointmentFromNotification(
     await tx.notification.updateMany({
       where: {
         storeId: session.user.storeId,
-        entityType: notification.entityType,
+        entityType: { in: [...COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES] },
         entityId: appointment.id,
         userId: previousAssignedUserId,
         status: { in: ["NEW", "SEEN"] },
@@ -764,10 +768,10 @@ async function reassignNotificationTarget(
 ): Promise<NotificationReassignment> {
   assertReassignableNotification(notification);
 
-  if (notification.entityType === "follow_up_overdue" || notification.entityType === "lead_no_continuity") {
+  if (isLeadCardNotificationEntityType(notification.entityType)) {
     return reassignLeadCardFromNotification(session, notification, input);
   }
-  if (notification.entityType === "commercial_appointment_scheduled") {
+  if (isCommercialAppointmentNotificationEntityType(notification.entityType)) {
     return reassignCommercialAppointmentFromNotification(session, notification, input);
   }
   if (notification.entityType === "technical_delivery_scheduled" || notification.entityType === "technical_delivery_signed_copy_pending") {

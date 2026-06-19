@@ -10,6 +10,24 @@ export type ActiveNotificationSummary = {
   types: string[];
 };
 
+export const LEAD_CARD_NOTIFICATION_ENTITY_TYPES = [
+  "follow_up_overdue",
+  "lead_no_continuity",
+  "lead_attention",
+  "lead_cooling",
+  "lead_high_risk",
+  "negotiation_stalled",
+  "purchase_confirmation_stalled",
+  "missing_next_action",
+] as const;
+
+export const COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES = [
+  "commercial_appointment_scheduled",
+  "visit_confirmation_due",
+  "appointment_upcoming",
+  "no_show_recovery",
+] as const;
+
 const activeNotificationStatuses = ["NEW", "SEEN"] as const;
 const priorityRank: Record<InternalNotificationPriority, number> = {
   LOW: 1,
@@ -27,6 +45,14 @@ export const emptyActiveNotificationSummary: ActiveNotificationSummary = {
 
 export function notificationEntityKey(entityType: string, entityId: string) {
   return `${entityType}:${entityId}`;
+}
+
+export function isLeadCardNotificationEntityType(entityType?: string | null) {
+  return Boolean(entityType && (LEAD_CARD_NOTIFICATION_ENTITY_TYPES as readonly string[]).includes(entityType));
+}
+
+export function isCommercialAppointmentNotificationEntityType(entityType?: string | null) {
+  return Boolean(entityType && (COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES as readonly string[]).includes(entityType));
 }
 
 export function mergeActiveNotificationSummaries(summaries: Array<ActiveNotificationSummary | null | undefined>): ActiveNotificationSummary {

@@ -10,8 +10,9 @@ import { isFollowUpOverdue } from "../services/commercial-interaction.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import {
+  COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES,
+  LEAD_CARD_NOTIFICATION_ENTITY_TYPES,
   activeNotificationSummaryByEntity,
-  emptyActiveNotificationSummary,
   mergeActiveNotificationSummaries,
   notificationEntityKey,
   type ActiveNotificationSummary,
@@ -304,12 +305,9 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
       activeNotificationSummaryByEntity({
         storeId: session.user.storeId,
         user: session.user,
-        entities: [
-          ...cardIds.flatMap((cardId) => [
-            { entityType: "follow_up_overdue", entityId: cardId },
-            { entityType: "lead_no_continuity", entityId: cardId },
-          ]),
-        ],
+        entities: cardIds.flatMap((cardId) =>
+          LEAD_CARD_NOTIFICATION_ENTITY_TYPES.map((entityType) => ({ entityType, entityId: cardId })),
+        ),
       }),
     ]);
 
@@ -321,10 +319,9 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
     const appointmentNotificationSummaries = await activeNotificationSummaryByEntity({
       storeId: session.user.storeId,
       user: session.user,
-      entities: upcomingCommercialAppointments.map((appointment) => ({
-        entityType: "commercial_appointment_scheduled",
-        entityId: appointment.id,
-      })),
+      entities: upcomingCommercialAppointments.flatMap((appointment) =>
+        COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES.map((entityType) => ({ entityType, entityId: appointment.id })),
+      ),
     });
 
     const nextAppointmentByCard = new Map<string, { id: string; type: string; status: string; startsAt: string; activeNotifications: ActiveNotificationSummary }>();
@@ -335,9 +332,11 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
           type: appointment.type,
           status: appointment.status,
           startsAt: appointment.startsAt.toISOString(),
-          activeNotifications:
-            appointmentNotificationSummaries.get(notificationEntityKey("commercial_appointment_scheduled", appointment.id)) ??
-            emptyActiveNotificationSummary,
+          activeNotifications: mergeActiveNotificationSummaries(
+            COMMERCIAL_APPOINTMENT_NOTIFICATION_ENTITY_TYPES.map((entityType) =>
+              appointmentNotificationSummaries.get(notificationEntityKey(entityType, appointment.id)),
+            ),
+          ),
         });
       }
     }
@@ -351,10 +350,9 @@ export async function registerCommercialKanbanRoutes(app: FastifyInstance) {
         // A future commercial appointment also softens the cooling alert.
         hasFutureSchedule: leadsWithFutureSchedule.has(card.leadId) || nextAppointment !== null,
         nextAppointment,
-        activeNotifications: mergeActiveNotificationSummaries([
-          activeNotificationSummaries.get(notificationEntityKey("follow_up_overdue", card.id)),
-          activeNotificationSummaries.get(notificationEntityKey("lead_no_continuity", card.id)),
-        ]),
+        activeNotifications: mergeActiveNotificationSummaries(
+          LEAD_CARD_NOTIFICATION_ENTITY_TYPES.map((entityType) => activeNotificationSummaries.get(notificationEntityKey(entityType, card.id))),
+        ),
       });
     });
 

@@ -5923,6 +5923,41 @@ try {
   assert.equal(commercialAlertScan.statusCode, 200);
   assert.ok(commercialAlertScan.json().data.alertsCreated >= 1);
   assert.ok(commercialAlertScan.json().data.byType.follow_up_overdue >= 1);
+  assert.ok(commercialAlertScan.json().data.byType.visit_confirmation_due >= 1);
+  assert.ok(commercialAlertScan.json().data.notificationsCreated >= 1);
+  assert.equal(commercialAlertScan.json().data.notificationsFailed, 0);
+
+  const visitConfirmationNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=visit_confirmation_due&entity_id=${soonVisitId}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(visitConfirmationNotifications.statusCode, 200);
+  const visitConfirmationNotification = visitConfirmationNotifications
+    .json()
+    .items.find((notification: { userId: string }) => notification.userId === sdrUserId);
+  assert.ok(visitConfirmationNotification);
+  assert.equal(visitConfirmationNotification.priority, "HIGH");
+  assert.equal(visitConfirmationNotification.sourceModule, "commercial_alerts");
+  assert.equal(visitConfirmationNotification.actionUrl, `/commercial-agenda/appointments/${soonVisitId}`);
+  assert.equal(visitConfirmationNotification.context.appointmentId, soonVisitId);
+  assert.equal(visitConfirmationNotification.context.cardId, agendaCardId);
+  assert.equal(visitConfirmationNotification.context.leadId, interactionLeadId);
+  assert.equal(visitConfirmationNotification.context.customer.id, createdCustomerId);
+  assert.equal(visitConfirmationNotification.context.vehicle.id, inventoryVehicleId);
+  assert.equal(visitConfirmationNotification.context.responsibleUser.id, sdrUserId);
+
+  const cardWithCommercialAlertNotification = await app.inject({
+    method: "GET",
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(agendaCardSource)}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(cardWithCommercialAlertNotification.statusCode, 200);
+  const cardWithVisitConfirmation = cardWithCommercialAlertNotification.json().items.find((card: { id: string }) => card.id === agendaCardId);
+  assert.ok(cardWithVisitConfirmation);
+  assert.equal(cardWithVisitConfirmation.nextAppointment.id, soonVisitId);
+  assert.ok(cardWithVisitConfirmation.nextAppointment.activeNotifications.types.includes("visit_confirmation_due"));
+  assert.equal(cardWithVisitConfirmation.nextAppointment.activeNotifications.highestPriority, "HIGH");
 
   const activeFollowUpAlert = await prisma.commercialAlert.findFirst({
     where: {
