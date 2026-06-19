@@ -979,6 +979,178 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.8fr);
 }
 
+.commercial-dashboard {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.commercial-control-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.commercial-module-tabs {
+  justify-self: flex-start;
+}
+
+.commercial-filter-grid {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(120px, 1fr)) auto;
+}
+
+.commercial-filter-grid label {
+  color: var(--muted);
+  display: grid;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.commercial-filter-grid input,
+.commercial-filter-grid select {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 42px;
+  padding: 9px 10px;
+}
+
+.commercial-filter-grid input:disabled {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.commercial-filter-grid input:focus,
+.commercial-filter-grid select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px var(--ring-soft);
+  outline: none;
+}
+
+.commercial-helper {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.commercial-stage-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.commercial-stage-list {
+  display: grid;
+  gap: 10px;
+}
+
+.commercial-stage-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(160px, 1fr) auto;
+}
+
+.commercial-stage-row span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.commercial-stage-row > div {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.commercial-stage-row i {
+  background: linear-gradient(90deg, var(--teal), var(--blue));
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+}
+
+.commercial-stage-row strong {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 12px;
+  min-width: 34px;
+  padding: 4px 8px;
+  text-align: center;
+}
+
+.commercial-breakdown-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.commercial-breakdown-list {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.commercial-breakdown-list li {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 10px;
+}
+
+.commercial-breakdown-list span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.commercial-breakdown-list strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.commercial-state-panel {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.commercial-state-panel svg {
+  color: var(--blue);
+  flex: 0 0 auto;
+}
+
+.commercial-state-panel.warning svg {
+  color: var(--amber);
+}
+
+.commercial-state-panel strong,
+.commercial-state-panel span {
+  display: block;
+}
+
+.commercial-state-panel span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
 .text-button {
   background: var(--ink);
   border: 0;
@@ -5723,7 +5895,8 @@ html[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
   .metric-grid,
   .profile-grid,
   .chart-zone,
-  .decision-strip {
+  .decision-strip,
+  .commercial-stage-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5766,6 +5939,11 @@ html[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
   }
 
   .period-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .commercial-filter-grid,
+  .commercial-breakdown-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5971,6 +6149,9 @@ html[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
   .chart-zone,
   .decision-strip,
   .kanban,
+  .commercial-filter-grid,
+  .commercial-stage-grid,
+  .commercial-breakdown-grid,
   .customer-access-panel,
   .admin-action-grid,
   .period-filter-grid,
@@ -6125,5 +6306,14 @@ html[data-theme="dark"] .recharts-tooltip-wrapper .recharts-default-tooltip {
 
   .login-hero-copy h1 {
     font-size: 2.25rem;
+  }
+
+  .commercial-stage-row {
+    align-items: stretch;
+    grid-template-columns: 1fr auto;
+  }
+
+  .commercial-stage-row > div {
+    grid-column: 1 / -1;
   }
 }
