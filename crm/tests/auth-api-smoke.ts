@@ -4170,7 +4170,11 @@ try {
     },
   });
   assert.equal(sellerTechnicalDeliveries.statusCode, 200);
-  assert.ok(sellerTechnicalDeliveries.json().items.some((delivery: { id: string }) => delivery.id === technicalDeliveryId));
+  const sellerTechnicalDeliveryItem = sellerTechnicalDeliveries.json().items.find((delivery: { id: string }) => delivery.id === technicalDeliveryId);
+  assert.ok(sellerTechnicalDeliveryItem);
+  assert.equal(sellerTechnicalDeliveryItem.activeNotifications.count, 1);
+  assert.equal(sellerTechnicalDeliveryItem.activeNotifications.highestPriority, "HIGH");
+  assert.ok(sellerTechnicalDeliveryItem.activeNotifications.types.includes("technical_delivery_scheduled"));
 
   const rescheduledTechnicalDeliveryAt = new Date(new Date(financeDueAt).getTime() + 10800000).toISOString();
   const rescheduleTechnicalDelivery = await app.inject({
@@ -4338,6 +4342,16 @@ try {
   assert.equal(printTechnicalDelivery.json().data.printStatus, "PRINTED");
   assert.equal(printTechnicalDelivery.json().print.mode, "manual_pdf");
 
+  const ownerTechnicalDeliveryWithPendingNotification = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries/${technicalDeliveryId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownerTechnicalDeliveryWithPendingNotification.statusCode, 200);
+  assert.ok(ownerTechnicalDeliveryWithPendingNotification.json().data.activeNotifications.count >= 2);
+  assert.equal(ownerTechnicalDeliveryWithPendingNotification.json().data.activeNotifications.highestPriority, "HIGH");
+  assert.ok(ownerTechnicalDeliveryWithPendingNotification.json().data.activeNotifications.types.includes("technical_delivery_signed_copy_pending"));
+
   const signedCopyPendingNotification = await app.inject({
     method: "GET",
     url: `/notifications?entity_type=technical_delivery_signed_copy_pending&entity_id=${technicalDeliveryId}&status=NEW&page_size=100`,
@@ -4418,6 +4432,14 @@ try {
       .json()
       .items.some((notification: { resolvedByUserId: string; status: string }) => notification.status === "RESOLVED" && notification.resolvedByUserId === administrativeBody.user.id),
   );
+
+  const sellerCompletedTechnicalDelivery = await app.inject({
+    method: "GET",
+    url: `/technical-deliveries/${technicalDeliveryId}`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerCompletedTechnicalDelivery.statusCode, 200);
+  assert.equal(sellerCompletedTechnicalDelivery.json().data.activeNotifications.count, 0);
 
   const signedCopyVehicleLink = await prisma.fileAttachmentLink.findFirst({
     where: {
@@ -5256,6 +5278,9 @@ try {
   assert.ok(agendaCardView);
   assert.equal(agendaCardView.nextAppointment.id, appointmentId);
   assert.equal(agendaCardView.nextAppointment.type, "VISIT");
+  assert.equal(agendaCardView.nextAppointment.activeNotifications.count, 1);
+  assert.equal(agendaCardView.nextAppointment.activeNotifications.highestPriority, "HIGH");
+  assert.ok(agendaCardView.nextAppointment.activeNotifications.types.includes("commercial_appointment_scheduled"));
 
   // Scope: SDR sees own agenda; another seller does not.
   const sdrAgenda = await app.inject({
@@ -5651,6 +5676,18 @@ try {
   assert.equal(projectedCard.lastInteractionType, "CONTACT_ATTEMPT");
   assert.equal(projectedCard.followUpOverdue, true);
 
+  const ownerCardWithInteraction = await app.inject({
+    method: "GET",
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(agendaCardSource)}&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownerCardWithInteraction.statusCode, 200);
+  const ownerProjectedCard = ownerCardWithInteraction.json().items.find((card: { id: string }) => card.id === agendaCardId);
+  assert.ok(ownerProjectedCard);
+  assert.ok(ownerProjectedCard.activeNotifications.count >= 1);
+  assert.equal(ownerProjectedCard.activeNotifications.highestPriority, "CRITICAL");
+  assert.ok(ownerProjectedCard.activeNotifications.types.includes("follow_up_overdue"));
+
   // Multi follow-up projection (review fix #1): the card reflects the EARLIEST pending follow-up,
   // and resolving one pending follow-up must not hide the other.
   const multiFollowUpSource = uniqueToken("multi-follow-up");
@@ -6035,7 +6072,11 @@ try {
     headers: { authorization: `Bearer ${sellerInventoryToken}` },
   });
   assert.equal(sellerSalesList.statusCode, 200);
-  assert.ok(sellerSalesList.json().items.some((sale: { id: string }) => sale.id === transferredSaleId));
+  const transferredSaleListItem = sellerSalesList.json().items.find((sale: { id: string }) => sale.id === transferredSaleId);
+  assert.ok(transferredSaleListItem);
+  assert.ok(transferredSaleListItem.activeNotifications.count >= 1);
+  assert.equal(transferredSaleListItem.activeNotifications.highestPriority, "HIGH");
+  assert.ok(transferredSaleListItem.activeNotifications.types.includes("commercial_sale_assigned"));
 
   // --- Operate sales (S2-US04 stage 3): negotiation, own-financing alert, initial docs, LOST ---
   const updateNegotiation = await app.inject({
@@ -6163,6 +6204,17 @@ try {
   });
   assert.equal(sellerDocumentationNotificationScope.statusCode, 200);
   assert.equal(sellerDocumentationNotificationScope.json().items.length, 0);
+
+  const ownerCommercialSaleDetail = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownerCommercialSaleDetail.statusCode, 200);
+  assert.ok(ownerCommercialSaleDetail.json().data.activeNotifications.count >= 2);
+  assert.equal(ownerCommercialSaleDetail.json().data.activeNotifications.highestPriority, "CRITICAL");
+  assert.ok(ownerCommercialSaleDetail.json().data.activeNotifications.types.includes("commercial_sale_documentation_pending"));
+  assert.ok(ownerCommercialSaleDetail.json().data.activeNotifications.types.includes("own_financing_alert"));
 
   // Closing again is blocked.
   const reClose = await app.inject({
@@ -6418,6 +6470,25 @@ try {
   });
   assert.equal(sellerNotificationSummary.statusCode, 200);
   assert.ok(sellerNotificationSummary.json().data.unread >= 1);
+
+  const sdrOpenSellerNotification = await app.inject({
+    method: "POST",
+    url: `/notifications/${notificationId}/open`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrOpenSellerNotification.statusCode, 404);
+
+  const openNotification = await app.inject({
+    method: "POST",
+    url: `/notifications/${notificationId}/open`,
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(openNotification.statusCode, 200);
+  assert.equal(openNotification.json().data.status, "SEEN");
+  assert.ok(openNotification.json().data.readAt);
+  assert.equal(openNotification.json().target.actionUrl, `/customers/${createdCustomerId}`);
+  assert.equal(openNotification.json().target.entityType, "customer");
+  assert.equal(openNotification.json().target.entityId, createdCustomerId);
 
   const readNotification = await app.inject({
     method: "POST",

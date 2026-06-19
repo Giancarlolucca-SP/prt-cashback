@@ -22,7 +22,16 @@ import {
   TECHNICAL_DELIVERY_SIGNED_COPY_PURPOSE,
   technicalDeliveryLinkTargets,
 } from "../services/technical-delivery-attachments.js";
-import { activeStoreUserIdsByRoles, notifyActiveUsers, resolveActiveNotificationsForEntity } from "../services/internal-notifications.js";
+import {
+  activeNotificationSummaryByEntity,
+  activeStoreUserIdsByRoles,
+  emptyActiveNotificationSummary,
+  mergeActiveNotificationSummaries,
+  notificationEntityKey,
+  notifyActiveUsers,
+  resolveActiveNotificationsForEntity,
+  type ActiveNotificationSummary,
+} from "../services/internal-notifications.js";
 
 const deliveryStatusSchema = z.enum([
   "AWAITING_PREREQUISITES",
@@ -154,7 +163,14 @@ function resolveChecklist(snapshot: unknown): TechnicalDeliveryChecklistItem[] {
   return defaultTechnicalDeliveryChecklist;
 }
 
-function sanitizeTechnicalDelivery(delivery: TechnicalDeliveryRecord) {
+function technicalDeliveryActiveNotificationSummary(summaryByEntity: Map<string, ActiveNotificationSummary>, deliveryId: string) {
+  return mergeActiveNotificationSummaries([
+    summaryByEntity.get(notificationEntityKey("technical_delivery_scheduled", deliveryId)),
+    summaryByEntity.get(notificationEntityKey("technical_delivery_signed_copy_pending", deliveryId)),
+  ]);
+}
+
+function sanitizeTechnicalDelivery(delivery: TechnicalDeliveryRecord, activeNotifications: ActiveNotificationSummary = emptyActiveNotificationSummary) {
   return {
     id: delivery.id,
     saleId: delivery.saleId,
@@ -176,6 +192,7 @@ function sanitizeTechnicalDelivery(delivery: TechnicalDeliveryRecord) {
     cancelReason: delivery.cancelReason,
     createdAt: delivery.createdAt.toISOString(),
     updatedAt: delivery.updatedAt.toISOString(),
+    activeNotifications,
   };
 }
 
@@ -365,8 +382,17 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       prisma.technicalDelivery.findMany({ where, orderBy: { scheduledAt: "asc" }, skip, take }),
       prisma.technicalDelivery.count({ where }),
     ]);
+    const deliveryIds = items.map((delivery) => delivery.id);
+    const activeNotificationSummaries = await activeNotificationSummaryByEntity({
+      storeId: session.user.storeId,
+      user: session.user,
+      entities: deliveryIds.flatMap((deliveryId) => [
+        { entityType: "technical_delivery_scheduled", entityId: deliveryId },
+        { entityType: "technical_delivery_signed_copy_pending", entityId: deliveryId },
+      ]),
+    });
 
-    return listResponse(items.map(sanitizeTechnicalDelivery), query, total);
+    return listResponse(items.map((delivery) => sanitizeTechnicalDelivery(delivery, technicalDeliveryActiveNotificationSummary(activeNotificationSummaries, delivery.id))), query, total);
   });
 
   app.get("/:id", async (request) => {
@@ -389,7 +415,16 @@ export async function registerTechnicalDeliveryRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Entrega tecnica nao encontrada.");
     }
 
-    return { data: sanitizeTechnicalDelivery(delivery) };
+    const activeNotificationSummaries = await activeNotificationSummaryByEntity({
+      storeId: session.user.storeId,
+      user: session.user,
+      entities: [
+        { entityType: "technical_delivery_scheduled", entityId: delivery.id },
+        { entityType: "technical_delivery_signed_copy_pending", entityId: delivery.id },
+      ],
+    });
+
+    return { data: sanitizeTechnicalDelivery(delivery, technicalDeliveryActiveNotificationSummary(activeNotificationSummaries, delivery.id)) };
   });
 
   app.post("/schedule", async (request, reply) => {

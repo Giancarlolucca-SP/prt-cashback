@@ -236,6 +236,39 @@ export async function registerNotificationRoutes(app: FastifyInstance) {
     return { data: sanitizeNotification(notification) };
   });
 
+  app.post("/:id/open", async (request) => {
+    const session = await requireAuth(request);
+    const params = notificationParamsSchema.parse(request.params);
+    const current = await getNotificationOrThrow(session.user.storeId, session.user, params.id);
+    if (!current.actionUrl) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Notificacao nao possui destino interno para abrir.");
+    }
+
+    const notification = await prisma.notification.update({
+      where: { id: current.id },
+      data: { readAt: current.readAt ?? new Date(), status: current.status === "NEW" ? "SEEN" : current.status },
+    });
+
+    await emitInternalEvent({
+      name: "notification.read",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "notification",
+      entityId: notification.id,
+      payload: { userId: notification.userId, opened: true, actionUrl: notification.actionUrl ?? "" },
+    });
+
+    return {
+      data: sanitizeNotification(notification),
+      target: {
+        actionUrl: notification.actionUrl,
+        entityType: notification.entityType,
+        entityId: notification.entityId,
+        sourceModule: notification.sourceModule,
+      },
+    };
+  });
+
   app.post("/:id/resolve", async (request) => {
     const session = await requireAuth(request);
     const params = notificationParamsSchema.parse(request.params);

@@ -519,7 +519,7 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
     const candidateCardIds = [...new Set(alerts.map((alert) => alert.cardId))];
     const existing = candidateCardIds.length
       ? await prisma.notification.findMany({
-          where: { storeId, entityType: { in: [...COMMERCIAL_NOTIFICATION_TYPES] }, entityId: { in: candidateCardIds } },
+          where: { storeId, entityType: { in: [...COMMERCIAL_NOTIFICATION_TYPES] }, entityId: { in: candidateCardIds }, status: { in: ["NEW", "SEEN"] } },
           select: { entityType: true, entityId: true },
         })
       : [];
@@ -545,6 +545,9 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
           body: `Card comercial ${alert.cardId} requer atencao da gestao.`,
           entityType: alert.type,
           entityId: alert.cardId,
+          priority: alert.type === "follow_up_overdue" ? "CRITICAL" : "HIGH",
+          sourceModule: "commercial_interactions",
+          actionUrl: `/commercial-kanban/cards/${alert.cardId}`,
         })),
       });
       notificationsCreated += recipients.length;

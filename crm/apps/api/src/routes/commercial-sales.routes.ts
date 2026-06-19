@@ -9,7 +9,15 @@ import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
-import { activeStoreUserIdsByRoles, notifyActiveUsers } from "../services/internal-notifications.js";
+import {
+  activeNotificationSummaryByEntity,
+  activeStoreUserIdsByRoles,
+  emptyActiveNotificationSummary,
+  mergeActiveNotificationSummaries,
+  notificationEntityKey,
+  notifyActiveUsers,
+  type ActiveNotificationSummary,
+} from "../services/internal-notifications.js";
 import {
   CUSTOMER_ARRIVAL_STATUSES,
   canCloseDeal,
@@ -114,7 +122,15 @@ const OWN_FINANCING_ALERT_TYPE = "own_financing_alert";
 
 type SaleRecord = Prisma.SaleGetPayload<Record<string, never>>;
 
-function sanitizeSale(sale: SaleRecord, stageKey: string | null) {
+function saleActiveNotificationSummary(summaryByEntity: Map<string, ActiveNotificationSummary>, saleId: string) {
+  return mergeActiveNotificationSummaries([
+    summaryByEntity.get(notificationEntityKey("commercial_sale_assigned", saleId)),
+    summaryByEntity.get(notificationEntityKey("commercial_sale_documentation_pending", saleId)),
+    summaryByEntity.get(notificationEntityKey(OWN_FINANCING_ALERT_TYPE, saleId)),
+  ]);
+}
+
+function sanitizeSale(sale: SaleRecord, stageKey: string | null, activeNotifications: ActiveNotificationSummary = emptyActiveNotificationSummary) {
   return {
     id: sale.id,
     customerId: sale.customerId,
@@ -133,6 +149,7 @@ function sanitizeSale(sale: SaleRecord, stageKey: string | null) {
     closedAt: sale.closedAt?.toISOString() ?? null,
     createdAt: sale.createdAt.toISOString(),
     updatedAt: sale.updatedAt.toISOString(),
+    activeNotifications,
   };
 }
 
@@ -363,8 +380,18 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       ? await prisma.saleCard.findMany({ where: { saleId: { in: items.map((sale) => sale.id) } }, select: { saleId: true, stageKey: true } })
       : [];
     const stageBySaleId = new Map(cards.map((card) => [card.saleId, card.stageKey]));
+    const saleIds = items.map((sale) => sale.id);
+    const activeNotificationSummaries = await activeNotificationSummaryByEntity({
+      storeId: session.user.storeId,
+      user: session.user,
+      entities: saleIds.flatMap((saleId) => [
+        { entityType: "commercial_sale_assigned", entityId: saleId },
+        { entityType: "commercial_sale_documentation_pending", entityId: saleId },
+        { entityType: OWN_FINANCING_ALERT_TYPE, entityId: saleId },
+      ]),
+    });
 
-    return listResponse(items.map((sale) => sanitizeSale(sale, stageBySaleId.get(sale.id) ?? null)), query, total);
+    return listResponse(items.map((sale) => sanitizeSale(sale, stageBySaleId.get(sale.id) ?? null, saleActiveNotificationSummary(activeNotificationSummaries, sale.id))), query, total);
   });
 
   app.get("/:id", async (request) => {
@@ -387,7 +414,16 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       throw new ApiError("NOT_FOUND", "Processo de vendas nao encontrado.");
     }
     const card = await prisma.saleCard.findFirst({ where: { saleId: sale.id }, select: { stageKey: true } });
-    return { data: sanitizeSale(sale, card?.stageKey ?? null) };
+    const activeNotificationSummaries = await activeNotificationSummaryByEntity({
+      storeId: session.user.storeId,
+      user: session.user,
+      entities: [
+        { entityType: "commercial_sale_assigned", entityId: sale.id },
+        { entityType: "commercial_sale_documentation_pending", entityId: sale.id },
+        { entityType: OWN_FINANCING_ALERT_TYPE, entityId: sale.id },
+      ],
+    });
+    return { data: sanitizeSale(sale, card?.stageKey ?? null, saleActiveNotificationSummary(activeNotificationSummaries, sale.id)) };
   });
 
   app.post("/transfer", async (request, reply) => {
