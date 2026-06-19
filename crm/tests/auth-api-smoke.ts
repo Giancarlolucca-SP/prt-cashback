@@ -5909,7 +5909,7 @@ try {
   // The transferred sale is visible to the seller (own scope).
   const sellerSalesList = await app.inject({
     method: "GET",
-    url: "/commercial-sales?page_size=100",
+    url: `/commercial-sales?customer_id=${createdCustomerId}&vehicle_id=${inventoryVehicleId}&page_size=100`,
     headers: { authorization: `Bearer ${sellerInventoryToken}` },
   });
   assert.equal(sellerSalesList.statusCode, 200);
@@ -6155,7 +6155,7 @@ try {
 
   const sellerCommercialSalesDocumentation = await app.inject({
     method: "GET",
-    url: "/commercial-sales?status=DOCUMENTATION&page_size=100",
+    url: `/commercial-sales?status=DOCUMENTATION&customer_id=${createdCustomerId}&vehicle_id=${inventoryVehicleId}&page_size=100`,
     headers: { authorization: `Bearer ${sellerInventoryToken}` },
   });
   assert.equal(sellerCommercialSalesDocumentation.statusCode, 200);
@@ -6163,7 +6163,7 @@ try {
 
   const managerCommercialSalesDocumentation = await app.inject({
     method: "GET",
-    url: "/commercial-sales?status=DOCUMENTATION&page_size=100",
+    url: `/commercial-sales?status=DOCUMENTATION&customer_id=${createdCustomerId}&vehicle_id=${inventoryVehicleId}&page_size=100`,
     headers: { authorization: `Bearer ${ownerBody.token}` },
   });
   assert.equal(managerCommercialSalesDocumentation.statusCode, 200);
@@ -6171,7 +6171,7 @@ try {
 
   const managementTechnicalDeliveryQueue = await app.inject({
     method: "GET",
-    url: "/technical-deliveries?status=SCHEDULED&page_size=100",
+    url: `/technical-deliveries?status=SCHEDULED&sale_id=${transferredSaleId}&page_size=100`,
     headers: { authorization: `Bearer ${administrativeBody.token}` },
   });
   assert.equal(managementTechnicalDeliveryQueue.statusCode, 200);
