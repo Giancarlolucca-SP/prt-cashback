@@ -8,6 +8,12 @@ import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
 import { isAddressProofExpired, isAddressProofItem } from "../services/sale-document-checklist.js";
 import { PAYMENT_RELEASED_STATUS } from "../services/sale-payment-check.js";
+import {
+  SALE_INSPECTION_REPORT_STATUSES,
+  requiredSaleInspectionReportBlockers,
+  summarizeSaleInspectionReports,
+  type SaleInspectionReportStatus,
+} from "../services/sale-inspection-report.js";
 
 const contractQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -37,6 +43,9 @@ const signatureProviderSchema = z.enum(["GOV_BR", "CDT_DIGITAL", "E_NOTARIADO", 
 const signaturePartyStatusSchema = z.enum(["PENDING", "AWAITING", "SIGNED", "REJECTED", "NOT_APPLICABLE"] as const);
 const vehicleTransferModeSchema = z.enum(["CDT_DIGITAL", "E_NOTARIADO", "CARTORIO_FISICO", "MANUAL", "NOT_DEFINED"] as const);
 const atpveStatusSchema = z.enum(["NOT_STARTED", "PENDING", "SENT", "SIGNED_SELLER", "SIGNED_BUYER", "COMPLETED", "BLOCKED", "NOT_APPLICABLE"] as const);
+const inspectionReportTypeSchema = z.enum(["CAUTIONARY", "TRANSFER"] as const);
+const inspectionReportStatusSchema = z.enum(SALE_INSPECTION_REPORT_STATUSES);
+const inspectionExportActionSchema = z.enum(["VIEW", "DOWNLOAD", "PRINT"] as const);
 
 const generateContractSchema = z.object({
   saleId: z.string().uuid(),
@@ -96,6 +105,47 @@ const registerSignedPackageSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
 });
 
+const inspectionReportQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  sale_id: z.string().uuid().optional(),
+  vehicle_id: z.string().uuid().optional(),
+  report_type: inspectionReportTypeSchema.optional(),
+  status: inspectionReportStatusSchema.optional(),
+});
+
+const inspectionReportParamsSchema = z.object({ id: z.string().uuid() });
+
+const updateInspectionReportSchema = z
+  .object({
+    status: inspectionReportStatusSchema.optional(),
+    reportFileId: z.string().uuid().nullable().optional(),
+    reportDate: z.coerce.date().nullable().optional(),
+    serviceProviderId: z.string().uuid().nullable().optional(),
+    requestedByCustomer: z.boolean().optional(),
+    notes: z.string().trim().max(1000).nullable().optional(),
+    replacementReason: z.string().trim().max(500).nullable().optional(),
+    rejectionReason: z.string().trim().max(500).nullable().optional(),
+    waiverReason: z.string().trim().max(500).nullable().optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Informe ao menos um campo para atualizar.",
+  })
+  .superRefine((input, ctx) => {
+    if (input.status === "REJECTED" && !input.rejectionReason && !input.notes) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe motivo/observacao para recusar laudo.", path: ["rejectionReason"] });
+    }
+    if (input.status === "WAIVED" && !input.waiverReason && !input.notes) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe justificativa para dispensar laudo.", path: ["waiverReason"] });
+    }
+  });
+
+const exportInspectionReportSchema = z.object({
+  action: inspectionExportActionSchema,
+  requestedByCustomer: z.boolean().default(false),
+  notes: z.string().trim().max(500).optional(),
+});
+
 const contractParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -130,6 +180,7 @@ type ContractRecord = {
 
 type ContractPackageRecord = Prisma.ContractDocumentPackageGetPayload<Record<string, never>>;
 type SaleRecord = Prisma.SaleGetPayload<Record<string, never>>;
+type SaleInspectionReportRecord = Prisma.SaleInspectionReportGetPayload<Record<string, never>>;
 
 function sanitizeContract(contract: ContractRecord) {
   return {
@@ -173,6 +224,39 @@ function sanitizeContractPackage(item: ContractPackageRecord) {
     reviewNotes: item.reviewNotes,
     signatureHash: item.signatureHash,
     guidance: item.guidance,
+    metadata: item.metadata,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeInspectionReport(item: SaleInspectionReportRecord) {
+  return {
+    id: item.id,
+    saleId: item.saleId,
+    vehicleId: item.vehicleId,
+    customerId: item.customerId,
+    reportType: item.reportType,
+    status: item.status,
+    isRequired: item.isRequired,
+    reportFileId: item.reportFileId,
+    reportDate: item.reportDate?.toISOString() ?? null,
+    attachedByUserId: item.attachedByUserId,
+    attachedAt: item.attachedAt?.toISOString() ?? null,
+    checkedByUserId: item.checkedByUserId,
+    checkedAt: item.checkedAt?.toISOString() ?? null,
+    serviceProviderId: item.serviceProviderId,
+    requestedByCustomer: item.requestedByCustomer,
+    printedAt: item.printedAt?.toISOString() ?? null,
+    printedByUserId: item.printedByUserId,
+    exportedAt: item.exportedAt?.toISOString() ?? null,
+    exportedByUserId: item.exportedByUserId,
+    retentionUntil: item.retentionUntil?.toISOString() ?? null,
+    deleteAfterRetentionStatus: item.deleteAfterRetentionStatus,
+    replacementReason: item.replacementReason,
+    rejectionReason: item.rejectionReason,
+    waiverReason: item.waiverReason,
+    notes: item.notes,
     metadata: item.metadata,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
@@ -281,6 +365,16 @@ async function ensureAttachmentInStore(storeId: string, attachmentId: string | n
   }
 }
 
+async function ensureServiceProviderInStore(storeId: string, providerId: string | null | undefined) {
+  if (!providerId) {
+    return;
+  }
+  const provider = await prisma.serviceProvider.findFirst({ where: { id: providerId, storeId, deletedAt: null }, select: { id: true } });
+  if (!provider) {
+    throw new ApiError("NOT_FOUND", "Prestador do laudo nao encontrado.");
+  }
+}
+
 async function ensureContractBelongsToSale(storeId: string, contractId: string | null | undefined, saleId: string) {
   if (!contractId) {
     return null;
@@ -332,6 +426,17 @@ function ensureSaleLinksReadyForContractPackage(sale: SaleRecord) {
 
   if (missing.length > 0) {
     throw new ApiError("BUSINESS_RULE_ERROR", "Pacote contratual bloqueado: venda incompleta.", { missing });
+  }
+}
+
+async function ensureInspectionReportsReadyForSale(storeId: string, saleId: string) {
+  const reports = await prisma.saleInspectionReport.findMany({
+    where: { storeId, saleId, isRequired: true },
+    select: { reportType: true, status: true, isRequired: true },
+  });
+  const pendingInspectionReports = requiredSaleInspectionReportBlockers(reports);
+  if (pendingInspectionReports.length > 0) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Operacao bloqueada por laudo obrigatorio pendente.", { pendingInspectionReports });
   }
 }
 
@@ -422,6 +527,58 @@ async function linkPackageAttachments(
   if (links.length > 0) {
     await tx.fileAttachmentLink.createMany({ data: links, skipDuplicates: true });
   }
+}
+
+async function linkInspectionReportAttachment(
+  tx: Prisma.TransactionClient,
+  input: {
+    storeId: string;
+    report: SaleInspectionReportRecord;
+    attachmentId: string;
+  },
+) {
+  const targets = [
+    { entityType: "sale", entityId: input.report.saleId },
+    { entityType: "vehicle", entityId: input.report.vehicleId },
+    input.report.customerId ? { entityType: "customer", entityId: input.report.customerId } : null,
+  ].filter((item): item is { entityType: string; entityId: string } => Boolean(item));
+
+  await tx.fileAttachmentLink.createMany({
+    data: targets.map((target) => ({
+      storeId: input.storeId,
+      attachmentId: input.attachmentId,
+      entityType: target.entityType,
+      entityId: target.entityId,
+      purpose: input.report.reportType === "CAUTIONARY" ? "cautionary_report" : "transfer_report",
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function loadInspectionReportForRead(storeId: string, reportId: string, user: { id: string; role: string }) {
+  const report = await prisma.saleInspectionReport.findFirst({ where: { id: reportId, storeId } });
+  if (!report) {
+    throw new ApiError("NOT_FOUND", "Laudo da venda nao encontrado.");
+  }
+
+  if (user.role === "SELLER" || user.role === "SDR") {
+    const sale = await prisma.sale.findFirst({ where: { id: report.saleId, storeId, deletedAt: null }, select: { sellerUserId: true } });
+    if (!sale || sale.sellerUserId !== user.id) {
+      throw new ApiError("NOT_FOUND", "Laudo da venda nao encontrado.");
+    }
+  }
+
+  return report;
+}
+
+function assertReportWaiverAllowed(role: string, status: SaleInspectionReportStatus | undefined) {
+  if (status !== "WAIVED") {
+    return;
+  }
+  if (role === "OWNER_MANAGER" || role === "ADMIN") {
+    return;
+  }
+  throw new ApiError("FORBIDDEN", "Dispensa de laudo obrigatorio exige gestor/administrador.");
 }
 
 export async function registerContractRoutes(app: FastifyInstance) {
@@ -618,6 +775,7 @@ export async function registerContractRoutes(app: FastifyInstance) {
     }
 
     await ensureBuyerDocumentsReadyForContract(session.user.storeId, sale);
+    await ensureInspectionReportsReadyForSale(session.user.storeId, sale.id);
     const currentMetadata = typeof current.metadata === "object" && current.metadata ? current.metadata : {};
     const requirePaymentBeforeSignature = Boolean(
       input.metadata?.requirePaymentBeforeSignature ?? (currentMetadata as Record<string, unknown>).requirePaymentBeforeSignature,
@@ -769,6 +927,198 @@ export async function registerContractRoutes(app: FastifyInstance) {
     return { data: sanitizeContractPackage(item) };
   });
 
+  app.get("/inspection-reports", async (request) => {
+    const session = await requirePermission(request, {
+      module: "documents",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "documents",
+    });
+    const query = inspectionReportQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const where = {
+      storeId: session.user.storeId,
+      ...(query.sale_id ? { saleId: query.sale_id } : {}),
+      ...(query.vehicle_id ? { vehicleId: query.vehicle_id } : {}),
+      ...(query.report_type ? { reportType: query.report_type } : {}),
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [items, total, allForSummary] = await Promise.all([
+      prisma.saleInspectionReport.findMany({ where, orderBy: [{ reportType: "asc" }, { createdAt: "desc" }], skip, take }),
+      prisma.saleInspectionReport.count({ where }),
+      prisma.saleInspectionReport.findMany({ where }),
+    ]);
+
+    return {
+      ...listResponse(items.map(sanitizeInspectionReport), query, total),
+      summary: summarizeSaleInspectionReports(allForSummary),
+    };
+  });
+
+  app.get("/inspection-reports/:id", async (request) => {
+    const session = await requirePermission(request, {
+      module: "documents",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "documents",
+    });
+    const params = inspectionReportParamsSchema.parse(request.params);
+    const report = await loadInspectionReportForRead(session.user.storeId, params.id, session.user);
+    return { data: sanitizeInspectionReport(report) };
+  });
+
+  app.patch("/inspection-reports/:id", async (request) => {
+    const session = await requirePermission(request, {
+      module: "documents",
+      action: "manage",
+      scope: "STORE",
+      sensitiveArea: "documents",
+    });
+    const params = inspectionReportParamsSchema.parse(request.params);
+    const input = updateInspectionReportSchema.parse(request.body);
+    const current = await prisma.saleInspectionReport.findFirst({ where: { id: params.id, storeId: session.user.storeId } });
+    if (!current) {
+      throw new ApiError("NOT_FOUND", "Laudo da venda nao encontrado.");
+    }
+
+    assertReportWaiverAllowed(session.user.role, input.status as SaleInspectionReportStatus | undefined);
+    await ensureAttachmentInStore(session.user.storeId, input.reportFileId);
+    await ensureServiceProviderInStore(session.user.storeId, input.serviceProviderId);
+
+    if (input.reportFileId && current.reportFileId && input.reportFileId !== current.reportFileId && !input.replacementReason) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Substituicao de laudo exige justificativa.", { missing: ["replacement_reason"] });
+    }
+
+    const explicitStatus = input.status as SaleInspectionReportStatus | undefined;
+    const nextReportFileId = input.reportFileId === undefined ? current.reportFileId : input.reportFileId;
+    const nextStatus = explicitStatus ?? (input.reportFileId ? "ATTACHED" : (current.status as SaleInspectionReportStatus));
+    if (nextStatus === "CHECKED" && !nextReportFileId) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Laudo conferido exige arquivo anexado.", { missing: ["report_file_id"] });
+    }
+
+    const now = new Date();
+    const reportDate = input.reportDate === undefined ? current.reportDate : input.reportDate;
+    const retentionUntil =
+      current.reportType === "CAUTIONARY" && (input.reportFileId || input.reportDate)
+        ? new Date((reportDate ?? now).getTime() + 730 * 24 * 60 * 60 * 1000)
+        : undefined;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.saleInspectionReport.update({
+        where: { id: current.id },
+        data: {
+          status: nextStatus,
+          reportFileId: input.reportFileId === undefined ? undefined : input.reportFileId,
+          reportDate: input.reportDate === undefined ? undefined : input.reportDate,
+          attachedByUserId: input.reportFileId ? session.user.id : undefined,
+          attachedAt: input.reportFileId ? now : undefined,
+          checkedByUserId: nextStatus === "CHECKED" ? session.user.id : nextStatus === "WAIVED" ? session.user.id : undefined,
+          checkedAt: nextStatus === "CHECKED" || nextStatus === "WAIVED" ? now : undefined,
+          serviceProviderId: input.serviceProviderId === undefined ? undefined : input.serviceProviderId,
+          requestedByCustomer: input.requestedByCustomer,
+          retentionUntil,
+          deleteAfterRetentionStatus: retentionUntil ? "PENDING_POLICY_REVIEW" : undefined,
+          replacementReason: input.replacementReason === undefined ? undefined : input.replacementReason,
+          rejectionReason: input.rejectionReason === undefined ? undefined : input.rejectionReason,
+          waiverReason: input.waiverReason === undefined ? undefined : input.waiverReason,
+          notes: input.notes === undefined ? undefined : input.notes,
+        },
+      });
+
+      if (input.reportFileId) {
+        await linkInspectionReportAttachment(tx, { storeId: session.user.storeId, report: next, attachmentId: input.reportFileId });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "documents",
+          action: "sale_inspection_report_updated",
+          entityType: "sale_inspection_report",
+          entityId: next.id,
+          result: "SUCCESS",
+          metadata: {
+            saleId: next.saleId,
+            vehicleId: next.vehicleId,
+            reportType: next.reportType,
+            fromStatus: current.status,
+            toStatus: next.status,
+            reportFileId: next.reportFileId,
+          },
+        },
+      });
+
+      return next;
+    });
+
+    const saleReports = await prisma.saleInspectionReport.findMany({ where: { storeId: session.user.storeId, saleId: updated.saleId } });
+    return { data: sanitizeInspectionReport(updated), summary: summarizeSaleInspectionReports(saleReports) };
+  });
+
+  app.post("/inspection-reports/:id/export", async (request) => {
+    const session = await requirePermission(request, {
+      module: "sales",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const params = inspectionReportParamsSchema.parse(request.params);
+    const input = exportInspectionReportSchema.parse(request.body);
+    const report = await loadInspectionReportForRead(session.user.storeId, params.id, session.user);
+    if (!report.reportFileId) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Laudo ainda nao possui arquivo para visualizacao/exportacao/impressao.", { reportType: report.reportType });
+    }
+
+    const now = new Date();
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.saleInspectionReport.update({
+        where: { id: report.id },
+        data: {
+          requestedByCustomer: input.requestedByCustomer ? true : undefined,
+          printedAt: input.action === "PRINT" ? now : undefined,
+          printedByUserId: input.action === "PRINT" ? session.user.id : undefined,
+          exportedAt: input.action === "DOWNLOAD" || input.action === "VIEW" ? now : undefined,
+          exportedByUserId: input.action === "DOWNLOAD" || input.action === "VIEW" ? session.user.id : undefined,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "documents",
+          action: input.action === "PRINT" ? "sale_inspection_report_printed" : "sale_inspection_report_exported",
+          entityType: "sale_inspection_report",
+          entityId: next.id,
+          result: "SUCCESS",
+          metadata: {
+            saleId: next.saleId,
+            vehicleId: next.vehicleId,
+            reportType: next.reportType,
+            action: input.action,
+            requestedByCustomer: input.requestedByCustomer,
+            notes: input.notes ?? null,
+          },
+        },
+      });
+
+      return next;
+    });
+
+    return {
+      data: {
+        report: sanitizeInspectionReport(updated),
+        action: input.action,
+        attachmentId: updated.reportFileId,
+        signedDownloadUrl: null,
+        auditLoggedAt: now.toISOString(),
+      },
+    };
+  });
   app.get("/:id", async (request) => {
     const session = await requirePermission(request, {
       module: "documents",

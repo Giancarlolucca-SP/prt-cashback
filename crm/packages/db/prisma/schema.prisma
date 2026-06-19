@@ -808,6 +808,45 @@ model VehicleInspection {
   @@map("vehicle_inspections")
 }
 
+model SaleInspectionReport {
+  id                         String   @id @default(uuid())
+  storeId                    String   @map("store_id")
+  saleId                     String   @map("sale_id")
+  vehicleId                  String   @map("vehicle_id")
+  customerId                 String?  @map("customer_id")
+  reportType                 String   @map("report_type")
+  status                     String   @default("PENDING")
+  isRequired                 Boolean  @default(true) @map("is_required")
+  reportFileId               String?  @map("report_file_id")
+  reportDate                 DateTime? @map("report_date")
+  attachedByUserId           String?  @map("attached_by_user_id")
+  attachedAt                 DateTime? @map("attached_at")
+  checkedByUserId            String?  @map("checked_by_user_id")
+  checkedAt                  DateTime? @map("checked_at")
+  serviceProviderId          String?  @map("service_provider_id")
+  requestedByCustomer        Boolean  @default(false) @map("requested_by_customer")
+  printedAt                  DateTime? @map("printed_at")
+  printedByUserId            String?  @map("printed_by_user_id")
+  exportedAt                 DateTime? @map("exported_at")
+  exportedByUserId           String?  @map("exported_by_user_id")
+  retentionUntil             DateTime? @map("retention_until")
+  deleteAfterRetentionStatus String?  @map("delete_after_retention_status")
+  replacementReason          String?  @map("replacement_reason")
+  rejectionReason            String?  @map("rejection_reason")
+  waiverReason               String?  @map("waiver_reason")
+  notes                      String?
+  metadata                   Json?
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@unique([saleId, reportType])
+  @@index([storeId, saleId])
+  @@index([storeId, vehicleId])
+  @@index([storeId, status])
+  @@index([reportFileId])
+  @@map("sale_inspection_reports")
+}
+
 model VehicleStatusHistory {
   id          String   @id @default(uuid())
   storeId     String   @map("store_id")

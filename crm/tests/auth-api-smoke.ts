@@ -4124,6 +4124,106 @@ try {
   });
   assert.equal(sellerScheduleTechnicalDelivery.statusCode, 403);
 
+  await prisma.saleInspectionReport.createMany({
+    data: [
+      {
+        storeId: ownerBody.user.storeId,
+        saleId,
+        vehicleId: inventoryVehicleId,
+        customerId: createdCustomerId,
+        reportType: "CAUTIONARY",
+        status: "PENDING",
+        metadata: { source: "smoke_technical_delivery_setup" },
+      },
+      {
+        storeId: ownerBody.user.storeId,
+        saleId,
+        vehicleId: inventoryVehicleId,
+        customerId: createdCustomerId,
+        reportType: "TRANSFER",
+        status: "PENDING",
+        metadata: { source: "smoke_technical_delivery_setup" },
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  const technicalDeliveryInspectionReports = await app.inject({
+    method: "GET",
+    url: `/contracts/inspection-reports?sale_id=${saleId}&page_size=10`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(technicalDeliveryInspectionReports.statusCode, 200);
+  assert.equal(technicalDeliveryInspectionReports.json().summary.blockedForRelease, true);
+  type TechnicalDeliveryInspectionReport = {
+    id: string;
+    reportType: string;
+    isRequired: boolean;
+  };
+  const technicalDeliveryReportItems = technicalDeliveryInspectionReports.json().items as TechnicalDeliveryInspectionReport[];
+  const technicalDeliveryCautionaryReport = technicalDeliveryReportItems.find((item) => item.reportType === "CAUTIONARY");
+  const technicalDeliveryTransferReport = technicalDeliveryReportItems.find((item) => item.reportType === "TRANSFER");
+  assert.ok(technicalDeliveryCautionaryReport);
+  assert.ok(technicalDeliveryTransferReport);
+
+  const technicalDeliveryCautionaryUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "vehicle-documents",
+      originalName: "laudo-cautelar-entrega-tecnica.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 24567,
+      classification: "cautionary_report",
+      link: { entityType: "vehicle", entityId: inventoryVehicleId, purpose: "cautionary_report" },
+    },
+  });
+  assert.equal(technicalDeliveryCautionaryUpload.statusCode, 201);
+
+  const technicalDeliveryTransferUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "laudo-transferencia-entrega-tecnica.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 25678,
+      classification: "transfer_report",
+      link: { entityType: "sale", entityId: saleId, purpose: "transfer_report" },
+    },
+  });
+  assert.equal(technicalDeliveryTransferUpload.statusCode, 201);
+
+  const checkTechnicalDeliveryCautionaryReport = await app.inject({
+    method: "PATCH",
+    url: `/contracts/inspection-reports/${technicalDeliveryCautionaryReport.id}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      reportFileId: technicalDeliveryCautionaryUpload.json().data.id,
+      reportDate: financeDueAt,
+      status: "CHECKED",
+      replacementReason: "Atualizacao validada no smoke de entrega tecnica",
+      notes: "Laudo cautelar conferido antes da entrega tecnica",
+    },
+  });
+  assert.equal(checkTechnicalDeliveryCautionaryReport.statusCode, 200);
+
+  const checkTechnicalDeliveryTransferReport = await app.inject({
+    method: "PATCH",
+    url: `/contracts/inspection-reports/${technicalDeliveryTransferReport.id}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      reportFileId: technicalDeliveryTransferUpload.json().data.id,
+      reportDate: financeDueAt,
+      status: "CHECKED",
+      notes: "Laudo de transferencia conferido antes da entrega tecnica",
+    },
+  });
+  assert.equal(checkTechnicalDeliveryTransferReport.statusCode, 200);
+  assert.equal(checkTechnicalDeliveryTransferReport.json().summary.blockedForRelease, false);
+
   const scheduleTechnicalDelivery = await app.inject({
     method: "POST",
     url: "/technical-deliveries/schedule",
@@ -6563,6 +6663,36 @@ try {
   });
   assert.equal(checkAddressProof.statusCode, 200);
   assert.equal(checkAddressProof.json().summary.blockedForContracts, false);
+  // --- Sprint 3 US04: required inspection reports are born from the DOCUMENTATION handoff ---
+  const sellerInspectionReports = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}/inspection-reports`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerInspectionReports.statusCode, 200);
+  assert.equal(sellerInspectionReports.json().data.summary.blockedForRelease, true);
+  type SmokeInspectionReport = {
+    id: string;
+    saleId: string;
+    vehicleId: string;
+    reportType: string;
+    status: string;
+    isRequired: boolean;
+    reportFileId: string | null;
+    printedAt: string | null;
+  };
+  const commercialGateInspectionReports = sellerInspectionReports.json().data.items as SmokeInspectionReport[];
+  assert.equal(commercialGateInspectionReports.filter((item) => item.isRequired).length, 2);
+  const cautionaryInspectionReport = commercialGateInspectionReports.find((item) => item.reportType === "CAUTIONARY");
+  const transferInspectionReport = commercialGateInspectionReports.find((item) => item.reportType === "TRANSFER");
+  assert.ok(cautionaryInspectionReport);
+  assert.ok(transferInspectionReport);
+  assert.equal(cautionaryInspectionReport.saleId, transferredSaleId);
+  assert.equal(cautionaryInspectionReport.vehicleId, inventoryVehicleId);
+  assert.equal(transferInspectionReport.saleId, transferredSaleId);
+  assert.equal(transferInspectionReport.status, "PENDING");
+  const cautionaryReportId = cautionaryInspectionReport.id;
+  const transferReportId = transferInspectionReport.id;
 
   // --- US04 -> US06 final gate (stage 5): real producers unlock technical delivery ---
   const commercialGateContract = await app.inject({
@@ -6630,6 +6760,119 @@ try {
   assert.equal(reviewedCommercialGatePackage.statusCode, 200);
   assert.equal(reviewedCommercialGatePackage.json().data.status, "READY_FOR_SIGNATURE");
   assert.equal(reviewedCommercialGatePackage.json().data.observationsReviewed, true);
+  const blockedPackageWithoutInspectionReports = await app.inject({
+    method: "POST",
+    url: `/contracts/packages/${commercialGatePackageId}/send-signature`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      signatureProvider: "CDT_DIGITAL",
+      vehicleTransferMode: "CDT_DIGITAL",
+      govbrLevelRequired: "PRATA_OURO",
+      vehicleDocumentEligibleForAtpve: true,
+      buyerNotificationChannel: "WHATSAPP",
+      buyerNotificationRecipient: "+5511999999999",
+    },
+  });
+  assert.equal(blockedPackageWithoutInspectionReports.statusCode, 422);
+  assert.equal(blockedPackageWithoutInspectionReports.json().error.code, "BUSINESS_RULE_ERROR");
+  assert.ok(
+    blockedPackageWithoutInspectionReports
+      .json()
+      .error.details.pendingInspectionReports.some((item: { reportType: string; reason: string }) => item.reportType === "TRANSFER" && item.reason === "required_report_pending"),
+  );
+
+  const cautionaryReportUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "vehicle-documents",
+      originalName: "laudo-cautelar-us04.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 45678,
+      classification: "cautionary_report",
+      link: { entityType: "vehicle", entityId: inventoryVehicleId, purpose: "cautionary_report" },
+    },
+  });
+  assert.equal(cautionaryReportUpload.statusCode, 201);
+  const cautionaryReportFileId = cautionaryReportUpload.json().data.id as string;
+
+  const transferReportUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "laudo-transferencia-us04.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 56789,
+      classification: "transfer_report",
+      link: { entityType: "sale", entityId: transferredSaleId, purpose: "transfer_report" },
+    },
+  });
+  assert.equal(transferReportUpload.statusCode, 201);
+  const transferReportFileId = transferReportUpload.json().data.id as string;
+
+  const checkedCautionaryReport = await app.inject({
+    method: "PATCH",
+    url: `/contracts/inspection-reports/${cautionaryReportId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      reportFileId: cautionaryReportFileId,
+      reportDate: financeDueAt,
+      status: "CHECKED",
+      requestedByCustomer: true,
+      replacementReason: "Atualizacao validada no smoke da US04",
+      notes: "Laudo cautelar anexado e conferido para assinatura",
+    },
+  });
+  assert.equal(checkedCautionaryReport.statusCode, 200);
+  assert.equal(checkedCautionaryReport.json().data.status, "CHECKED");
+  assert.equal(checkedCautionaryReport.json().data.reportFileId, cautionaryReportFileId);
+  assert.equal(checkedCautionaryReport.json().summary.blockedForRelease, true);
+
+  const checkedTransferReport = await app.inject({
+    method: "PATCH",
+    url: `/contracts/inspection-reports/${transferReportId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      reportFileId: transferReportFileId,
+      reportDate: financeDueAt,
+      status: "CHECKED",
+      notes: "Laudo de transferencia anexado e conferido para assinatura",
+    },
+  });
+  assert.equal(checkedTransferReport.statusCode, 200);
+  assert.equal(checkedTransferReport.json().data.status, "CHECKED");
+  assert.equal(checkedTransferReport.json().data.reportFileId, transferReportFileId);
+  assert.equal(checkedTransferReport.json().summary.blockedForRelease, false);
+
+  const sellerPrintsCautionaryReport = await app.inject({
+    method: "POST",
+    url: `/contracts/inspection-reports/${cautionaryReportId}/export`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {
+      action: "PRINT",
+      requestedByCustomer: true,
+      notes: "Cliente solicitou copia impressa do laudo cautelar",
+    },
+  });
+  assert.equal(sellerPrintsCautionaryReport.statusCode, 200);
+  assert.equal(sellerPrintsCautionaryReport.json().data.action, "PRINT");
+  assert.equal(sellerPrintsCautionaryReport.json().data.attachmentId, cautionaryReportFileId);
+
+  const sellerInspectionReportsAfterCheck = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}/inspection-reports`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerInspectionReportsAfterCheck.statusCode, 200);
+  assert.equal(sellerInspectionReportsAfterCheck.json().data.summary.blockedForRelease, false);
+  assert.ok(
+    (sellerInspectionReportsAfterCheck.json().data.items as SmokeInspectionReport[]).some(
+      (item) => item.id === cautionaryReportId && item.status === "CHECKED" && Boolean(item.printedAt),
+    ),
+  );
 
   const sentCommercialGatePackage = await app.inject({
     method: "POST",
