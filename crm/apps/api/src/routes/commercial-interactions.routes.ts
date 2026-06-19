@@ -14,8 +14,6 @@ import {
   COMMERCIAL_INTERACTION_RESULTS,
   COMMERCIAL_INTERACTION_TYPES,
   COMMERCIAL_NEXT_ACTION_TYPES,
-  COMMERCIAL_NOTIFICATION_TYPES,
-  commercialNotificationDedupKey,
   continuityNeedsManagerNotification,
   isFollowUpOverdue,
   leadContinuityStatus,
@@ -25,6 +23,7 @@ import {
   type CommercialNextActionType,
   type CommercialNotificationType,
 } from "../services/commercial-interaction.js";
+import { notifyActiveUsers } from "../services/internal-notifications.js";
 
 const interactionTypeKeys = COMMERCIAL_INTERACTION_TYPES.map((entry) => entry.key) as [CommercialInteractionType, ...CommercialInteractionType[]];
 const resultKeys = COMMERCIAL_INTERACTION_RESULTS.map((entry) => entry.key) as [CommercialInteractionResult, ...CommercialInteractionResult[]];
@@ -465,11 +464,12 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
     const storeId = session.user.storeId;
     const now = new Date();
 
-    // Notification recipients: Administrador + Dono/Gestor.
-    const recipients = await prisma.user.findMany({
+    // Management gets the general view; the card owner gets the operational alert.
+    const managementRecipients = await prisma.user.findMany({
       where: { storeId, role: { in: ["OWNER_MANAGER", "ADMIN"] }, isActive: true, deletedAt: null },
       select: { id: true },
     });
+    const managementRecipientIds = managementRecipients.map((recipient) => recipient.id);
 
     // Active commercial cards (for both overdue scoping and continuity).
     const activeCards = await prisma.leadCard.findMany({
@@ -477,6 +477,16 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
       include: { lead: true },
     });
     const activeCardById = new Map(activeCards.map((card) => [card.id, card]));
+    const assignedUserIds = [
+      ...new Set(activeCards.map((card) => card.lead.assignedUserId).filter((userId): userId is string => Boolean(userId))),
+    ];
+    const activeAssignedUsers = assignedUserIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: assignedUserIds }, storeId, isActive: true, deletedAt: null },
+          select: { id: true },
+        })
+      : [];
+    const activeAssignedUserIds = new Set(activeAssignedUsers.map((user) => user.id));
 
     // Overdue follow-ups (pending next action in the past) on active cards.
     const overdueInteractions = await prisma.commercialInteraction.findMany({
@@ -496,9 +506,16 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
     const cardsWithFutureAppointment = new Set(futureAppointments.map((entry) => entry.cardId));
 
     // Build the needed (card, reason) alerts.
-    const alerts: Array<{ cardId: string; leadId: string | null; type: CommercialNotificationType; title: string }> = [];
+    const alerts: Array<{ cardId: string; leadId: string | null; responsibleUserId: string | null; type: CommercialNotificationType; title: string }> = [];
     for (const cardId of overdueActiveCardIds) {
-      alerts.push({ cardId, leadId: activeCardById.get(cardId)?.leadId ?? null, type: "follow_up_overdue", title: "Follow-up vencido" });
+      const card = activeCardById.get(cardId);
+      alerts.push({
+        cardId,
+        leadId: card?.leadId ?? null,
+        responsibleUserId: card?.lead.assignedUserId ?? null,
+        type: "follow_up_overdue",
+        title: "Follow-up vencido",
+      });
     }
     for (const card of activeCards) {
       const status = leadContinuityStatus({
@@ -509,50 +526,43 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
         now,
       });
       if (continuityNeedsManagerNotification(status)) {
-        alerts.push({ cardId: card.id, leadId: card.leadId, type: "lead_no_continuity", title: `Lead sem continuidade (${status})` });
+        alerts.push({
+          cardId: card.id,
+          leadId: card.leadId,
+          responsibleUserId: card.lead.assignedUserId,
+          type: "lead_no_continuity",
+          title: `Lead sem continuidade (${status})`,
+        });
       }
     }
 
     // Dedup by the ACTIVE condition, not by readAt: while the follow-up is still overdue / the lead
     // still has no continuity, do not recreate the alert (reading it must not trigger a re-create).
     // Notifications are removed when the underlying condition is resolved (see the resolve endpoint).
-    const candidateCardIds = [...new Set(alerts.map((alert) => alert.cardId))];
-    const existing = candidateCardIds.length
-      ? await prisma.notification.findMany({
-          where: { storeId, entityType: { in: [...COMMERCIAL_NOTIFICATION_TYPES] }, entityId: { in: candidateCardIds }, status: { in: ["NEW", "SEEN"] } },
-          select: { entityType: true, entityId: true },
-        })
-      : [];
-    const seenKeys = new Set(existing.map((entry) => `${entry.entityType}:${entry.entityId}`));
-
     let notificationsCreated = 0;
     let deduped = 0;
     for (const alert of alerts) {
-      const key = commercialNotificationDedupKey(alert.cardId, alert.type);
-      if (seenKeys.has(key)) {
-        deduped += 1;
+      const operationalRecipientId =
+        alert.responsibleUserId && activeAssignedUserIds.has(alert.responsibleUserId) ? alert.responsibleUserId : null;
+      const userIds = [...managementRecipientIds, operationalRecipientId];
+      if (userIds.length === 0) {
         continue;
       }
-      seenKeys.add(key);
-      if (recipients.length === 0) {
-        continue;
-      }
-      await prisma.notification.createMany({
-        data: recipients.map((recipient) => ({
-          storeId,
-          userId: recipient.id,
-          title: alert.title,
-          body: `Card comercial ${alert.cardId} requer atencao da gestao.`,
-          entityType: alert.type,
-          entityId: alert.cardId,
-          priority: alert.type === "follow_up_overdue" ? "CRITICAL" : "HIGH",
-          sourceModule: "commercial_interactions",
-          actionUrl: `/commercial-kanban/cards/${alert.cardId}`,
-        })),
+      const result = await notifyActiveUsers({
+        storeId,
+        userIds,
+        title: alert.title,
+        body: `Card comercial ${alert.cardId} requer atencao operacional.`,
+        entityType: alert.type,
+        entityId: alert.cardId,
+        priority: alert.type === "follow_up_overdue" ? "CRITICAL" : "HIGH",
+        sourceModule: "commercial_interactions",
+        actionUrl: `/commercial-kanban/cards/${alert.cardId}`,
       });
-      notificationsCreated += recipients.length;
+      notificationsCreated += result.created;
+      deduped += result.refreshed;
 
-      if (alert.leadId) {
+      if (result.created > 0 && alert.leadId) {
         await prisma.auditLog.create({
           data: {
             storeId,
@@ -575,7 +585,7 @@ export async function registerCommercialInteractionRoutes(app: FastifyInstance) 
         noContinuityAlerts: alerts.filter((alert) => alert.type === "lead_no_continuity").length,
         notificationsCreated,
         deduped,
-        recipients: recipients.length,
+        managementRecipients: managementRecipientIds.length,
       },
     };
   });

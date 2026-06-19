@@ -5671,6 +5671,33 @@ try {
   });
   assert.equal(ownerOverdueNotifications.statusCode, 200);
   assert.ok(ownerOverdueNotifications.json().items.some((n: { entityId: string }) => n.entityId === agendaCardId));
+
+  const sdrOverdueNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=follow_up_overdue&entity_id=${agendaCardId}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrOverdueNotifications.statusCode, 200);
+  assert.ok(
+    sdrOverdueNotifications
+      .json()
+      .items.some(
+        (notification: { userId: string; priority: string; sourceModule: string; actionUrl: string }) =>
+          notification.userId === sdrUserId &&
+          notification.priority === "CRITICAL" &&
+          notification.sourceModule === "commercial_interactions" &&
+          notification.actionUrl === `/commercial-kanban/cards/${agendaCardId}`,
+      ),
+  );
+
+  const sellerForeignOverdueNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=follow_up_overdue&entity_id=${agendaCardId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerForeignOverdueNotifications.statusCode, 200);
+  assert.equal(sellerForeignOverdueNotifications.json().items.length, 0);
+
   const notificationReassignAlert = ownerOverdueNotifications
     .json()
     .items.find((n: { id: string; entityId: string }) => n.entityId === notificationReassignCardId);
@@ -5706,6 +5733,18 @@ try {
     sellerReassignedNotificationCard
       .json()
       .items.some((card: { id: string; assignedUserId: string }) => card.id === notificationReassignCardId && card.assignedUserId === sellerUserId),
+  );
+
+  const sellerReassignedCardNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=follow_up_overdue&entity_id=${notificationReassignCardId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerReassignedCardNotifications.statusCode, 200);
+  assert.ok(
+    sellerReassignedCardNotifications
+      .json()
+      .items.some((notification: { userId: string }) => notification.userId === sellerUserId),
   );
 
   const notificationReassignAudit = await app.inject({

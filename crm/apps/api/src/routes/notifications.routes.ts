@@ -204,6 +204,17 @@ async function reassignLeadCardFromNotification(
       data: { assignedUserId: input.assignedUserId, updatedByUserId: session.user.id },
     });
 
+    await tx.notification.updateMany({
+      where: {
+        storeId: session.user.storeId,
+        entityType: { in: ["follow_up_overdue", "lead_no_continuity"] },
+        entityId: card.id,
+        userId: previousAssignedUserId,
+        status: { in: ["NEW", "SEEN"] },
+      },
+      data: { userId: input.assignedUserId },
+    });
+
     await tx.auditLog.create({
       data: {
         storeId: session.user.storeId,
