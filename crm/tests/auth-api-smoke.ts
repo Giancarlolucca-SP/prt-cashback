@@ -7537,6 +7537,69 @@ try {
   assert.ok(inventoryPerformance.json().listingMetrics.views >= 100);
   assert.equal(inventoryPerformance.json().listingMetrics.ctr, "0.1200");
 
+  const sellerCommercialOverview = await app.inject({
+    method: "GET",
+    url: "/analytics/commercial-overview",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerCommercialOverview.statusCode, 403);
+
+  const commercialOverview = await app.inject({
+    method: "GET",
+    url: "/analytics/commercial-overview",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialOverview.statusCode, 200);
+  assert.ok(commercialOverview.json().modules.includes("commercial_kanban"));
+  assert.ok(commercialOverview.json().totals.commercialCards >= 1);
+  assert.ok(commercialOverview.json().totals.salesCards >= 1);
+  assert.ok(commercialOverview.json().distributions.commercialCardsByStage.NEW_LEAD >= 0);
+  assert.ok(commercialOverview.json().distributions.salesByStage.CLOSED_WON >= 1);
+
+  const commercialOverviewBySdr = await app.inject({
+    method: "GET",
+    url: `/analytics/commercial-overview?responsible_user_id=${sdrUserId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialOverviewBySdr.statusCode, 200);
+  assert.equal(commercialOverviewBySdr.json().filters.responsibleUserId, sdrUserId);
+
+  const sdrCommercialDashboard = await app.inject({
+    method: "GET",
+    url: "/analytics/commercial-sdr",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCommercialDashboard.statusCode, 200);
+  assert.equal(sdrCommercialDashboard.json().filters.responsibleUserId, sdrUserId);
+  assert.ok(sdrCommercialDashboard.json().totals.cards >= 1);
+  assert.ok(sdrCommercialDashboard.json().totals.transferredToSales >= 1);
+  assert.ok(sdrCommercialDashboard.json().cardsByStage.NEW_LEAD >= 0);
+
+  const sellerCannotOpenSdrDashboard = await app.inject({
+    method: "GET",
+    url: "/analytics/commercial-sdr",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerCannotOpenSdrDashboard.statusCode, 403);
+
+  const sellerCommercialSalesDashboard = await app.inject({
+    method: "GET",
+    url: "/analytics/commercial-sales",
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerCommercialSalesDashboard.statusCode, 200);
+  assert.equal(sellerCommercialSalesDashboard.json().filters.sellerUserId, sellerUserId);
+  assert.ok(sellerCommercialSalesDashboard.json().totals.salesCards >= 1);
+  assert.ok(sellerCommercialSalesDashboard.json().totals.receivedFromSdr >= 1);
+  assert.ok(sellerCommercialSalesDashboard.json().salesByStage.CLOSED_WON >= 1);
+
+  const sdrCannotOpenSalesDashboard = await app.inject({
+    method: "GET",
+    url: "/analytics/commercial-sales",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCannotOpenSalesDashboard.statusCode, 403);
+
   const sellerCompliance = await app.inject({
     method: "GET",
     url: "/compliance/legal-checks",
