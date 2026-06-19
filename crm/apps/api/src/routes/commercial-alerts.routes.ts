@@ -1,18 +1,25 @@
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { ApiError } from "../api/errors.js";
 import { requirePermission } from "../api/auth-guards.js";
+import { getPagination, listResponse } from "../api/pagination.js";
 import { isCommercialFullView } from "../auth/commercial-scope.js";
 import { prisma } from "../lib/db.js";
 import {
   COMMERCIAL_ALERT_RULES,
+  COMMERCIAL_ALERT_STATUSES,
+  commercialAlertRule,
   detectAppointmentAlert,
   detectFollowUpOverdueAlert,
   detectLeadContinuityAlert,
   detectMissingNextActionAlert,
   detectNegotiationStalledAlert,
+  isCommercialAlertType,
   sortCommercialAlertCandidates,
   type CommercialAlertCandidate,
+  type CommercialAlertSeverity,
+  type CommercialAlertStatus,
   type CommercialAlertType,
 } from "../services/commercial-alert.js";
 import {
@@ -24,8 +31,34 @@ import { COMMERCIAL_BOARD_KEY, type CommercialStageKey } from "../services/comme
 import type { CommercialAppointmentStatus, CommercialAppointmentType } from "../services/commercial-appointment.js";
 
 type CommercialCardWithLead = Prisma.LeadCardGetPayload<{ include: { lead: true } }>;
+type CommercialAlertWithCard = Prisma.CommercialAlertGetPayload<{ include: { card: { include: { lead: true } } } }>;
 
 const scannedAlertTypes = COMMERCIAL_ALERT_RULES.map((rule) => rule.type);
+const alertTypeKeys = COMMERCIAL_ALERT_RULES.map((rule) => rule.type) as [CommercialAlertType, ...CommercialAlertType[]];
+const alertStatusKeys = [...COMMERCIAL_ALERT_STATUSES] as [CommercialAlertStatus, ...CommercialAlertStatus[]];
+const alertSeverityKeys = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as [CommercialAlertSeverity, ...CommercialAlertSeverity[]];
+const alertTypeSchema = z.enum(alertTypeKeys);
+const alertStatusSchema = z.enum(alertStatusKeys);
+const alertSeveritySchema = z.enum(alertSeverityKeys);
+
+const commercialAlertsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  status: alertStatusSchema.optional(),
+  type: alertTypeSchema.optional(),
+  severity: alertSeveritySchema.optional(),
+  card_id: z.string().uuid().optional(),
+  lead_id: z.string().uuid().optional(),
+  customer_id: z.string().uuid().optional(),
+  vehicle_id: z.string().uuid().optional(),
+  responsible_user_id: z.string().uuid().optional(),
+  target: z.enum(["all", "mine", "management"]).default("all"),
+  open_only: z.coerce.boolean().default(true),
+  due_from: z.coerce.date().optional(),
+  due_to: z.coerce.date().optional(),
+  triggered_from: z.coerce.date().optional(),
+  triggered_to: z.coerce.date().optional(),
+});
 
 function alertKey(alert: { type: string; cardId: string }) {
   return `${alert.type}:${alert.cardId}`;
@@ -46,6 +79,73 @@ function countByType(candidates: CommercialAlertCandidate[]) {
     acc[candidate.type] = (acc[candidate.type] ?? 0) + 1;
     return acc;
   }, {});
+}
+
+function alertPriority(alertType: string): number {
+  return isCommercialAlertType(alertType) ? commercialAlertRule(alertType).priority : Number.MAX_SAFE_INTEGER;
+}
+
+function sortPersistedAlerts<T extends { alertType: string; dueAt: Date | null; triggeredAt: Date; createdAt: Date }>(alerts: readonly T[]): T[] {
+  return [...alerts].sort((a, b) => {
+    const priorityDiff = alertPriority(a.alertType) - alertPriority(b.alertType);
+    if (priorityDiff !== 0) return priorityDiff;
+    const dueA = a.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const dueB = b.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    if (dueA !== dueB) return dueA - dueB;
+    const triggeredDiff = a.triggeredAt.getTime() - b.triggeredAt.getTime();
+    if (triggeredDiff !== 0) return triggeredDiff;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
+
+function sanitizeCommercialAlert(alert: CommercialAlertWithCard) {
+  const type = isCommercialAlertType(alert.alertType) ? alert.alertType : null;
+  const rule = type ? commercialAlertRule(type) : null;
+  return {
+    id: alert.id,
+    storeId: alert.storeId,
+    alertType: alert.alertType,
+    alertLabel: rule?.label ?? alert.alertType,
+    priority: rule?.priority ?? Number.MAX_SAFE_INTEGER,
+    severity: alert.severity,
+    status: alert.status,
+    cardId: alert.cardId,
+    leadId: alert.leadId,
+    customerId: alert.customerId,
+    vehicleId: alert.vehicleId,
+    responsibleUserId: alert.responsibleUserId,
+    targetUserId: alert.targetUserId,
+    targetRole: alert.targetRole,
+    reason: alert.reason,
+    suggestedAction: alert.suggestedAction,
+    dueAt: alert.dueAt?.toISOString() ?? null,
+    triggeredAt: alert.triggeredAt.toISOString(),
+    resolvedAt: alert.resolvedAt?.toISOString() ?? null,
+    resolvedByUserId: alert.resolvedByUserId,
+    metadata: alert.metadata,
+    card: {
+      id: alert.card.id,
+      boardKey: alert.card.boardKey,
+      stageKey: alert.card.stageKey,
+      stageEnteredAt: alert.card.stageEnteredAt.toISOString(),
+      archivedAt: alert.card.archivedAt?.toISOString() ?? null,
+    },
+    lead: {
+      id: alert.card.lead.id,
+      title: alert.card.lead.title,
+      assignedUserId: alert.card.lead.assignedUserId,
+      status: alert.card.lead.status,
+      source: alert.card.lead.source,
+      channel: alert.card.lead.channel,
+      interest: alert.card.lead.interest,
+      lastInteractionAt: alert.card.lead.lastInteractionAt?.toISOString() ?? null,
+      nextActionAt: alert.card.lead.nextActionAt?.toISOString() ?? null,
+      nextActionType: alert.card.lead.nextActionType,
+      createdAt: alert.card.lead.createdAt.toISOString(),
+    },
+    createdAt: alert.createdAt.toISOString(),
+    updatedAt: alert.updatedAt.toISOString(),
+  };
 }
 
 function enrichCandidate(storeId: string, candidate: CommercialAlertCandidate, card: CommercialCardWithLead): PersistCommercialAlertInput {
@@ -179,6 +279,60 @@ async function buildAlertCandidates(storeId: string, now: Date) {
 }
 
 export async function registerCommercialAlertRoutes(app: FastifyInstance) {
+  app.get("/", async (request) => {
+    const session = await requirePermission(request, {
+      module: "leads",
+      action: "read",
+      scope: "STORE",
+      sensitiveArea: "general",
+    });
+    const query = commercialAlertsQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const fullView = isCommercialFullView(session.user.role);
+
+    const statusWhere: Prisma.StringFilter | string | undefined = query.status
+      ? query.status
+      : query.open_only
+        ? { in: [...ACTIVE_COMMERCIAL_ALERT_STATUSES] }
+        : undefined;
+    const visibilityWhere: Prisma.CommercialAlertWhereInput = fullView
+      ? query.target === "management"
+        ? { targetRole: "MANAGEMENT" }
+        : query.target === "mine"
+          ? { OR: [{ targetUserId: session.user.id }, { responsibleUserId: session.user.id }] }
+          : {}
+      : { OR: [{ targetUserId: session.user.id }, { responsibleUserId: session.user.id }] };
+    const responsibleWhere: Prisma.CommercialAlertWhereInput =
+      fullView && query.responsible_user_id ? { responsibleUserId: query.responsible_user_id } : {};
+
+    const where: Prisma.CommercialAlertWhereInput = {
+      storeId: session.user.storeId,
+      ...visibilityWhere,
+      ...responsibleWhere,
+      ...(statusWhere ? { status: statusWhere } : {}),
+      ...(query.type ? { alertType: query.type } : {}),
+      ...(query.severity ? { severity: query.severity } : {}),
+      ...(query.card_id ? { cardId: query.card_id } : {}),
+      ...(query.lead_id ? { leadId: query.lead_id } : {}),
+      ...(query.customer_id ? { customerId: query.customer_id } : {}),
+      ...(query.vehicle_id ? { vehicleId: query.vehicle_id } : {}),
+      ...(query.due_from || query.due_to
+        ? { dueAt: { ...(query.due_from ? { gte: query.due_from } : {}), ...(query.due_to ? { lte: query.due_to } : {}) } }
+        : {}),
+      ...(query.triggered_from || query.triggered_to
+        ? { triggeredAt: { ...(query.triggered_from ? { gte: query.triggered_from } : {}), ...(query.triggered_to ? { lte: query.triggered_to } : {}) } }
+        : {}),
+    };
+
+    const alerts = await prisma.commercialAlert.findMany({
+      where,
+      include: { card: { include: { lead: true } } },
+    });
+    const sorted = sortPersistedAlerts(alerts);
+
+    return listResponse(sorted.slice(skip, skip + take).map(sanitizeCommercialAlert), query, sorted.length);
+  });
+
   app.post("/scan", async (request) => {
     const session = await requirePermission(request, {
       module: "leads",

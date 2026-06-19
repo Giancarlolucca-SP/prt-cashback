@@ -1960,6 +1960,7 @@ try {
   assert.equal(duplicateInventory.statusCode, 409);
   assert.equal(duplicateInventory.json().error.code, "CONFLICT");
 
+  const removedInventoryPlate = uniquePlate("RM");
   const removedInventory = await app.inject({
     method: "POST",
     url: "/inventory",
@@ -1971,7 +1972,7 @@ try {
         brand: "Renault",
         model: "Duster",
         yearModel: 2020,
-        plate: uniquePlate("RM"),
+        plate: removedInventoryPlate,
       },
       ownershipType: "OWN",
       status: "REMOVED",
@@ -2153,7 +2154,7 @@ try {
 
   const listRemovedInventory = await app.inject({
     method: "GET",
-    url: "/inventory?page=1&page_size=100&status=REMOVED",
+    url: `/inventory?page=1&page_size=20&status=REMOVED&search=${encodeURIComponent(removedInventoryPlate)}`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
@@ -4902,6 +4903,7 @@ try {
   assert.equal(invalidCommercialCard.json().error.code, "VALIDATION_ERROR");
 
   // SDR creates a card manually from a phone call (no full customer record required).
+  const commercialCardSource = uniqueToken("commercial-card");
   const sdrCreateCommercialCard = await app.inject({
     method: "POST",
     url: "/commercial-kanban/cards",
@@ -4910,7 +4912,7 @@ try {
       name: "Interessado Ligacao QA",
       phone: "11990001111",
       vehicleId: inventoryVehicleId,
-      source: "ligacao_loja",
+      source: commercialCardSource,
       channel: "telefone",
       note: "Pediu retorno a tarde.",
     },
@@ -4923,7 +4925,7 @@ try {
   // SDR sees own card; another seller (different portfolio) does not.
   const sdrListCommercialCards = await app.inject({
     method: "GET",
-    url: "/commercial-kanban/cards?stage=NEW_LEAD&page_size=100",
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(commercialCardSource)}&page_size=100`,
     headers: { authorization: `Bearer ${sdrToken}` },
   });
   assert.equal(sdrListCommercialCards.statusCode, 200);
@@ -5003,7 +5005,7 @@ try {
   // Archived (LOST) card leaves the default active view but stays filterable.
   const activeViewCommercialCards = await app.inject({
     method: "GET",
-    url: "/commercial-kanban/cards?page_size=100",
+    url: `/commercial-kanban/cards?origin=${encodeURIComponent(commercialCardSource)}&page_size=100`,
     headers: { authorization: `Bearer ${ownerBody.token}` },
   });
   assert.equal(activeViewCommercialCards.statusCode, 200);
@@ -5011,7 +5013,7 @@ try {
 
   const lostViewCommercialCards = await app.inject({
     method: "GET",
-    url: "/commercial-kanban/cards?stage=LOST&page_size=100",
+    url: `/commercial-kanban/cards?stage=LOST&origin=${encodeURIComponent(commercialCardSource)}&page_size=100`,
     headers: { authorization: `Bearer ${ownerBody.token}` },
   });
   assert.equal(lostViewCommercialCards.statusCode, 200);
@@ -5071,11 +5073,12 @@ try {
   checkpoint("commercial-kanban");
 
   // --- Commercial agenda (S2-US02): create, mandatory links, scope, transitions, next-on-card ---
+  const agendaCardSource = uniqueToken("agenda-card");
   const agendaCardWithVehicle = await app.inject({
     method: "POST",
     url: "/commercial-kanban/cards",
     headers: { authorization: `Bearer ${sdrToken}` },
-    payload: { name: "Agenda Card Veiculo", phone: "11990002222", customerId: createdCustomerId, vehicleId: inventoryVehicleId, source: "ligacao_loja" },
+    payload: { name: "Agenda Card Veiculo", phone: "11990002222", customerId: createdCustomerId, vehicleId: inventoryVehicleId, source: agendaCardSource },
   });
   assert.equal(agendaCardWithVehicle.statusCode, 201);
   assert.equal(agendaCardWithVehicle.json().data.customerId, createdCustomerId);
@@ -5085,7 +5088,7 @@ try {
     method: "POST",
     url: "/commercial-kanban/cards",
     headers: { authorization: `Bearer ${sdrToken}` },
-    payload: { name: "Agenda Card 0km", source: "ligacao_loja" },
+    payload: { name: "Agenda Card 0km", source: agendaCardSource },
   });
   assert.equal(agendaCardNoVehicle.statusCode, 201);
   const agendaCardNoVehicleId = agendaCardNoVehicle.json().data.id as string;
@@ -5139,7 +5142,7 @@ try {
   // Next appointment shows up on the Kanban card.
   const cardWithNextAppointment = await app.inject({
     method: "GET",
-    url: `/commercial-kanban/cards?stage=NEW_LEAD&page_size=100`,
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(agendaCardSource)}&page_size=100`,
     headers: { authorization: `Bearer ${sdrToken}` },
   });
   assert.equal(cardWithNextAppointment.statusCode, 200);
@@ -5533,7 +5536,7 @@ try {
   // Card projection: last interaction + overdue follow-up indicator surface on the Kanban card.
   const cardWithInteraction = await app.inject({
     method: "GET",
-    url: "/commercial-kanban/cards?stage=NEW_LEAD&page_size=100",
+    url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(agendaCardSource)}&page_size=100`,
     headers: { authorization: `Bearer ${sdrToken}` },
   });
   assert.equal(cardWithInteraction.statusCode, 200);
@@ -5544,11 +5547,12 @@ try {
 
   // Multi follow-up projection (review fix #1): the card reflects the EARLIEST pending follow-up,
   // and resolving one pending follow-up must not hide the other.
+  const multiFollowUpSource = uniqueToken("multi-follow-up");
   const multiFollowUpCard = await app.inject({
     method: "POST",
     url: "/commercial-kanban/cards",
     headers: { authorization: `Bearer ${sdrToken}` },
-    payload: { name: "Card Multi Follow-up", source: "ligacao_loja" },
+    payload: { name: "Card Multi Follow-up", source: multiFollowUpSource },
   });
   assert.equal(multiFollowUpCard.statusCode, 201);
   const multiFollowUpCardId = multiFollowUpCard.json().data.id as string;
@@ -5573,7 +5577,7 @@ try {
   const readMultiFollowUpCard = async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/commercial-kanban/cards?stage=NEW_LEAD&page_size=100",
+      url: `/commercial-kanban/cards?stage=NEW_LEAD&origin=${encodeURIComponent(multiFollowUpSource)}&page_size=100`,
       headers: { authorization: `Bearer ${sdrToken}` },
     });
     return res.json().items.find((card: { id: string }) => card.id === multiFollowUpCardId);
@@ -5639,6 +5643,34 @@ try {
   assert.equal(activeFollowUpAlert.responsibleUserId, sdrUserId);
   assert.equal(activeFollowUpAlert.metadata?.dedupKey, `follow_up_overdue:${agendaCardId}`);
 
+  const sdrCommercialAlerts = await app.inject({
+    method: "GET",
+    url: "/commercial-alerts?type=follow_up_overdue&severity=CRITICAL&page_size=100",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCommercialAlerts.statusCode, 200);
+  assert.ok(sdrCommercialAlerts.json().items.some((item: { id: string }) => item.id === activeFollowUpAlert.id));
+  assert.ok(sdrCommercialAlerts.json().items.every((item: { responsibleUserId: string | null }) => item.responsibleUserId === sdrUserId));
+
+  const sdrCannotWidenCommercialAlerts = await app.inject({
+    method: "GET",
+    url: `/commercial-alerts?responsible_user_id=${ownerBody.user.id}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCannotWidenCommercialAlerts.statusCode, 200);
+  assert.ok(
+    sdrCannotWidenCommercialAlerts.json().items.every((item: { responsibleUserId: string | null }) => item.responsibleUserId === sdrUserId),
+  );
+
+  const managementCommercialAlerts = await app.inject({
+    method: "GET",
+    url: `/commercial-alerts?target=management&type=follow_up_overdue&severity=CRITICAL&responsible_user_id=${sdrUserId}&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(managementCommercialAlerts.statusCode, 200);
+  assert.ok(managementCommercialAlerts.json().items.some((item: { id: string }) => item.id === activeFollowUpAlert.id));
+  assert.ok(managementCommercialAlerts.json().items.every((item: { targetRole: string | null }) => item.targetRole === "MANAGEMENT"));
+
   const commercialAlertScanAgain = await app.inject({
     method: "POST",
     url: "/commercial-alerts/scan",
@@ -5672,6 +5704,14 @@ try {
   });
   assert.equal(resolvedFollowUpAlert?.status, "RESOLVED");
   assert.equal(resolvedFollowUpAlert?.resolvedByUserId, ownerBody.user.id);
+
+  const resolvedCommercialAlerts = await app.inject({
+    method: "GET",
+    url: `/commercial-alerts?status=RESOLVED&type=follow_up_overdue&card_id=${agendaCardId}&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(resolvedCommercialAlerts.statusCode, 200);
+  assert.ok(resolvedCommercialAlerts.json().items.some((item: { id: string }) => item.id === activeFollowUpAlert.id));
   checkpoint("commercial-interactions");
 
   // --- Commercial sales transition (S2-US04): SDR -> Sales creates a DRAFT Sale ---
