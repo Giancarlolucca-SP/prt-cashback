@@ -21,6 +21,7 @@ import { registerHealthRoutes } from "./routes/health.routes.js";
 import { registerInventoryRoutes } from "./routes/inventory.routes.js";
 import { registerJobRoutes } from "./routes/jobs.routes.js";
 import { registerCommercialAgendaRoutes } from "./routes/commercial-agenda.routes.js";
+import { registerCommercialAlertRoutes } from "./routes/commercial-alerts.routes.js";
 import { registerCommercialInteractionRoutes } from "./routes/commercial-interactions.routes.js";
 import { registerCommercialKanbanRoutes } from "./routes/commercial-kanban.routes.js";
 import { registerCommercialSalesRoutes } from "./routes/commercial-sales.routes.js";
@@ -72,6 +73,7 @@ export function buildApp() {
   app.register(registerLeadRoutes, { prefix: "/leads" });
   app.register(registerCommercialKanbanRoutes, { prefix: "/commercial-kanban" });
   app.register(registerCommercialAgendaRoutes, { prefix: "/commercial-agenda" });
+  app.register(registerCommercialAlertRoutes, { prefix: "/commercial-alerts" });
   app.register(registerCommercialInteractionRoutes, { prefix: "/commercial-interactions" });
   app.register(registerCommercialSalesRoutes, { prefix: "/commercial-sales" });
   app.register(registerAppointmentRoutes, { prefix: "/appointments" });

@@ -5609,6 +5609,69 @@ try {
   assert.equal(overdueOnlyTrue.statusCode, 200);
   // ...but filtered out when overdue_only=true (it has no overdue follow-up).
   assert.ok(!overdueOnlyTrue.json().items.some((it: { id: string }) => it.id === ownerInteractionId));
+
+  // --- Commercial alerts (S2-US05 stage 3): materialize real conditions into commercial_alerts ---
+  const commercialAlertScanForbidden = await app.inject({
+    method: "POST",
+    url: "/commercial-alerts/scan",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(commercialAlertScanForbidden.statusCode, 403);
+
+  const commercialAlertScan = await app.inject({
+    method: "POST",
+    url: "/commercial-alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialAlertScan.statusCode, 200);
+  assert.ok(commercialAlertScan.json().data.alertsCreated >= 1);
+  assert.ok(commercialAlertScan.json().data.byType.follow_up_overdue >= 1);
+
+  const activeFollowUpAlert = await prisma.commercialAlert.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      cardId: agendaCardId,
+      alertType: "follow_up_overdue",
+      status: { in: ["PENDING", "VIEWED"] },
+    },
+  });
+  assert.ok(activeFollowUpAlert);
+  assert.equal(activeFollowUpAlert.responsibleUserId, sdrUserId);
+  assert.equal(activeFollowUpAlert.metadata?.dedupKey, `follow_up_overdue:${agendaCardId}`);
+
+  const commercialAlertScanAgain = await app.inject({
+    method: "POST",
+    url: "/commercial-alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialAlertScanAgain.statusCode, 200);
+  assert.ok(commercialAlertScanAgain.json().data.alertsRefreshed >= 1);
+  const activeFollowUpAlertCount = await prisma.commercialAlert.count({
+    where: {
+      storeId: ownerBody.user.storeId,
+      cardId: agendaCardId,
+      alertType: "follow_up_overdue",
+      status: { in: ["PENDING", "VIEWED"] },
+    },
+  });
+  assert.equal(activeFollowUpAlertCount, 1);
+
+  await prisma.commercialInteraction.updateMany({
+    where: { storeId: ownerBody.user.storeId, cardId: agendaCardId, nextActionStatus: "PENDING", nextActionAt: { lt: new Date() } },
+    data: { nextActionStatus: "DONE" },
+  });
+  const commercialAlertScanResolved = await app.inject({
+    method: "POST",
+    url: "/commercial-alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(commercialAlertScanResolved.statusCode, 200);
+  assert.ok(commercialAlertScanResolved.json().data.alertsResolved >= 1);
+  const resolvedFollowUpAlert = await prisma.commercialAlert.findUnique({
+    where: { id: activeFollowUpAlert.id },
+  });
+  assert.equal(resolvedFollowUpAlert?.status, "RESOLVED");
+  assert.equal(resolvedFollowUpAlert?.resolvedByUserId, ownerBody.user.id);
   checkpoint("commercial-interactions");
 
   // --- Commercial sales transition (S2-US04): SDR -> Sales creates a DRAFT Sale ---
