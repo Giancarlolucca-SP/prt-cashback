@@ -99,6 +99,18 @@ type NotificationRecord = {
   updatedAt: Date;
 };
 
+type NotificationContext = {
+  appointmentId: string | null;
+  cardId: string | null;
+  customer: { id: string; name: string } | null;
+  deliveryId: string | null;
+  leadId: string | null;
+  responsibleUser: { id: string; name: string; role: string } | null;
+  saleId: string | null;
+  stageKey: string | null;
+  status: string | null;
+  vehicle: { id: string; label: string; plate: string | null } | null;
+};
 type NotificationSession = Awaited<ReturnType<typeof requirePermission>>;
 type NotificationReassignInput = z.infer<typeof reassignNotificationSchema>;
 type NotificationReassignment = {
@@ -110,7 +122,26 @@ type NotificationReassignment = {
   unchanged: boolean;
 };
 
-function sanitizeNotification(notification: NotificationRecord) {
+function emptyNotificationContext(): NotificationContext {
+  return {
+    appointmentId: null,
+    cardId: null,
+    customer: null,
+    deliveryId: null,
+    leadId: null,
+    responsibleUser: null,
+    saleId: null,
+    stageKey: null,
+    status: null,
+    vehicle: null,
+  };
+}
+
+function vehicleLabel(vehicle: { brand: string; model: string; version: string | null; yearModel: number | null }) {
+  return [vehicle.brand, vehicle.model, vehicle.version, vehicle.yearModel ? String(vehicle.yearModel) : null].filter(Boolean).join(" ");
+}
+
+function sanitizeNotification(notification: NotificationRecord, context?: NotificationContext | null) {
   return {
     id: notification.id,
     storeId: notification.storeId,
@@ -132,6 +163,7 @@ function sanitizeNotification(notification: NotificationRecord) {
     dismissedReason: notification.dismissedReason,
     createdAt: notification.createdAt.toISOString(),
     updatedAt: notification.updatedAt.toISOString(),
+    context: context ?? null,
   };
 }
 
@@ -160,6 +192,265 @@ async function getNotificationOrThrow(storeId: string, user: { id: string; role:
   });
   if (!notification) throw new ApiError("NOT_FOUND", "Notificacao nao encontrada.");
   return notification;
+}
+
+async function buildNotificationContexts(storeId: string, notifications: NotificationRecord[]) {
+  const contexts = new Map<string, NotificationContext>();
+  const directCustomerIds = new Set<string>();
+  const cardIds = new Set<string>();
+  const appointmentIds = new Set<string>();
+  const saleIds = new Set<string>();
+  const deliveryIds = new Set<string>();
+
+  for (const notification of notifications) {
+    if (!notification.entityId || !notification.entityType) continue;
+    if (notification.entityType === "customer") directCustomerIds.add(notification.entityId);
+    if (notification.entityType === "follow_up_overdue" || notification.entityType === "lead_no_continuity") cardIds.add(notification.entityId);
+    if (notification.entityType === "commercial_appointment_scheduled") appointmentIds.add(notification.entityId);
+    if (
+      notification.entityType === "commercial_sale_assigned" ||
+      notification.entityType === "commercial_sale_documentation_pending" ||
+      notification.entityType === "own_financing_alert"
+    ) {
+      saleIds.add(notification.entityId);
+    }
+    if (notification.entityType === "technical_delivery_scheduled" || notification.entityType === "technical_delivery_signed_copy_pending") {
+      deliveryIds.add(notification.entityId);
+    }
+  }
+
+  const [cards, appointments, sales, saleCards, deliveries, directCustomers] = await Promise.all([
+    cardIds.size
+      ? prisma.leadCard.findMany({
+          where: { id: { in: [...cardIds] }, storeId },
+          select: {
+            id: true,
+            leadId: true,
+            stageKey: true,
+            lead: { select: { assignedUserId: true, customerId: true, status: true, title: true, vehicleId: true } },
+          },
+        })
+      : Promise.resolve([]),
+    appointmentIds.size
+      ? prisma.commercialAppointment.findMany({
+          where: { id: { in: [...appointmentIds] }, storeId },
+          select: {
+            id: true,
+            cardId: true,
+            customerId: true,
+            leadId: true,
+            responsibleUserId: true,
+            status: true,
+            vehicleId: true,
+          },
+        })
+      : Promise.resolve([]),
+    saleIds.size
+      ? prisma.sale.findMany({
+          where: { id: { in: [...saleIds] }, storeId, deletedAt: null },
+          select: {
+            id: true,
+            customerId: true,
+            leadCardId: true,
+            leadId: true,
+            sellerUserId: true,
+            status: true,
+            vehicleId: true,
+          },
+        })
+      : Promise.resolve([]),
+    saleIds.size
+      ? prisma.saleCard.findMany({
+          where: { saleId: { in: [...saleIds] }, storeId },
+          select: { saleId: true, stageKey: true },
+        })
+      : Promise.resolve([]),
+    deliveryIds.size
+      ? prisma.technicalDelivery.findMany({
+          where: { id: { in: [...deliveryIds] }, storeId },
+          select: {
+            id: true,
+            customerId: true,
+            responsibleUserId: true,
+            saleId: true,
+            sellerUserId: true,
+            status: true,
+            vehicleId: true,
+          },
+        })
+      : Promise.resolve([]),
+    directCustomerIds.size
+      ? prisma.customer.findMany({
+          where: { id: { in: [...directCustomerIds] }, storeId, deletedAt: null },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const saleStageBySaleId = new Map(saleCards.map((card) => [card.saleId, card.stageKey]));
+  const customerIds = new Set(directCustomers.map((customer) => customer.id));
+  const vehicleIds = new Set<string>();
+  const userIds = new Set(notifications.map((notification) => notification.userId).filter((userId): userId is string => Boolean(userId)));
+
+  for (const card of cards) {
+    if (card.lead.customerId) customerIds.add(card.lead.customerId);
+    if (card.lead.vehicleId) vehicleIds.add(card.lead.vehicleId);
+    if (card.lead.assignedUserId) userIds.add(card.lead.assignedUserId);
+  }
+  for (const appointment of appointments) {
+    if (appointment.customerId) customerIds.add(appointment.customerId);
+    if (appointment.vehicleId) vehicleIds.add(appointment.vehicleId);
+    userIds.add(appointment.responsibleUserId);
+  }
+  for (const sale of sales) {
+    if (sale.customerId) customerIds.add(sale.customerId);
+    if (sale.vehicleId) vehicleIds.add(sale.vehicleId);
+    if (sale.sellerUserId) userIds.add(sale.sellerUserId);
+  }
+  for (const delivery of deliveries) {
+    customerIds.add(delivery.customerId);
+    vehicleIds.add(delivery.vehicleId);
+    if (delivery.responsibleUserId) userIds.add(delivery.responsibleUserId);
+    if (delivery.sellerUserId) userIds.add(delivery.sellerUserId);
+  }
+
+  const [customers, vehicles, users] = await Promise.all([
+    customerIds.size
+      ? prisma.customer.findMany({
+          where: { id: { in: [...customerIds] }, storeId, deletedAt: null },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    vehicleIds.size
+      ? prisma.vehicle.findMany({
+          where: { id: { in: [...vehicleIds] }, storeId, deletedAt: null },
+          select: { id: true, brand: true, model: true, version: true, yearModel: true, plate: true },
+        })
+      : Promise.resolve([]),
+    userIds.size
+      ? prisma.user.findMany({
+          where: { id: { in: [...userIds] }, storeId, isActive: true, deletedAt: null },
+          select: { id: true, name: true, role: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const customerById = new Map(customers.map((customer) => [customer.id, customer]));
+  const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+  const userById = new Map(users.map((user) => [user.id, user]));
+
+  function contextVehicle(vehicleId?: string | null) {
+    if (!vehicleId) return null;
+    const vehicle = vehicleById.get(vehicleId);
+    return vehicle ? { id: vehicle.id, label: vehicleLabel(vehicle), plate: vehicle.plate } : null;
+  }
+
+  function fillContext(base: NotificationContext, input: { customerId?: string | null; responsibleUserId?: string | null; vehicleId?: string | null }) {
+    return {
+      ...base,
+      customer: input.customerId ? customerById.get(input.customerId) ?? null : null,
+      responsibleUser: input.responsibleUserId ? userById.get(input.responsibleUserId) ?? null : null,
+      vehicle: contextVehicle(input.vehicleId),
+    } satisfies NotificationContext;
+  }
+
+  function setNotificationContext(notification: NotificationRecord, context?: NotificationContext | null) {
+    const base = context ?? emptyNotificationContext();
+    contexts.set(notification.id, {
+      ...base,
+      responsibleUser: base.responsibleUser ?? (notification.userId ? userById.get(notification.userId) ?? null : null),
+    });
+  }
+
+  const contextByCardId = new Map(
+    cards.map((card) => [
+      card.id,
+      fillContext(
+        {
+          ...emptyNotificationContext(),
+          cardId: card.id,
+          leadId: card.leadId,
+          stageKey: card.stageKey,
+          status: card.lead.status,
+        },
+        { customerId: card.lead.customerId, responsibleUserId: card.lead.assignedUserId, vehicleId: card.lead.vehicleId },
+      ),
+    ]),
+  );
+  const contextByAppointmentId = new Map(
+    appointments.map((appointment) => [
+      appointment.id,
+      fillContext(
+        {
+          ...emptyNotificationContext(),
+          appointmentId: appointment.id,
+          cardId: appointment.cardId,
+          leadId: appointment.leadId,
+          status: appointment.status,
+        },
+        { customerId: appointment.customerId, responsibleUserId: appointment.responsibleUserId, vehicleId: appointment.vehicleId },
+      ),
+    ]),
+  );
+  const contextBySaleId = new Map(
+    sales.map((sale) => [
+      sale.id,
+      fillContext(
+        {
+          ...emptyNotificationContext(),
+          cardId: sale.leadCardId,
+          leadId: sale.leadId,
+          saleId: sale.id,
+          stageKey: saleStageBySaleId.get(sale.id) ?? null,
+          status: sale.status,
+        },
+        { customerId: sale.customerId, responsibleUserId: sale.sellerUserId, vehicleId: sale.vehicleId },
+      ),
+    ]),
+  );
+  const contextByDeliveryId = new Map(
+    deliveries.map((delivery) => [
+      delivery.id,
+      fillContext(
+        {
+          ...emptyNotificationContext(),
+          deliveryId: delivery.id,
+          saleId: delivery.saleId,
+          status: delivery.status,
+        },
+        { customerId: delivery.customerId, responsibleUserId: delivery.responsibleUserId ?? delivery.sellerUserId, vehicleId: delivery.vehicleId },
+      ),
+    ]),
+  );
+  const contextByCustomerId = new Map(
+    directCustomers.map((customer) => [
+      customer.id,
+      fillContext(emptyNotificationContext(), { customerId: customer.id, responsibleUserId: null, vehicleId: null }),
+    ]),
+  );
+
+  for (const notification of notifications) {
+    if (!notification.entityType || !notification.entityId) continue;
+    if (notification.entityType === "customer") setNotificationContext(notification, contextByCustomerId.get(notification.entityId));
+    if (notification.entityType === "follow_up_overdue" || notification.entityType === "lead_no_continuity") {
+      setNotificationContext(notification, contextByCardId.get(notification.entityId));
+    }
+    if (notification.entityType === "commercial_appointment_scheduled") {
+      setNotificationContext(notification, contextByAppointmentId.get(notification.entityId));
+    }
+    if (
+      notification.entityType === "commercial_sale_assigned" ||
+      notification.entityType === "commercial_sale_documentation_pending" ||
+      notification.entityType === "own_financing_alert"
+    ) {
+      setNotificationContext(notification, contextBySaleId.get(notification.entityId));
+    }
+    if (notification.entityType === "technical_delivery_scheduled" || notification.entityType === "technical_delivery_signed_copy_pending") {
+      setNotificationContext(notification, contextByDeliveryId.get(notification.entityId));
+    }
+  }
+
+  return contexts;
 }
 
 function assertReassignableNotification(notification: NotificationRecord) {
@@ -515,8 +806,13 @@ export async function registerNotificationRoutes(app: FastifyInstance) {
       prisma.notification.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }),
       prisma.notification.count({ where }),
     ]);
+    const contexts = await buildNotificationContexts(session.user.storeId, items);
 
-    return listResponse(items.map(sanitizeNotification), query, total);
+    return listResponse(
+      items.map((notification) => sanitizeNotification(notification, contexts.get(notification.id))),
+      query,
+      total,
+    );
   });
 
   app.get("/summary", async (request) => {

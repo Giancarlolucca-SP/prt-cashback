@@ -5670,7 +5670,16 @@ try {
     headers: { authorization: `Bearer ${ownerBody.token}` },
   });
   assert.equal(ownerOverdueNotifications.statusCode, 200);
-  assert.ok(ownerOverdueNotifications.json().items.some((n: { entityId: string }) => n.entityId === agendaCardId));
+  const agendaOverdueNotification = ownerOverdueNotifications.json().items.find((n: { entityId: string }) => n.entityId === agendaCardId);
+  assert.ok(agendaOverdueNotification);
+  assert.equal(agendaOverdueNotification.context.cardId, agendaCardId);
+  assert.equal(agendaOverdueNotification.context.leadId, interactionLeadId);
+  assert.equal(agendaOverdueNotification.context.customer.id, createdCustomerId);
+  assert.equal(agendaOverdueNotification.context.customer.name, "Cliente Contrato API");
+  assert.equal(agendaOverdueNotification.context.vehicle.id, inventoryVehicleId);
+  assert.ok(agendaOverdueNotification.context.vehicle.label);
+  assert.equal(agendaOverdueNotification.context.responsibleUser.id, sdrUserId);
+  assert.equal(agendaOverdueNotification.context.stageKey, "NEW_LEAD");
 
   const sdrOverdueNotifications = await app.inject({
     method: "GET",
@@ -6586,7 +6595,11 @@ try {
     },
   });
   assert.equal(sellerNotifications.statusCode, 200);
-  assert.ok(sellerNotifications.json().items.some((notification: { id: string }) => notification.id === notificationId));
+  const sellerNotificationItem = sellerNotifications.json().items.find((notification: { id: string }) => notification.id === notificationId);
+  assert.ok(sellerNotificationItem);
+  assert.equal(sellerNotificationItem.context.customer.id, createdCustomerId);
+  assert.equal(sellerNotificationItem.context.customer.name, "Cliente Contrato API");
+  assert.equal(sellerNotificationItem.context.responsibleUser.id, sellerUserId);
 
   const sellerNotificationsByCreatedPeriod = await app.inject({
     method: "GET",
