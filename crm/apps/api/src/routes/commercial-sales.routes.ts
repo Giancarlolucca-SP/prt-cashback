@@ -35,6 +35,7 @@ import {
   type CustomerArrivalStatus,
   type FinancingType,
 } from "../services/sales-transition.js";
+import { createMissingSalePaymentChecks, summarizeSalePaymentChecks } from "../services/sale-payment-check.js";
 
 // Sales-board (Kanban Vendas) default stage when an opportunity enters the sales flow.
 const SALES_STAGE_ASSUMED = "ASSUMED";
@@ -358,6 +359,29 @@ function sanitizeDocumentChecklistItem(item: SaleDocumentChecklistRecord) {
   };
 }
 
+type SalePaymentCheckRecord = Prisma.SalePaymentCheckGetPayload<Record<string, never>>;
+
+function sanitizeSalePaymentCheckForCommercial(item: SalePaymentCheckRecord) {
+  return {
+    id: item.id,
+    saleId: item.saleId,
+    paymentItemType: item.paymentItemType,
+    direction: item.direction,
+    isRequired: item.isRequired,
+    expectedAmount: item.expectedAmount.toString(),
+    confirmedAmount: item.confirmedAmount?.toString() ?? null,
+    pendingAmount: item.pendingAmount?.toString() ?? null,
+    paymentMethod: item.paymentMethod,
+    expectedAt: item.expectedAt?.toISOString() ?? null,
+    paymentStatus: item.paymentStatus,
+    releaseStatus: item.releaseStatus,
+    checkedAt: item.checkedAt?.toISOString() ?? null,
+    releaseApprovedAt: item.releaseApprovedAt?.toISOString() ?? null,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
 function documentChecklistSummary(items: SaleDocumentChecklistRecord[]) {
   const staleItems = items.filter((item) => item.isRequired && isAddressProofItem(item.itemKey, item.metadata) && isAddressProofExpired(item.issueDate));
   const pendingRequiredItems = items.filter((item) => item.isRequired && !item.isDone);
@@ -672,6 +696,24 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       data: sanitizeDocumentChecklistItem(updated),
       summary: documentChecklistSummary(items),
       warnings: expiredAddressProof ? [{ itemKey: item.itemKey, code: "ADDRESS_PROOF_EXPIRED" }] : [],
+    };
+  });
+
+  app.get("/:id/payment-checks", async (request) => {
+    const session = await requirePermission(request, { module: "sales", action: "read", scope: "STORE", sensitiveArea: "general" });
+    const params = saleParamsSchema.parse(request.params);
+    const sale = await loadScopedSale(session, params.id);
+    const items = await prisma.salePaymentCheck.findMany({
+      where: { storeId: session.user.storeId, saleId: sale.id },
+      orderBy: [{ isRequired: "desc" }, { createdAt: "asc" }],
+    });
+
+    return {
+      data: {
+        sale: sanitizeSale(sale, await getSaleStageKey(sale.id)),
+        summary: summarizeSalePaymentChecks(items),
+        items: items.map(sanitizeSalePaymentCheckForCommercial),
+      },
     };
   });
 
@@ -1074,6 +1116,7 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       }
 
       await createMissingBuyerDocumentChecklistItems(tx, session.user.storeId, next);
+      await createMissingSalePaymentChecks(tx, session.user.storeId, next);
 
       await tx.auditLog.create({
         data: {
@@ -1100,6 +1143,19 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
           entityId: sale.id,
           result: "SUCCESS",
           metadata: { status: "DOCUMENTATION", customerId: next.customerId, financingType: next.financingType },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "finance",
+          action: "sale_payment_checklist_created",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: { status: "DOCUMENTATION", salePrice: next.salePrice?.toString() ?? null, financingType: next.financingType },
         },
       });
       if (sale.leadId) {

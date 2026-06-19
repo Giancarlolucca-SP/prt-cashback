@@ -6453,6 +6453,53 @@ try {
   assert.ok(buyerChecklist.json().data.items.some((item: { itemKey: string; isRequired: boolean }) => item.itemKey === "person_address_proof" && item.isRequired));
   assert.equal(buyerChecklist.json().data.summary.blockedForContracts, true);
 
+  // --- Sprint 3 US02: payment conference is created from the same DOCUMENTATION handoff ---
+  const sellerPaymentChecks = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}/payment-checks`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerPaymentChecks.statusCode, 200);
+  assert.equal(sellerPaymentChecks.json().data.summary.blockedForRelease, true);
+  assert.ok(
+    sellerPaymentChecks
+      .json()
+      .data.items.some(
+        (item: { paymentItemType: string; direction: string; expectedAmount: string }) =>
+          item.paymentItemType === "own_financing_received_store_account" && item.direction === "INCOME" && item.expectedAmount === "95000",
+      ),
+  );
+
+  const financePaymentChecks = await app.inject({
+    method: "GET",
+    url: `/finance/sale-payment-checks?sale_id=${transferredSaleId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(financePaymentChecks.statusCode, 200);
+  assert.equal(financePaymentChecks.json().summary.blockedForRelease, true);
+  const commercialGatePaymentCheck = financePaymentChecks
+    .json()
+    .items.find((item: { paymentItemType: string }) => item.paymentItemType === "own_financing_received_store_account");
+  assert.ok(commercialGatePaymentCheck);
+  const commercialGatePaymentCheckId = commercialGatePaymentCheck.id as string;
+
+  const partialPaymentConference = await app.inject({
+    method: "POST",
+    url: `/finance/sale-payment-checks/${commercialGatePaymentCheckId}/confirm`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      confirmedAmount: 50000,
+      bankMovementAt: financeDueAt,
+      bankDescription: "Entrada parcial encontrada no extrato QA",
+      bankTransactionId: "QA-PARTIAL-US02",
+      notes: "Recebimento parcial nao libera entrega",
+    },
+  });
+  assert.equal(partialPaymentConference.statusCode, 200);
+  assert.equal(partialPaymentConference.json().data.paymentStatus, "PARTIAL_RECEIVED");
+  assert.equal(partialPaymentConference.json().data.releaseStatus, "BLOCKED");
+  assert.equal(partialPaymentConference.json().data.pendingAmount, "45000");
+
   const sellerCannotApproveBuyerDocument = await app.inject({
     method: "PATCH",
     url: `/commercial-sales/${transferredSaleId}/document-checklist/person_identity_document`,
@@ -6594,6 +6641,42 @@ try {
   assert.equal(paidCommercialGateIncome.statusCode, 200);
   assert.equal(paidCommercialGateIncome.json().data.entityId, transferredSaleId);
   assert.equal(paidCommercialGateIncome.json().data.status, "PAID");
+
+  const blockedWithoutPaymentRelease = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {
+      saleId: transferredSaleId,
+      scheduledAt: new Date(new Date(financeDueAt).getTime() + 16200000).toISOString(),
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(blockedWithoutPaymentRelease.statusCode, 422);
+  assert.equal(blockedWithoutPaymentRelease.json().error.code, "BUSINESS_RULE_ERROR");
+  assert.deepEqual(blockedWithoutPaymentRelease.json().error.details.pendingPrerequisites, ["payment_confirmed"]);
+  assert.ok(
+    blockedWithoutPaymentRelease
+      .json()
+      .error.details.paymentChecks.some((item: { id: string; releaseStatus: string }) => item.id === commercialGatePaymentCheckId && item.releaseStatus === "BLOCKED"),
+  );
+
+  const fullPaymentConference = await app.inject({
+    method: "POST",
+    url: `/finance/sale-payment-checks/${commercialGatePaymentCheckId}/confirm`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      confirmedAmount: 95000,
+      bankMovementAt: financeDueAt,
+      bankDescription: "Valor integral da financeira propria caiu na conta da loja",
+      bankTransactionId: "QA-FULL-US02",
+      notes: "Conferencia financeira liberada para documentacao e entrega",
+    },
+  });
+  assert.equal(fullPaymentConference.statusCode, 200);
+  assert.equal(fullPaymentConference.json().data.paymentStatus, "CONFIRMED_RECEIVED");
+  assert.equal(fullPaymentConference.json().data.releaseStatus, "RELEASED_FOR_DOCUMENTATION");
+  assert.equal(fullPaymentConference.json().data.pendingAmount, "0");
 
   const commercialGateDeliveryAt = new Date(new Date(financeDueAt).getTime() + 18000000).toISOString();
   const scheduledCommercialGateDelivery = await app.inject({

@@ -1227,6 +1227,47 @@ model FinancialTransaction {
   @@map("financial_transactions")
 }
 
+model SalePaymentCheck {
+  id                      String   @id @default(uuid())
+  storeId                 String   @map("store_id")
+  saleId                  String   @map("sale_id")
+  paymentItemType         String   @map("payment_item_type")
+  direction               String
+  isRequired              Boolean  @default(true) @map("is_required")
+  expectedAmount          Decimal  @map("expected_amount") @db.Decimal(14, 2)
+  confirmedAmount         Decimal? @map("confirmed_amount") @db.Decimal(14, 2)
+  pendingAmount           Decimal? @map("pending_amount") @db.Decimal(14, 2)
+  paymentMethod           String?  @map("payment_method")
+  expectedAt              DateTime? @map("expected_at")
+  bankMovementAt          DateTime? @map("bank_movement_at")
+  bankAccountId           String?  @map("bank_account_id")
+  bankDescription         String?  @map("bank_description")
+  bankTransactionId       String?  @map("bank_transaction_id")
+  payerOrReceiverName     String?  @map("payer_or_receiver_name")
+  payerOrReceiverDocument String?  @map("payer_or_receiver_document")
+  proofFileId             String?  @map("proof_file_id")
+  bankEvidenceFileId      String?  @map("bank_evidence_file_id")
+  paymentStatus           String   @default("PENDING") @map("payment_status")
+  releaseStatus           String   @default("BLOCKED") @map("release_status")
+  checkedByUserId         String?  @map("checked_by_user_id")
+  checkedAt               DateTime? @map("checked_at")
+  releaseApprovedByUserId String?  @map("release_approved_by_user_id")
+  releaseApprovedAt       DateTime? @map("release_approved_at")
+  divergenceReason        String?  @map("divergence_reason")
+  notes                   String?
+  metadata                Json?
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@unique([saleId, paymentItemType, direction])
+  @@index([storeId, saleId])
+  @@index([storeId, paymentStatus])
+  @@index([storeId, releaseStatus])
+  @@index([proofFileId])
+  @@index([bankEvidenceFileId])
+  @@map("sale_payment_checks")
+}
+
 model VehicleFinancialResult {
   id        String   @id @default(uuid())
   storeId   String   @map("store_id")

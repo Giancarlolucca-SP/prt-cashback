@@ -32,6 +32,7 @@ import {
   resolveActiveNotificationsForEntity,
   type ActiveNotificationSummary,
 } from "../services/internal-notifications.js";
+import { PAYMENT_RELEASED_STATUS } from "../services/sale-payment-check.js";
 
 const deliveryStatusSchema = z.enum([
   "AWAITING_PREREQUISITES",
@@ -267,7 +268,7 @@ async function getSaleReadyForDelivery(storeId: string, saleId: string) {
 }
 
 async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
-  const [signedContract, buyerDocumentChecklist, paidIncome] = await Promise.all([
+  const [signedContract, buyerDocumentChecklist, paidIncome, paymentChecks] = await Promise.all([
     prisma.contract.findFirst({
       where: {
         storeId,
@@ -298,29 +299,43 @@ async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
       select: { id: true, paidAt: true },
       orderBy: { paidAt: "desc" },
     }),
+    prisma.salePaymentCheck.findMany({
+      where: {
+        storeId,
+        saleId,
+        isRequired: true,
+      },
+      select: { id: true, paymentItemType: true, releaseStatus: true },
+    }),
   ]);
 
   const checklistByKey = new Map(buyerDocumentChecklist.map((item) => [item.itemKey, item]));
   const buyerDocumentsReady = requiredBuyerDocumentKeys.every((key) => checklistByKey.get(key)?.isDone === true);
+  const paymentChecksReady =
+    paymentChecks.length > 0 ? paymentChecks.every((item) => item.releaseStatus === PAYMENT_RELEASED_STATUS) : Boolean(paidIncome);
   const pendingPrerequisites = [
     !signedContract ? "contract_signed" : null,
     !buyerDocumentsReady ? "buyer_documents_checked" : null,
-    !paidIncome ? "payment_confirmed" : null,
+    !paymentChecksReady ? "payment_confirmed" : null,
   ].filter((item): item is string => Boolean(item));
 
   if (pendingPrerequisites.length > 0) {
-    throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica ainda nao liberada.", { pendingPrerequisites });
+    throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica ainda nao liberada.", {
+      pendingPrerequisites,
+      paymentChecks: paymentChecks.filter((item) => item.releaseStatus !== PAYMENT_RELEASED_STATUS),
+    });
   }
 
-  if (!signedContract || !paidIncome) {
+  if (!signedContract || !paymentChecksReady) {
     throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica ainda nao liberada.", { pendingPrerequisites });
   }
 
   return {
     signedContractId: signedContract.id,
     signedAt: signedContract.signedAt?.toISOString() ?? null,
-    paidTransactionId: paidIncome.id,
-    paidAt: paidIncome.paidAt?.toISOString() ?? null,
+    paidTransactionId: paidIncome?.id ?? null,
+    paidAt: paidIncome?.paidAt?.toISOString() ?? null,
+    paymentCheckIds: paymentChecks.map((item) => item.id),
     buyerDocumentKeys: requiredBuyerDocumentKeys,
   };
 }
