@@ -49,7 +49,7 @@
     "test:smoke:auth:summary": "node scripts/summarize-auth-smoke-timings.mjs",
     "test:smoke:auth:timed": "node scripts/run-auth-smoke-timed.mjs",
     "test:smoke:rate": "node --test tests/rate-limit.test.mjs",
-    "test:unit": "node --test tests/dev-check.test.mjs tests/prisma-log-level.test.mjs tests/prisma-schema-contract.test.mjs tests/qa-daily-auto-local.test.mjs tests/qa-runner.test.mjs tests/remote-content-schema-coverage.test.mjs tests/seed-contract.test.mjs tests/sql-injection-guard.test.mjs tests/web-csp-contract.test.mjs && node --import tsx --test tests/remote-content-guard.test.ts tests/technical-delivery-document.test.ts tests/commercial-kanban.test.ts tests/technical-delivery-lifecycle.test.ts tests/commercial-appointment.test.ts tests/commercial-scope.test.ts tests/commercial-interaction.test.ts tests/sales-transition.test.ts",
+    "test:unit": "node --test tests/dev-check.test.mjs tests/prisma-log-level.test.mjs tests/prisma-schema-contract.test.mjs tests/qa-daily-auto-local.test.mjs tests/qa-runner.test.mjs tests/remote-content-schema-coverage.test.mjs tests/seed-contract.test.mjs tests/sql-injection-guard.test.mjs tests/web-csp-contract.test.mjs && node --import tsx --test tests/remote-content-guard.test.ts tests/technical-delivery-document.test.ts tests/commercial-kanban.test.ts tests/technical-delivery-lifecycle.test.ts tests/commercial-appointment.test.ts tests/commercial-scope.test.ts tests/commercial-interaction.test.ts tests/commercial-alert.test.ts tests/sales-transition.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
