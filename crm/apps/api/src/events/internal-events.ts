@@ -62,6 +62,8 @@ export type InternalEventName =
   | "listing.sold"
   | "notification.created"
   | "notification.read"
+  | "notification.resolved"
+  | "notification.dismissed"
   | "ocr.status_changed"
   | "ocr.field_extracted"
   | "ocr.field_reviewed"

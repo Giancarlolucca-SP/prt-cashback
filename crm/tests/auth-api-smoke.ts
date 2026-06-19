@@ -6221,22 +6221,45 @@ try {
       body: "Cliente precisa de retorno sobre proposta.",
       entityType: "customer",
       entityId: createdCustomerId,
+      priority: "HIGH",
+      sourceModule: "commercial",
+      actionUrl: `/customers/${createdCustomerId}`,
     },
   });
   assert.equal(createNotification.statusCode, 201);
   assert.equal(createNotification.json().data.userId, sellerUserId);
+  assert.equal(createNotification.json().data.priority, "HIGH");
+  assert.equal(createNotification.json().data.status, "NEW");
+  assert.equal(createNotification.json().data.sourceModule, "commercial");
+  assert.equal(createNotification.json().data.actionUrl, `/customers/${createdCustomerId}`);
   assert.equal(createNotification.json().data.readAt, null);
   const notificationId = createNotification.json().data.id as string;
 
   const sellerNotifications = await app.inject({
     method: "GET",
-    url: "/notifications?unread_only=true",
+    url: `/notifications?unread_only=true&priority=HIGH&source_module=commercial&entity_id=${createdCustomerId}`,
     headers: {
       authorization: `Bearer ${sellerTokenAgain}`,
     },
   });
   assert.equal(sellerNotifications.statusCode, 200);
   assert.ok(sellerNotifications.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const sdrNotificationScope = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_id=${createdCustomerId}&page_size=100`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrNotificationScope.statusCode, 200);
+  assert.ok(!sdrNotificationScope.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const ownerNotificationScope = await app.inject({
+    method: "GET",
+    url: `/notifications?user_id=${sellerUserId}&status=NEW&priority=HIGH&source_module=commercial&entity_id=${createdCustomerId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(ownerNotificationScope.statusCode, 200);
+  assert.ok(ownerNotificationScope.json().items.some((notification: { id: string }) => notification.id === notificationId));
 
   const sellerNotificationSummary = await app.inject({
     method: "GET",
@@ -6257,6 +6280,7 @@ try {
   });
   assert.equal(readNotification.statusCode, 200);
   assert.ok(readNotification.json().data.readAt);
+  assert.equal(readNotification.json().data.status, "SEEN");
 
   const sellerUnreadAfterRead = await app.inject({
     method: "GET",
@@ -6267,6 +6291,61 @@ try {
   });
   assert.equal(sellerUnreadAfterRead.statusCode, 200);
   assert.ok(!sellerUnreadAfterRead.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const resolveNotification = await app.inject({
+    method: "POST",
+    url: `/notifications/${notificationId}/resolve`,
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(resolveNotification.statusCode, 200);
+  assert.equal(resolveNotification.json().data.status, "RESOLVED");
+  assert.ok(resolveNotification.json().data.resolvedAt);
+  assert.equal(resolveNotification.json().data.resolvedByUserId, sellerUserId);
+
+  const sellerResolvedNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?status=RESOLVED&entity_id=${createdCustomerId}`,
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(sellerResolvedNotifications.statusCode, 200);
+  assert.ok(sellerResolvedNotifications.json().items.some((notification: { id: string }) => notification.id === notificationId));
+
+  const createDismissibleNotification = await app.inject({
+    method: "POST",
+    url: "/notifications",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      userId: sellerUserId,
+      title: "Aviso comercial para ignorar",
+      body: "Aviso sem acao obrigatoria.",
+      entityType: "customer",
+      entityId: createdCustomerId,
+      priority: "LOW",
+      sourceModule: "commercial",
+    },
+  });
+  assert.equal(createDismissibleNotification.statusCode, 201);
+  const dismissibleNotificationId = createDismissibleNotification.json().data.id as string;
+
+  const dismissNotification = await app.inject({
+    method: "POST",
+    url: `/notifications/${dismissibleNotificationId}/dismiss`,
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+    payload: { reason: "Aviso validado manualmente" },
+  });
+  assert.equal(dismissNotification.statusCode, 200);
+  assert.equal(dismissNotification.json().data.status, "DISMISSED");
+  assert.ok(dismissNotification.json().data.dismissedAt);
+  assert.equal(dismissNotification.json().data.dismissedByUserId, sellerUserId);
+  assert.equal(dismissNotification.json().data.dismissedReason, "Aviso validado manualmente");
+
+  const resolveDismissedNotification = await app.inject({
+    method: "POST",
+    url: `/notifications/${dismissibleNotificationId}/resolve`,
+    headers: { authorization: `Bearer ${sellerTokenAgain}` },
+  });
+  assert.equal(resolveDismissedNotification.statusCode, 409);
+  assert.equal(resolveDismissedNotification.json().error.code, "CONFLICT");
 
   const deleteAttachment = await app.inject({
     method: "POST",

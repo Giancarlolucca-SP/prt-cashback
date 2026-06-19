@@ -1898,18 +1898,31 @@ model AutomationTest {
 }
 
 model Notification {
-  id         String    @id @default(uuid())
-  storeId    String?   @map("store_id")
-  userId     String?   @map("user_id")
-  title      String
-  body       String?
-  entityType String?   @map("entity_type")
-  entityId   String?   @map("entity_id")
-  readAt     DateTime? @map("read_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id                String    @id @default(uuid())
+  storeId           String?   @map("store_id")
+  userId            String?   @map("user_id")
+  title             String
+  body              String?
+  entityType        String?   @map("entity_type")
+  entityId          String?   @map("entity_id")
+  priority          String    @default("MEDIUM")
+  status            String    @default("NEW")
+  sourceModule      String?   @map("source_module")
+  actionUrl         String?   @map("action_url")
+  dueAt             DateTime? @map("due_at")
+  readAt            DateTime? @map("read_at")
+  resolvedAt        DateTime? @map("resolved_at")
+  resolvedByUserId  String?   @map("resolved_by_user_id")
+  dismissedAt       DateTime? @map("dismissed_at")
+  dismissedByUserId String?   @map("dismissed_by_user_id")
+  dismissedReason   String?   @map("dismissed_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   @@index([storeId])
   @@index([userId, readAt])
+  @@index([storeId, status])
+  @@index([storeId, priority])
   @@map("notifications")
 }
 
