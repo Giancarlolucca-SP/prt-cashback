@@ -514,6 +514,7 @@ model LeadCard {
   lead                   Lead                    @relation(fields: [leadId], references: [id])
   commercialAppointments CommercialAppointment[]
   commercialInteractions CommercialInteraction[]
+  commercialAlerts       CommercialAlert[]
 
   @@index([storeId, boardKey, stageKey])
   @@index([storeId, boardKey, archivedAt])
@@ -589,6 +590,41 @@ model CommercialAppointment {
   @@index([responsibleUserId])
   @@index([leadId])
   @@map("commercial_appointments")
+}
+
+model CommercialAlert {
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  alertType         String    @map("alert_type")
+  severity          String
+  status            String    @default("PENDING")
+  cardId            String    @map("card_id")
+  leadId            String?   @map("lead_id")
+  customerId        String?   @map("customer_id")
+  vehicleId         String?   @map("vehicle_id")
+  responsibleUserId String?   @map("responsible_user_id")
+  targetUserId      String?   @map("target_user_id")
+  targetRole        String?   @map("target_role")
+  reason            String
+  suggestedAction   String?   @map("suggested_action")
+  dueAt             DateTime? @map("due_at")
+  triggeredAt       DateTime  @default(now()) @map("triggered_at")
+  resolvedAt        DateTime? @map("resolved_at")
+  resolvedByUserId  String?   @map("resolved_by_user_id")
+  metadata          Json?     @map("metadata_json")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  card LeadCard @relation(fields: [cardId], references: [id])
+
+  @@index([storeId, status, severity])
+  @@index([storeId, alertType, status])
+  @@index([storeId, responsibleUserId, status])
+  @@index([storeId, targetUserId, status])
+  @@index([cardId])
+  @@index([leadId])
+  @@index([dueAt])
+  @@map("commercial_alerts")
 }
 
 model LeadStageHistory {

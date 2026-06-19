@@ -7,6 +7,10 @@ const activeRepasseMigration = readFileSync(
   "packages/db/prisma/migrations/20260616195000_active_repasse_excludes_terminal_statuses/migration.sql",
   "utf8"
 );
+const commercialAlertsMigration = readFileSync(
+  "packages/db/prisma/migrations/20260618223000_add_commercial_alerts/migration.sql",
+  "utf8"
+);
 
 function modelBlock(modelName) {
   const match = schema.match(new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`, "m"));
@@ -65,4 +69,16 @@ test("active repasse is unique per store vehicle pair", () => {
   assert.match(activeRepasseMigration, /ON "repasse_processes"\("store_id", "vehicle_id"\)/);
   assert.match(activeRepasseMigration, /WHERE "deleted_at" IS NULL/);
   assert.match(activeRepasseMigration, /"status" NOT IN \('CANCELLED', 'REVENUE_RECOGNIZED'\)/);
+});
+
+test("commercial alerts persist priority queue state and dedupe active conditions", () => {
+  const alert = modelBlock("CommercialAlert");
+  assert.match(alert, /storeId\s+String\s+@map\("store_id"\)/);
+  assert.match(alert, /alertType\s+String\s+@map\("alert_type"\)/);
+  assert.match(alert, /status\s+String\s+@default\("PENDING"\)/);
+  assert.match(alert, /metadata\s+Json\?\s+@map\("metadata_json"\)/);
+  assert.match(alert, /@@map\("commercial_alerts"\)/);
+  assert.match(commercialAlertsMigration, /CREATE UNIQUE INDEX "commercial_alerts_active_dedup_key"/);
+  assert.match(commercialAlertsMigration, /ON "commercial_alerts"\("store_id", "card_id", "alert_type"\)/);
+  assert.match(commercialAlertsMigration, /WHERE "status" IN \('PENDING', 'VIEWED'\)/);
 });
