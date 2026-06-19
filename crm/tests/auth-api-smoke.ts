@@ -6442,6 +6442,81 @@ try {
   assert.ok(buyerDocChecked);
   assert.equal(buyerDocChecked.saleId, transferredSaleId);
 
+  // --- Sprint 3 US01: buyer document checklist is born from the DOCUMENTATION handoff ---
+  const buyerChecklist = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}/document-checklist`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+  });
+  assert.equal(buyerChecklist.statusCode, 200);
+  assert.ok(buyerChecklist.json().data.items.some((item: { itemKey: string; isRequired: boolean }) => item.itemKey === "person_identity_document" && item.isRequired));
+  assert.ok(buyerChecklist.json().data.items.some((item: { itemKey: string; isRequired: boolean }) => item.itemKey === "person_address_proof" && item.isRequired));
+  assert.equal(buyerChecklist.json().data.summary.blockedForContracts, true);
+
+  const sellerCannotApproveBuyerDocument = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}/document-checklist/person_identity_document`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { status: "CHECKED", notes: "tentativa de aprovar como vendedor" },
+  });
+  assert.equal(sellerCannotApproveBuyerDocument.statusCode, 403);
+
+  const sellerReceivesBuyerDocument = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}/document-checklist/person_identity_document`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: { status: "RECEIVED", notes: "RG/CNH entregue pelo comprador" },
+  });
+  assert.equal(sellerReceivesBuyerDocument.statusCode, 200);
+  assert.equal(sellerReceivesBuyerDocument.json().data.status, "RECEIVED");
+  assert.equal(sellerReceivesBuyerDocument.json().data.isDone, false);
+
+  const blockedContractByBuyerDocs = await app.inject({
+    method: "POST",
+    url: "/contracts/generate",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      saleId: transferredSaleId,
+      status: "GENERATED",
+      snapshot: { qa: true, source: "s3-us01-blocked-by-docs" },
+    },
+  });
+  assert.equal(blockedContractByBuyerDocs.statusCode, 422);
+  assert.ok(
+    blockedContractByBuyerDocs
+      .json()
+      .error.details.pendingDocumentItems.some((item: { itemKey: string; reason: string }) => item.itemKey === "person_identity_document" && item.reason === "required_pending"),
+  );
+
+  const staleAddressProofDate = new Date(Date.now() - 130 * 24 * 60 * 60 * 1000).toISOString();
+  const staleAddressProof = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}/document-checklist/person_address_proof`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { status: "CHECKED", issueDate: staleAddressProofDate, notes: "comprovante antigo em QA" },
+  });
+  assert.equal(staleAddressProof.statusCode, 422);
+  assert.equal(staleAddressProof.json().error.code, "BUSINESS_RULE_ERROR");
+
+  const checkIdentityDocument = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}/document-checklist/person_identity_document`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { status: "CHECKED", notes: "RG/CNH conferido pelo administrativo" },
+  });
+  assert.equal(checkIdentityDocument.statusCode, 200);
+  assert.equal(checkIdentityDocument.json().data.isDone, true);
+
+  const currentAddressProofDate = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+  const checkAddressProof = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}/document-checklist/person_address_proof`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: { status: "CHECKED", issueDate: currentAddressProofDate, notes: "comprovante atualizado conferido" },
+  });
+  assert.equal(checkAddressProof.statusCode, 200);
+  assert.equal(checkAddressProof.json().summary.blockedForContracts, false);
+
   // --- US04 -> US06 final gate (stage 5): real producers unlock technical delivery ---
   const commercialGateContract = await app.inject({
     method: "POST",

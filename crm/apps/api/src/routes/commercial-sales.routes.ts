@@ -10,6 +10,14 @@ import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 import {
+  DOCUMENT_CHECKLIST_STATUSES,
+  buildBuyerDocumentChecklistItems,
+  isAddressProofExpired,
+  isAddressProofItem,
+  isDocumentChecklistDone,
+  type DocumentChecklistStatus,
+} from "../services/sale-document-checklist.js";
+import {
   activeNotificationSummaryByEntity,
   activeStoreUserIdsByRoles,
   emptyActiveNotificationSummary,
@@ -117,6 +125,32 @@ const closeDealSchema = z.object({
 });
 
 const conferDocumentsSchema = z.object({ notes: notesField }).default({});
+const documentChecklistStatusSchema = z.enum(DOCUMENT_CHECKLIST_STATUSES);
+const documentChecklistParamsSchema = saleParamsSchema.extend({
+  itemKey: z.string().trim().min(2).max(80),
+});
+const updateDocumentChecklistItemSchema = z
+  .object({
+    status: documentChecklistStatusSchema.optional(),
+    attachmentId: z.string().uuid().nullable().optional(),
+    issueDate: z.coerce.date().nullable().optional(),
+    validUntil: z.coerce.date().nullable().optional(),
+    responsibleUserId: z.string().uuid().nullable().optional(),
+    notes: notesField,
+    rejectionReason: z.string().trim().max(500).optional(),
+    waivedReason: z.string().trim().max(500).optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Informe ao menos um campo para atualizar.",
+  })
+  .superRefine((input, ctx) => {
+    if (input.status === "REJECTED" && !input.rejectionReason && !input.notes) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe motivo/observacao para recusar documento.", path: ["rejectionReason"] });
+    }
+    if (input.status === "WAIVED" && !input.waivedReason && !input.notes) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe motivo/observacao para dispensar documento.", path: ["waivedReason"] });
+    }
+  });
 
 const OWN_FINANCING_ALERT_TYPE = "own_financing_alert";
 
@@ -297,6 +331,106 @@ function mergeSnapshot(snapshot: Prisma.JsonValue | null, patch: Record<string, 
   return { ...base, ...patch } as Prisma.InputJsonObject;
 }
 
+type SaleDocumentChecklistRecord = Prisma.SaleDocumentChecklistGetPayload<Record<string, never>>;
+
+function sanitizeDocumentChecklistItem(item: SaleDocumentChecklistRecord) {
+  return {
+    id: item.id,
+    saleId: item.saleId,
+    itemKey: item.itemKey,
+    label: item.label,
+    status: item.status,
+    isRequired: item.isRequired,
+    isDone: item.isDone,
+    attachmentId: item.attachmentId,
+    issueDate: item.issueDate?.toISOString() ?? null,
+    validUntil: item.validUntil?.toISOString() ?? null,
+    completedAt: item.completedAt?.toISOString() ?? null,
+    checkedAt: item.checkedAt?.toISOString() ?? null,
+    checkedByUserId: item.checkedByUserId,
+    responsibleUserId: item.responsibleUserId,
+    notes: item.notes,
+    rejectionReason: item.rejectionReason,
+    waivedReason: item.waivedReason,
+    metadata: item.metadata,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+function documentChecklistSummary(items: SaleDocumentChecklistRecord[]) {
+  const staleItems = items.filter((item) => item.isRequired && isAddressProofItem(item.itemKey, item.metadata) && isAddressProofExpired(item.issueDate));
+  const pendingRequiredItems = items.filter((item) => item.isRequired && !item.isDone);
+  const blockers = [
+    ...pendingRequiredItems.map((item) => ({ itemKey: item.itemKey, reason: "required_pending" })),
+    ...staleItems.map((item) => ({ itemKey: item.itemKey, reason: "address_proof_expired" })),
+  ];
+
+  return {
+    total: items.length,
+    required: items.filter((item) => item.isRequired).length,
+    done: items.filter((item) => item.isDone).length,
+    pendingRequired: pendingRequiredItems.length,
+    blockedForContracts: blockers.length > 0,
+    blockers,
+  };
+}
+
+async function createMissingBuyerDocumentChecklistItems(
+  tx: Prisma.TransactionClient,
+  storeId: string,
+  sale: Pick<SaleRecord, "id" | "customerId" | "hasFinancing" | "financingType" | "sellerUserId">,
+) {
+  const customer = sale.customerId
+    ? await tx.customer.findFirst({ where: { id: sale.customerId, storeId, deletedAt: null }, select: { type: true } })
+    : null;
+  const items = buildBuyerDocumentChecklistItems({
+    buyerType: customer?.type ?? "PERSON",
+    hasFinancing: sale.hasFinancing,
+    financingType: sale.financingType,
+  });
+
+  await tx.saleDocumentChecklist.createMany({
+    data: items.map((item) => ({
+      storeId,
+      saleId: sale.id,
+      itemKey: item.itemKey,
+      label: item.label,
+      isRequired: item.isRequired,
+      responsibleUserId: sale.sellerUserId,
+      metadata: item.metadata as Prisma.InputJsonObject,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+function canRoleAdministerDocumentChecklist(role: string) {
+  return isCommercialFullView(role);
+}
+
+function assertChecklistStatusAllowedForRole(role: string, status: DocumentChecklistStatus | undefined) {
+  if (!status || canRoleAdministerDocumentChecklist(role)) {
+    return;
+  }
+  if (role === "SELLER" && ["REQUESTED", "RECEIVED", "ATTACHED"].includes(status)) {
+    return;
+  }
+  throw new ApiError("FORBIDDEN", "Vendedor pode anexar/receber documentos, mas nao aprovar, recusar ou dispensar conferencia.");
+}
+
+async function ensureAttachmentInStore(storeId: string, attachmentId: string | null | undefined) {
+  if (!attachmentId) {
+    return;
+  }
+  const attachment = await prisma.fileAttachment.findFirst({
+    where: { id: attachmentId, storeId, status: "ACTIVE", deletedAt: null },
+    select: { id: true },
+  });
+  if (!attachment) {
+    throw new ApiError("NOT_FOUND", "Anexo do checklist nao encontrado.");
+  }
+}
+
 // Best-effort managerial alert for customer-own financing. Deduped by the ACTIVE condition
 // (one alert per sale while it persists, regardless of readAt), like the S2-US03 review fix.
 async function raiseOwnFinancingAlert(session: SalesSession, sale: SaleRecord) {
@@ -424,6 +558,121 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       ],
     });
     return { data: sanitizeSale(sale, card?.stageKey ?? null, saleActiveNotificationSummary(activeNotificationSummaries, sale.id)) };
+  });
+
+  app.get("/:id/document-checklist", async (request) => {
+    const session = await requirePermission(request, { module: "sales", action: "read", scope: "STORE", sensitiveArea: "general" });
+    const params = saleParamsSchema.parse(request.params);
+    const sale = await loadScopedSale(session, params.id);
+    const items = await prisma.saleDocumentChecklist.findMany({
+      where: { storeId: session.user.storeId, saleId: sale.id },
+      orderBy: [{ isRequired: "desc" }, { createdAt: "asc" }],
+    });
+
+    return {
+      data: {
+        sale: sanitizeSale(sale, await getSaleStageKey(sale.id)),
+        summary: documentChecklistSummary(items),
+        items: items.map(sanitizeDocumentChecklistItem),
+      },
+    };
+  });
+
+  app.patch("/:id/document-checklist/:itemKey", async (request) => {
+    const session = await requirePermission(request, { module: "documents", action: "manage", scope: "STORE", sensitiveArea: "documents" });
+    const params = documentChecklistParamsSchema.parse(request.params);
+    const input = updateDocumentChecklistItemSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    const item = await prisma.saleDocumentChecklist.findFirst({
+      where: { storeId: session.user.storeId, saleId: sale.id, itemKey: params.itemKey },
+    });
+    if (!item) {
+      throw new ApiError("NOT_FOUND", "Item do checklist documental nao encontrado.");
+    }
+
+    assertChecklistStatusAllowedForRole(session.user.role, input.status);
+    if (input.responsibleUserId) {
+      await ensureSellerInStore(session.user.storeId, input.responsibleUserId);
+    }
+    await ensureAttachmentInStore(session.user.storeId, input.attachmentId);
+
+    const requestedStatus = (input.status ?? item.status) as DocumentChecklistStatus;
+    const issueDate = input.issueDate === undefined ? item.issueDate : input.issueDate;
+    const isAddressProof = isAddressProofItem(item.itemKey, item.metadata);
+    const expiredAddressProof = isAddressProof && isAddressProofExpired(issueDate);
+    if (expiredAddressProof && isDocumentChecklistDone(requestedStatus)) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Comprovante de residencia/endereco esta desatualizado.", {
+        itemKey: item.itemKey,
+        maxAgeDays: 92,
+      });
+    }
+    const nextStatus = expiredAddressProof ? "EXPIRED" : requestedStatus;
+    const nextIsDone = isDocumentChecklistDone(nextStatus);
+    const now = new Date();
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.saleDocumentChecklist.update({
+        where: { id: item.id },
+        data: {
+          status: nextStatus,
+          isDone: nextIsDone,
+          attachmentId: input.attachmentId === undefined ? undefined : input.attachmentId,
+          issueDate: input.issueDate === undefined ? undefined : input.issueDate,
+          validUntil: input.validUntil === undefined ? undefined : input.validUntil,
+          completedAt: nextIsDone ? item.completedAt ?? now : null,
+          checkedAt: nextIsDone ? item.checkedAt ?? now : null,
+          checkedByUserId: nextIsDone ? item.checkedByUserId ?? session.user.id : null,
+          responsibleUserId: input.responsibleUserId === undefined ? undefined : input.responsibleUserId,
+          notes: input.notes === undefined ? undefined : input.notes,
+          rejectionReason: input.rejectionReason === undefined ? undefined : input.rejectionReason,
+          waivedReason: input.waivedReason === undefined ? undefined : input.waivedReason,
+        },
+      });
+
+      if (input.attachmentId) {
+        await tx.fileAttachmentLink.createMany({
+          data: [
+            {
+              storeId: session.user.storeId,
+              attachmentId: input.attachmentId,
+              entityType: "sale",
+              entityId: sale.id,
+              purpose: item.itemKey,
+            },
+          ],
+          skipDuplicates: true,
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "documents",
+          action: "buyer_document_checklist_item_updated",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: {
+            itemKey: item.itemKey,
+            fromStatus: item.status,
+            toStatus: next.status,
+            attachmentId: next.attachmentId,
+            addressProofExpired: expiredAddressProof,
+          },
+        },
+      });
+
+      return next;
+    });
+
+    const items = await prisma.saleDocumentChecklist.findMany({ where: { storeId: session.user.storeId, saleId: sale.id } });
+    return {
+      data: sanitizeDocumentChecklistItem(updated),
+      summary: documentChecklistSummary(items),
+      warnings: expiredAddressProof ? [{ itemKey: item.itemKey, code: "ADDRESS_PROOF_EXPIRED" }] : [],
+    };
   });
 
   app.post("/transfer", async (request, reply) => {
@@ -711,14 +960,18 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       // Real producer of the technical-delivery prerequisite (buyer documents delivered, S2-US06).
       await tx.saleDocumentChecklist.upsert({
         where: { saleId_itemKey: { saleId: sale.id, itemKey: "buyer_document_delivered" } },
-        update: { isDone: true, completedAt: new Date() },
+        update: { status: "RECEIVED", isDone: true, completedAt: new Date(), responsibleUserId: sale.sellerUserId },
         create: {
           storeId: session.user.storeId,
           saleId: sale.id,
           itemKey: "buyer_document_delivered",
           label: "Documentos do comprador entregues",
+          status: "RECEIVED",
           isDone: true,
+          isRequired: true,
           completedAt: new Date(),
+          responsibleUserId: sale.sellerUserId,
+          metadata: { category: "gate", source: "s2_us06" },
         },
       });
 
@@ -820,6 +1073,8 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
         });
       }
 
+      await createMissingBuyerDocumentChecklistItems(tx, session.user.storeId, next);
+
       await tx.auditLog.create({
         data: {
           storeId: session.user.storeId,
@@ -832,6 +1087,19 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
           result: "SUCCESS",
           // Closing moves to the management/documentation queue; it NEVER releases documents/delivery.
           metadata: { negotiatedValue, paymentMethod, financingType, status: "DOCUMENTATION", releasesDocuments: false },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "documents",
+          action: "buyer_document_checklist_created",
+          entityType: "sale",
+          entityId: sale.id,
+          result: "SUCCESS",
+          metadata: { status: "DOCUMENTATION", customerId: next.customerId, financingType: next.financingType },
         },
       });
       if (sale.leadId) {
@@ -910,14 +1178,19 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       // Real producer of the technical-delivery prerequisite (buyer documents checked, S2-US06).
       await tx.saleDocumentChecklist.upsert({
         where: { saleId_itemKey: { saleId: sale.id, itemKey: "buyer_document_checked" } },
-        update: { isDone: true, completedAt: new Date() },
+        update: { status: "CHECKED", isDone: true, completedAt: new Date(), checkedAt: new Date(), checkedByUserId: session.user.id },
         create: {
           storeId: session.user.storeId,
           saleId: sale.id,
           itemKey: "buyer_document_checked",
           label: "Documentos do comprador conferidos",
+          status: "CHECKED",
           isDone: true,
+          isRequired: true,
           completedAt: new Date(),
+          checkedAt: new Date(),
+          checkedByUserId: session.user.id,
+          metadata: { category: "gate", source: "s2_us06" },
         },
       });
 

@@ -916,18 +916,32 @@ model SalePaymentTerm {
 }
 
 model SaleDocumentChecklist {
-  id          String    @id @default(uuid())
-  storeId     String    @map("store_id")
-  saleId      String    @map("sale_id")
-  itemKey     String    @map("item_key")
-  label       String
-  isDone      Boolean   @default(false) @map("is_done")
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  saleId            String    @map("sale_id")
+  itemKey           String    @map("item_key")
+  label             String
+  status            String    @default("PENDING")
+  isRequired        Boolean   @default(true) @map("is_required")
+  isDone            Boolean   @default(false) @map("is_done")
+  attachmentId      String?   @map("attachment_id")
+  issueDate         DateTime? @map("issue_date")
+  validUntil        DateTime? @map("valid_until")
+  completedAt       DateTime? @map("completed_at")
+  checkedAt         DateTime? @map("checked_at")
+  checkedByUserId   String?   @map("checked_by_user_id")
+  responsibleUserId String?   @map("responsible_user_id")
+  notes             String?
+  rejectionReason   String?   @map("rejection_reason")
+  waivedReason      String?   @map("waived_reason")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   @@unique([saleId, itemKey])
   @@index([storeId])
+  @@index([storeId, saleId, status])
+  @@index([attachmentId])
   @@map("sale_document_checklists")
 }
 

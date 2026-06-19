@@ -6,6 +6,7 @@ import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
 import { prisma } from "../lib/db.js";
+import { isAddressProofExpired, isAddressProofItem } from "../services/sale-document-checklist.js";
 
 const contractQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -117,6 +118,39 @@ async function buildSaleSnapshot(storeId: string, saleId: string, extra?: Record
   };
 }
 
+async function ensureBuyerDocumentsReadyForContract(storeId: string, sale: Awaited<ReturnType<typeof getSaleOrThrow>>) {
+  if (sale.status !== "DOCUMENTATION") {
+    return;
+  }
+
+  const checklist = await prisma.saleDocumentChecklist.findMany({
+    where: { storeId, saleId: sale.id, isRequired: true },
+    select: { itemKey: true, label: true, status: true, isDone: true, issueDate: true, metadata: true },
+  });
+
+  if (checklist.length === 0) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Contrato bloqueado: checklist documental do comprador ainda nao foi criado.", {
+      pendingDocumentItems: [{ itemKey: "buyer_document_checklist", reason: "missing_checklist" }],
+    });
+  }
+
+  const pendingDocumentItems = checklist
+    .flatMap((item) => {
+      const issues: Array<{ itemKey: string; label: string; reason: string; status: string }> = [];
+      if (!item.isDone) {
+        issues.push({ itemKey: item.itemKey, label: item.label, reason: "required_pending", status: item.status });
+      }
+      if (isAddressProofItem(item.itemKey, item.metadata) && isAddressProofExpired(item.issueDate)) {
+        issues.push({ itemKey: item.itemKey, label: item.label, reason: "address_proof_expired", status: item.status });
+      }
+      return issues;
+    });
+
+  if (pendingDocumentItems.length > 0) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Contrato bloqueado por pendencia documental obrigatoria.", { pendingDocumentItems });
+  }
+}
+
 export async function registerContractRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const session = await requirePermission(request, {
@@ -164,6 +198,7 @@ export async function registerContractRoutes(app: FastifyInstance) {
     });
     const input = generateContractSchema.parse(request.body);
     const sale = await getSaleOrThrow(session.user.storeId, input.saleId);
+    await ensureBuyerDocumentsReadyForContract(session.user.storeId, sale);
     const currentVersion = await prisma.contract.count({
       where: { storeId: session.user.storeId, saleId: sale.id },
     });
