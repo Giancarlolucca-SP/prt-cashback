@@ -269,7 +269,7 @@ async function getSaleReadyForDelivery(storeId: string, saleId: string) {
 }
 
 async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
-  const [signedContract, buyerDocumentChecklist, paidIncome, paymentChecks, inspectionReports] = await Promise.all([
+  const [signedContract, signedWarrantyTerm, buyerDocumentChecklist, paidIncome, paymentChecks, inspectionReports] = await Promise.all([
     prisma.contract.findFirst({
       where: {
         storeId,
@@ -279,6 +279,16 @@ async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
       },
       select: { id: true, signedAt: true },
       orderBy: { signedAt: "desc" },
+    }),
+    prisma.warrantyTerm.findFirst({
+      where: {
+        storeId,
+        saleId,
+        signedStatus: { in: ["SIGNED", "WAIVED"] },
+        signedConfirmedAt: { not: null },
+      },
+      select: { id: true, signedStatus: true, signedConfirmedAt: true },
+      orderBy: { signedConfirmedAt: "desc" },
     }),
     prisma.saleDocumentChecklist.findMany({
       where: {
@@ -326,6 +336,7 @@ async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
   const inspectionReportsReady = pendingInspectionReports.length === 0;
   const pendingPrerequisites = [
     !signedContract ? "contract_signed" : null,
+    !signedWarrantyTerm ? "warranty_term_signed" : null,
     !buyerDocumentsReady ? "buyer_documents_checked" : null,
     !paymentChecksReady ? "payment_confirmed" : null,
     !inspectionReportsReady ? "inspection_reports_checked" : null,
@@ -339,13 +350,16 @@ async function ensureDeliveryPrerequisites(storeId: string, saleId: string) {
     });
   }
 
-  if (!signedContract || !paymentChecksReady || !inspectionReportsReady) {
+  if (!signedContract || !signedWarrantyTerm || !paymentChecksReady || !inspectionReportsReady) {
     throw new ApiError("BUSINESS_RULE_ERROR", "Entrega tecnica ainda nao liberada.", { pendingPrerequisites, pendingInspectionReports });
   }
 
   return {
     signedContractId: signedContract.id,
     signedAt: signedContract.signedAt?.toISOString() ?? null,
+    warrantyTermId: signedWarrantyTerm.id,
+    warrantySignedStatus: signedWarrantyTerm.signedStatus,
+    warrantySignedAt: signedWarrantyTerm.signedConfirmedAt?.toISOString() ?? null,
     paidTransactionId: paidIncome?.id ?? null,
     paidAt: paidIncome?.paidAt?.toISOString() ?? null,
     paymentCheckIds: paymentChecks.map((item) => item.id),

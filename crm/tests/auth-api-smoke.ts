@@ -3992,6 +3992,10 @@ try {
   assert.equal(generateContract.json().data.version, 1);
   assert.equal(generateContract.json().data.status, "GENERATED");
   const contractId = generateContract.json().data.id as string;
+  assert.equal(generateContract.json().warrantyTerm.saleId, saleId);
+  assert.equal(generateContract.json().warrantyTerm.sourceContractId, contractId);
+  assert.equal(generateContract.json().warrantyTerm.status, "READY_TO_PRINT");
+  const warrantyTermId = generateContract.json().warrantyTerm.id as string;
 
   const listContracts = await app.inject({
     method: "GET",
@@ -4042,24 +4046,93 @@ try {
   assert.equal(blockedTechnicalDeliverySchedule.statusCode, 422);
   assert.equal(blockedTechnicalDeliverySchedule.json().error.code, "BUSINESS_RULE_ERROR");
   assert.ok(blockedTechnicalDeliverySchedule.json().error.details.pendingPrerequisites.includes("buyer_documents_checked"));
+  assert.ok(blockedTechnicalDeliverySchedule.json().error.details.pendingPrerequisites.includes("warranty_term_signed"));
 
-  const warrantyTerm = await app.inject({
+  const listWarrantyTerms = await app.inject({
+    method: "GET",
+    url: `/contracts/warranty-terms?sale_id=${saleId}`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(listWarrantyTerms.statusCode, 200);
+  assert.ok(listWarrantyTerms.json().items.some((term: { id: string; generatedFileId: string | null }) => term.id === warrantyTermId && Boolean(term.generatedFileId)));
+
+  const warrantyTermDocument = await app.inject({
+    method: "GET",
+    url: `/contracts/warranty-terms/${warrantyTermId}/document?format=html`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(warrantyTermDocument.statusCode, 200);
+  assert.match(warrantyTermDocument.body, /Termo de Garantia de 90 Dias/);
+
+  const sellerWarrantySummaryBeforeSignature = await app.inject({
+    method: "GET",
+    url: `/contracts/sales/${saleId}/signature-summary`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerWarrantySummaryBeforeSignature.statusCode, 200);
+  assert.ok(sellerWarrantySummaryBeforeSignature.json().data.pendingItems.includes("warranty_term_signed"));
+
+  const printWarrantyTerm = await app.inject({
     method: "POST",
-    url: "/contracts/warranty-terms",
+    url: `/contracts/warranty-terms/${warrantyTermId}/print`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      saleId,
-      terms: {
-        prazoDias: 90,
-        cobertura: ["motor", "cambio"],
-      },
+      printerConfigured: true,
     },
   });
-  assert.equal(warrantyTerm.statusCode, 201);
-  assert.equal(warrantyTerm.json().data.saleId, saleId);
+  assert.equal(printWarrantyTerm.statusCode, 200);
+  assert.equal(printWarrantyTerm.json().data.status, "PRINTED");
+  assert.ok(printWarrantyTerm.json().data.printedAt);
 
+  const reprintWarrantyTerm = await app.inject({
+    method: "POST",
+    url: `/contracts/warranty-terms/${warrantyTermId}/print`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      printerConfigured: true,
+      reason: "Cliente solicitou segunda via para assinatura fisica",
+    },
+  });
+  assert.equal(reprintWarrantyTerm.statusCode, 200);
+  assert.equal(reprintWarrantyTerm.json().data.status, "REPRINTED");
+  assert.equal(reprintWarrantyTerm.json().data.reprintCount, 1);
+
+  const confirmWarrantySignature = await app.inject({
+    method: "POST",
+    url: `/contracts/warranty-terms/${warrantyTermId}/confirm-signature`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      signedStatus: "SIGNED",
+      observation: "Termo assinado fisicamente pelo comprador no smoke US06",
+      allDocumentsSignedStatus: "ALL_SIGNED",
+    },
+  });
+  assert.equal(confirmWarrantySignature.statusCode, 200);
+  assert.equal(confirmWarrantySignature.json().data.signedStatus, "SIGNED");
+  assert.equal(confirmWarrantySignature.json().data.allDocumentsSignedStatus, "ALL_SIGNED");
+
+  const sellerWarrantySummaryAfterSignature = await app.inject({
+    method: "GET",
+    url: `/contracts/sales/${saleId}/signature-summary`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerWarrantySummaryAfterSignature.statusCode, 200);
+  assert.equal(sellerWarrantySummaryAfterSignature.json().data.warrantyTerm.signedStatus, "SIGNED");
+  assert.ok(!sellerWarrantySummaryAfterSignature.json().data.pendingItems.includes("warranty_term_signed"));
   const deliveryChecklist = await app.inject({
     method: "POST",
     url: "/contracts/delivery-checklists",
@@ -6922,6 +6995,9 @@ try {
   assert.equal(commercialGateContract.statusCode, 201);
   assert.equal(commercialGateContract.json().data.saleId, transferredSaleId);
   const commercialGateContractId = commercialGateContract.json().data.id as string;
+  assert.equal(commercialGateContract.json().warrantyTerm.saleId, transferredSaleId);
+  assert.equal(commercialGateContract.json().warrantyTerm.sourceContractId, commercialGateContractId);
+  const commercialGateWarrantyTermId = commercialGateContract.json().warrantyTerm.id as string;
 
   const commercialGateContractPackage = await app.inject({
     method: "POST",
@@ -7167,6 +7243,49 @@ try {
   assert.equal(signedCommercialGateContract.json().data.status, "SIGNED");
   assert.equal(signedCommercialGateContract.json().data.signedAt, financeDueAt);
 
+  const blockedWithoutWarrantySignature = await app.inject({
+    method: "POST",
+    url: "/technical-deliveries/schedule",
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {
+      saleId: transferredSaleId,
+      scheduledAt: new Date(new Date(financeDueAt).getTime() + 13800000).toISOString(),
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(blockedWithoutWarrantySignature.statusCode, 422);
+  assert.ok(blockedWithoutWarrantySignature.json().error.details.pendingPrerequisites.includes("warranty_term_signed"));
+
+  const printCommercialGateWarranty = await app.inject({
+    method: "POST",
+    url: `/contracts/warranty-terms/${commercialGateWarrantyTermId}/print`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { printerConfigured: true },
+  });
+  assert.equal(printCommercialGateWarranty.statusCode, 200);
+  assert.equal(printCommercialGateWarranty.json().data.status, "PRINTED");
+
+  const signCommercialGateWarranty = await app.inject({
+    method: "POST",
+    url: `/contracts/warranty-terms/${commercialGateWarrantyTermId}/confirm-signature`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      signedStatus: "SIGNED",
+      observation: "Termo de garantia assinado no gate US04-US06",
+      allDocumentsSignedStatus: "ALL_SIGNED",
+    },
+  });
+  assert.equal(signCommercialGateWarranty.statusCode, 200);
+  assert.equal(signCommercialGateWarranty.json().data.signedStatus, "SIGNED");
+
+  const commercialGateSignatureSummary = await app.inject({
+    method: "GET",
+    url: `/contracts/sales/${transferredSaleId}/signature-summary`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(commercialGateSignatureSummary.statusCode, 200);
+  assert.equal(commercialGateSignatureSummary.json().data.warrantyTerm.signedStatus, "SIGNED");
+  assert.ok(!commercialGateSignatureSummary.json().data.pendingItems.includes("warranty_term_signed"));
   const blockedWithoutPaidIncome = await app.inject({
     method: "POST",
     url: "/technical-deliveries/schedule",

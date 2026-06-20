@@ -1043,14 +1043,34 @@ model ContractDocumentPackage {
 }
 
 model WarrantyTerm {
-  id        String   @id @default(uuid())
-  storeId   String   @map("store_id")
-  saleId    String   @map("sale_id")
-  terms     Json
-  createdAt DateTime @default(now()) @map("created_at")
+  id                       String    @id @default(uuid())
+  storeId                  String    @map("store_id")
+  saleId                   String    @map("sale_id")
+  sourceContractId         String?   @map("source_contract_id")
+  templateId               String?   @map("template_id")
+  generatedFileId          String?   @map("generated_file_id")
+  status                   String    @default("GENERATED")
+  terms                    Json
+  snapshot                 Json?
+  generatedAt              DateTime? @map("generated_at")
+  printedAt                DateTime? @map("printed_at")
+  printedByUserId          String?   @map("printed_by_user_id")
+  signedStatus             String    @default("PENDING") @map("signed_status")
+  signedConfirmedAt        DateTime? @map("signed_confirmed_at")
+  signedConfirmedByUserId  String?   @map("signed_confirmed_by_user_id")
+  signatureObservation     String?   @map("signature_observation")
+  allDocumentsSignedStatus String    @default("PENDING_SIGNATURES") @map("all_documents_signed_status")
+  reprintCount             Int       @default(0) @map("reprint_count")
+  lastReprintAt            DateTime? @map("last_reprint_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
 
   @@index([storeId])
   @@index([saleId])
+  @@index([sourceContractId])
+  @@index([generatedFileId])
+  @@index([storeId, status])
+  @@index([storeId, signedStatus])
   @@map("warranty_terms")
 }
 
