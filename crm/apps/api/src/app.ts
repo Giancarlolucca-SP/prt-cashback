@@ -33,6 +33,7 @@ import { registerOpsRoutes } from "./routes/ops.routes.js";
 import { registerPurchaseRoutes } from "./routes/purchases.routes.js";
 import { registerRepasseRoutes } from "./routes/repasse.routes.js";
 import { registerSaleRoutes } from "./routes/sales.routes.js";
+import { registerSaleDossierRoutes } from "./routes/sale-dossiers.routes.js";
 import { registerSecurityHoneypotRoutes } from "./routes/security-honeypot.routes.js";
 import { registerServiceRoutes } from "./routes/services.routes.js";
 import { registerSettingRoutes } from "./routes/settings.routes.js";
@@ -82,6 +83,7 @@ export function buildApp() {
   app.register(registerComplianceRoutes, { prefix: "/compliance" });
   app.register(registerInventoryRoutes, { prefix: "/inventory" });
   app.register(registerSaleRoutes, { prefix: "/sales" });
+  app.register(registerSaleDossierRoutes, { prefix: "/sale-dossiers" });
   app.register(registerFinanceRoutes, { prefix: "/finance" });
   app.register(registerCommissionRoutes, { prefix: "/commissions" });
   app.register(registerContractRoutes, { prefix: "/contracts" });

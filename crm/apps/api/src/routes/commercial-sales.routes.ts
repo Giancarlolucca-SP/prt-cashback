@@ -37,6 +37,7 @@ import {
 } from "../services/sales-transition.js";
 import { createMissingSalePaymentChecks, summarizeSalePaymentChecks } from "../services/sale-payment-check.js";
 import { createMissingSaleInspectionReports, summarizeSaleInspectionReports } from "../services/sale-inspection-report.js";
+import { ensureSaleDossier } from "../services/sale-dossier.js";
 
 // Sales-board (Kanban Vendas) default stage when an opportunity enters the sales flow.
 const SALES_STAGE_ASSUMED = "ASSUMED";
@@ -1652,6 +1653,10 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
       await createMissingBuyerDocumentChecklistItems(tx, session.user.storeId, next);
       await createMissingSalePaymentChecks(tx, session.user.storeId, next);
       await createMissingSaleInspectionReports(tx, session.user.storeId, next);
+      await ensureSaleDossier(tx, next, {
+        actorUserId: session.user.id,
+        summary: { source: "commercial_sale_closed", status: "DOCUMENTATION", stageKey: "CLOSED_WON" },
+      });
 
       await tx.auditLog.create({
         data: {

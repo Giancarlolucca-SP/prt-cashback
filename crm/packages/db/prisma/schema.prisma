@@ -1280,6 +1280,89 @@ model BuyerDocumentReadyNotification {
   @@index([storeId, status])
   @@map("buyer_document_ready_notifications")
 }
+
+model SaleDossier {
+  id              String    @id @default(uuid())
+  storeId         String    @map("store_id")
+  saleId          String    @map("sale_id")
+  vehicleId       String?   @map("vehicle_id")
+  buyerId         String?   @map("buyer_id")
+  sellerUserId    String?   @map("seller_user_id")
+  leadId          String?   @map("lead_id")
+  status          String    @default("OPEN")
+  openedAt        DateTime  @default(now()) @map("opened_at")
+  closedAt        DateTime? @map("closed_at")
+  lastEventAt     DateTime? @map("last_event_at")
+  summary         Json?
+  metricsSnapshot Json?     @map("metrics_snapshot")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([storeId, saleId])
+  @@index([storeId])
+  @@index([saleId])
+  @@index([vehicleId])
+  @@index([buyerId])
+  @@index([sellerUserId])
+  @@index([storeId, status])
+  @@map("sale_dossiers")
+}
+
+model SaleDossierDocument {
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  saleDossierId    String   @map("sale_dossier_id")
+  saleId           String   @map("sale_id")
+  vehicleId        String?  @map("vehicle_id")
+  buyerId          String?  @map("buyer_id")
+  attachmentId     String   @map("attachment_id")
+  documentType     String   @map("document_type")
+  sourceModule     String   @map("source_module")
+  sourceEntityType String?  @map("source_entity_type")
+  sourceEntityId   String?  @map("source_entity_id")
+  origin           String   @default("SYSTEM")
+  responsibleUserId String? @map("responsible_user_id")
+  capturedAt       DateTime @default(now()) @map("captured_at")
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([saleDossierId, attachmentId, documentType])
+  @@index([storeId])
+  @@index([saleDossierId])
+  @@index([saleId])
+  @@index([vehicleId])
+  @@index([buyerId])
+  @@index([attachmentId])
+  @@index([documentType])
+  @@index([sourceModule])
+  @@map("sale_dossier_documents")
+}
+
+model SaleDossierEvent {
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  saleDossierId    String   @map("sale_dossier_id")
+  saleId           String   @map("sale_id")
+  eventType        String   @map("event_type")
+  sourceModule     String   @map("source_module")
+  sourceEntityType String?  @map("source_entity_type")
+  sourceEntityId   String?  @map("source_entity_id")
+  actorUserId      String?  @map("actor_user_id")
+  occurredAt       DateTime @default(now()) @map("occurred_at")
+  fromStatus       String?  @map("from_status")
+  toStatus         String?  @map("to_status")
+  payload          Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([saleDossierId, occurredAt])
+  @@index([saleId])
+  @@index([eventType])
+  @@index([sourceModule])
+  @@map("sale_dossier_events")
+}
+
 model PurchaseLead {
   id          String         @id @default(uuid())
   storeId     String         @map("store_id")

@@ -6968,6 +6968,10 @@ try {
   assert.equal(closeDeal.json().releasesDocuments, false);
   // Own financing was set in stage 3 -> alert raised.
   assert.equal(closeDeal.json().financingAlert, true);
+  const bornSaleDossier = await prisma.saleDossier.findFirst({ where: { saleId: transferredSaleId, storeId: ownerBody.user.storeId } });
+  assert.ok(bornSaleDossier);
+  assert.equal(bornSaleDossier.saleId, transferredSaleId);
+  assert.equal(bornSaleDossier.status, "OPEN");
 
   const documentationNotifications = await app.inject({
     method: "GET",
@@ -7639,6 +7643,77 @@ try {
   });
   assert.equal(sellerCommercialGateDeliveries.statusCode, 200);
   assert.ok(sellerCommercialGateDeliveries.json().items.some((delivery: { id: string }) => delivery.id === commercialGateDeliveryId));
+
+  // --- Sprint 3 US09: digital sale dossier consolidates the real US04 -> US06 gate ---
+  const sdrCannotReadSaleDossier = await app.inject({
+    method: "GET",
+    url: `/sale-dossiers/${transferredSaleId}`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCannotReadSaleDossier.statusCode, 403);
+
+  const sellerSaleDossier = await app.inject({
+    method: "GET",
+    url: `/sale-dossiers/${transferredSaleId}`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerSaleDossier.statusCode, 200);
+  assert.equal(sellerSaleDossier.json().data.dossier.saleId, transferredSaleId);
+  assert.equal(sellerSaleDossier.json().data.dossier.sellerUserId, sellerUserId);
+  assert.equal(sellerSaleDossier.json().data.metrics.prerequisites.buyerDocumentsDelivered, true);
+  assert.equal(sellerSaleDossier.json().data.metrics.prerequisites.buyerDocumentsChecked, true);
+  assert.equal(sellerSaleDossier.json().data.metrics.prerequisites.contractSigned, true);
+  assert.equal(sellerSaleDossier.json().data.metrics.prerequisites.warrantySigned, true);
+  assert.equal(sellerSaleDossier.json().data.metrics.prerequisites.paymentConfirmed, true);
+  assert.equal(sellerSaleDossier.json().data.metrics.operations.technicalDeliveryStatus, "SCHEDULED");
+  assert.equal(sellerSaleDossier.json().data.metrics.finance.additionalRevenueTotal, "2500.00");
+  assert.equal(sellerSaleDossier.json().data.metrics.finance.additionalCostTotal, "3000.00");
+  assert.equal(sellerSaleDossier.json().data.metrics.finance.additionalSpreadTotal, "-500.00");
+  assert.ok(sellerSaleDossier.json().data.documents.some((document: { attachmentId: string; documentType: string }) => document.attachmentId === signedContractFileId && document.documentType === "signed_contract"));
+  assert.ok(sellerSaleDossier.json().data.documents.some((document: { attachmentId: string; documentType: string }) => document.attachmentId === atpveEvidenceFileId && document.documentType === "atpve_evidence"));
+  assert.ok(sellerSaleDossier.json().data.recentEvents.some((event: { eventType: string }) => event.eventType === "technical_delivery_scheduled"));
+
+  const attachDossierEvidence = await app.inject({
+    method: "POST",
+    url: `/sale-dossiers/${transferredSaleId}/documents`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {
+      attachmentId: atpveEvidenceFileId,
+      documentType: "administrative_evidence",
+      sourceModule: "qa",
+      metadata: { source: "s3-us09-smoke" },
+    },
+  });
+  assert.equal(attachDossierEvidence.statusCode, 201);
+  assert.equal(attachDossierEvidence.json().data.saleId, transferredSaleId);
+  assert.equal(attachDossierEvidence.json().data.origin, "MANUAL");
+
+  const saleDossierDocuments = await app.inject({
+    method: "GET",
+    url: `/sale-dossiers/${transferredSaleId}/documents?document_type=administrative_evidence`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(saleDossierDocuments.statusCode, 200);
+  assert.ok(saleDossierDocuments.json().items.some((document: { attachmentId: string }) => document.attachmentId === atpveEvidenceFileId));
+
+  const saleDossierEvents = await app.inject({
+    method: "GET",
+    url: `/sale-dossiers/${transferredSaleId}/events?event_type=payment_released_for_documentation`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(saleDossierEvents.statusCode, 200);
+  assert.ok(saleDossierEvents.json().items.some((event: { sourceEntityId: string }) => event.sourceEntityId === commercialGatePaymentCheckId));
+
+  const saleDossierMetrics = await app.inject({
+    method: "GET",
+    url: "/sale-dossiers/metrics/summary",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(saleDossierMetrics.statusCode, 200);
+  assert.ok(saleDossierMetrics.json().data.totals.administrativeSales >= 1);
+  assert.ok(Number(saleDossierMetrics.json().data.additionalRevenue.totalRevenue) >= 2500);
+  assert.ok(Number(saleDossierMetrics.json().data.additionalRevenue.totalCost) >= 3000);
+  assert.ok(Number.isFinite(Number(saleDossierMetrics.json().data.additionalRevenue.totalSpread)));
   checkpoint("commercial-sales");
 
   const sellerDeleteCustomer = await app.inject({
