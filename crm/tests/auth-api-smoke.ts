@@ -2435,9 +2435,11 @@ try {
     },
     payload: {
       name: providerName,
-      serviceTypes: ["preparacao", "mecanica"],
+      serviceTypes: ["preparacao", "mecanica", "despachante"],
       contactName: "Carlos Servicos",
       phone: "11988887777",
+      email: "despachante.qa@gt3.local",
+      preferredDispatchChannel: "MANUAL_PHYSICAL",
     },
   });
   assert.equal(createServiceProvider.statusCode, 201);
@@ -4594,6 +4596,140 @@ try {
   assert.equal(sellerDispatch.statusCode, 403);
   assert.equal(sellerDispatch.json().error.code, "FORBIDDEN");
 
+  const incompleteDispatch = await app.inject({
+    method: "POST",
+    url: "/dispatch/processes",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      saleId,
+      providerId: serviceProviderId,
+      status: "AWAITING_DOCUMENTS",
+      metadata: {
+        protocol: uniqueToken("DSP-QA-INCOMPLETE"),
+        vehicleId: inventoryVehicleId,
+      },
+    },
+  });
+  assert.equal(incompleteDispatch.statusCode, 201);
+  assert.equal(incompleteDispatch.json().data.packageStatus, "AWAITING_DOCUMENTS");
+  assert.ok(
+    incompleteDispatch
+      .json()
+      .package.missingDocuments.some((item: { key: string; reason: string }) => item.key === "transfer_mode" && item.reason === "transfer_mode_missing"),
+  );
+  const incompleteDispatchId = incompleteDispatch.json().data.id as string;
+
+  const blockedDispatchSend = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${incompleteDispatchId}/send-package`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {},
+  });
+  assert.equal(blockedDispatchSend.statusCode, 422);
+  assert.equal(blockedDispatchSend.json().error.code, "BUSINESS_RULE_ERROR");
+  assert.ok(blockedDispatchSend.json().error.details.missingDocuments.some((item: { key: string }) => item.key === "transfer_mode"));
+
+  const buyerIdentityForDispatch = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "customer-documents",
+      originalName: "documento-comprador-despachante.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1100,
+      classification: "buyer_identity_document",
+      link: { entityType: "customer", entityId: createdCustomerId, purpose: "person_identity_document" },
+    },
+  });
+  assert.equal(buyerIdentityForDispatch.statusCode, 201);
+  const buyerIdentityForDispatchId = buyerIdentityForDispatch.json().data.id as string;
+
+  const buyerAddressForDispatch = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "customer-documents",
+      originalName: "comprovante-residencia-despachante.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1200,
+      classification: "buyer_address_proof",
+      link: { entityType: "customer", entityId: createdCustomerId, purpose: "person_address_proof" },
+    },
+  });
+  assert.equal(buyerAddressForDispatch.statusCode, 201);
+  const buyerAddressForDispatchId = buyerAddressForDispatch.json().data.id as string;
+
+  const signedContractForDispatch = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "contrato-assinado-despachante.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 2200,
+      classification: "signed_contract",
+      link: { entityType: "contract", entityId: contractId, purpose: "signed_contract" },
+    },
+  });
+  assert.equal(signedContractForDispatch.statusCode, 201);
+
+  await prisma.saleDocumentChecklist.upsert({
+    where: { saleId_itemKey: { saleId, itemKey: "person_identity_document" } },
+    update: {
+      status: "CHECKED",
+      isDone: true,
+      attachmentId: buyerIdentityForDispatchId,
+      completedAt: new Date(financeDueAt),
+      checkedAt: new Date(financeDueAt),
+      checkedByUserId: ownerBody.user.id,
+    },
+    create: {
+      storeId: ownerBody.user.storeId,
+      saleId,
+      itemKey: "person_identity_document",
+      label: "RG ou CNH do comprador",
+      status: "CHECKED",
+      isDone: true,
+      attachmentId: buyerIdentityForDispatchId,
+      completedAt: new Date(financeDueAt),
+      checkedAt: new Date(financeDueAt),
+      checkedByUserId: ownerBody.user.id,
+    },
+  });
+  await prisma.saleDocumentChecklist.upsert({
+    where: { saleId_itemKey: { saleId, itemKey: "person_address_proof" } },
+    update: {
+      status: "CHECKED",
+      isDone: true,
+      attachmentId: buyerAddressForDispatchId,
+      issueDate: new Date(financeDueAt),
+      completedAt: new Date(financeDueAt),
+      checkedAt: new Date(financeDueAt),
+      checkedByUserId: ownerBody.user.id,
+    },
+    create: {
+      storeId: ownerBody.user.storeId,
+      saleId,
+      itemKey: "person_address_proof",
+      label: "Comprovante de residencia do comprador",
+      status: "CHECKED",
+      isDone: true,
+      attachmentId: buyerAddressForDispatchId,
+      issueDate: new Date(financeDueAt),
+      completedAt: new Date(financeDueAt),
+      checkedAt: new Date(financeDueAt),
+      checkedByUserId: ownerBody.user.id,
+      metadata: { category: "address_proof", maxAgeDays: 92 },
+    },
+  });
+
   const createDispatch = await app.inject({
     method: "POST",
     url: "/dispatch/processes",
@@ -4603,8 +4739,8 @@ try {
     payload: {
       saleId,
       providerId: serviceProviderId,
-      status: "OPEN",
-      channel: "detran-sp",
+      status: "AWAITING_DOCUMENTS",
+      transferMode: "GREEN_RECEIPT_PHYSICAL",
       metadata: {
         protocol: uniqueToken("DSP-QA"),
         vehicleId: inventoryVehicleId,
@@ -4614,6 +4750,10 @@ try {
   assert.equal(createDispatch.statusCode, 201);
   assert.equal(createDispatch.json().data.saleId, saleId);
   assert.equal(createDispatch.json().data.providerId, serviceProviderId);
+  assert.equal(createDispatch.json().data.transferMode, "GREEN_RECEIPT_PHYSICAL");
+  assert.equal(createDispatch.json().data.dispatcherPreferredChannel, "MANUAL_PHYSICAL");
+  assert.equal(createDispatch.json().package.ready, true);
+  assert.equal(createDispatch.json().package.physicalDeliveryRequired, true);
   const dispatchId = createDispatch.json().data.id as string;
 
   const listDispatch = await app.inject({
@@ -4626,22 +4766,94 @@ try {
   assert.equal(listDispatch.statusCode, 200);
   assert.ok(listDispatch.json().items.some((process: { id: string }) => process.id === dispatchId));
 
-  const updateDispatch = await app.inject({
-    method: "PATCH",
-    url: `/dispatch/processes/${dispatchId}`,
+  const reviewDispatchPackage = await app.inject({
+    method: "GET",
+    url: `/dispatch/processes/${dispatchId}/package`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(reviewDispatchPackage.statusCode, 200);
+  assert.equal(reviewDispatchPackage.json().package.ready, true);
+  assert.equal(reviewDispatchPackage.json().package.preferredChannel, "MANUAL_PHYSICAL");
+  assert.ok(
+    reviewDispatchPackage
+      .json()
+      .package.documentsIncluded.some((document: { key: string; attachmentId: string | null }) => document.key === "transfer_report" && Boolean(document.attachmentId)),
+  );
+
+  const printDispatchPackage = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/print-package`,
     headers: {
       authorization: `Bearer ${ownerBody.token}`,
     },
     payload: {
-      channel: "detran-digital",
-      metadata: {
-        protocol: "DSP-QA-UPDATED",
-        stage: "documentacao",
-      },
+      printerConfigured: false,
+      notes: "Recibo verde exige entrega fisica ao despachante",
     },
   });
-  assert.equal(updateDispatch.statusCode, 200);
-  assert.equal(updateDispatch.json().data.channel, "detran-digital");
+  assert.equal(printDispatchPackage.statusCode, 200);
+  assert.equal(printDispatchPackage.json().data.status, "PRINTED");
+  assert.equal(printDispatchPackage.json().data.packageStatus, "PRINTED");
+  assert.ok(printDispatchPackage.json().print.documents.length >= 5);
+
+  const sendDispatchPackage = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/send-package`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {},
+  });
+  assert.equal(sendDispatchPackage.statusCode, 200);
+  assert.equal(sendDispatchPackage.json().delivery.channel, "MANUAL_PHYSICAL");
+  assert.equal(sendDispatchPackage.json().delivery.physicalDeliveryRequired, true);
+
+  const protocolUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "protocolo-despachante.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1300,
+      classification: "dispatcher_protocol",
+      link: { entityType: "sale", entityId: saleId, purpose: "dispatcher_protocol" },
+    },
+  });
+  assert.equal(protocolUpload.statusCode, 201);
+  const protocolFileId = protocolUpload.json().data.id as string;
+
+  const deliverDispatchPackage = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/deliver`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      deliveredAt: financeDueAt,
+      protocolNumber: "DSP-QA-PROTOCOLO",
+      protocolFileId,
+      notes: "Pacote fisico entregue ao despachante no smoke test",
+    },
+  });
+  assert.equal(deliverDispatchPackage.statusCode, 200);
+  assert.equal(deliverDispatchPackage.json().data.status, "PROTOCOL_RECEIVED");
+  assert.equal(deliverDispatchPackage.json().data.protocolNumber, "DSP-QA-PROTOCOLO");
+  assert.equal(deliverDispatchPackage.json().data.protocolFileId, protocolFileId);
+
+  const sellerDispatchStatus = await app.inject({
+    method: "GET",
+    url: `/dispatch/processes/by-sale/${saleId}`,
+    headers: {
+      authorization: `Bearer ${sellerInventoryToken}`,
+    },
+  });
+  assert.equal(sellerDispatchStatus.statusCode, 200);
+  assert.equal(sellerDispatchStatus.json().data.id, dispatchId);
+  assert.equal(sellerDispatchStatus.json().data.status, "PROTOCOL_RECEIVED");
 
   const finishDispatch = await app.inject({
     method: "POST",
@@ -4671,7 +4883,6 @@ try {
   assert.equal(getDispatch.json().data.id, dispatchId);
   assert.equal(getDispatch.json().data.metadata.stage, "completed");
   checkpoint("sales/finance/contracts/dispatch");
-
   const prepareUpload = await app.inject({
     method: "POST",
     url: "/files/prepare-upload",

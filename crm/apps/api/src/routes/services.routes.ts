@@ -9,6 +9,7 @@ import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 
 const serviceOrderStatusSchema = z.enum(["OPEN", "SCHEDULED", "RUNNING", "WAITING_PROVIDER", "WAITING_INVOICE", "DONE", "CANCELLED"]);
+const dispatchChannelPreferenceSchema = z.enum(["EMAIL", "WHATSAPP", "MANUAL_PHYSICAL"] as const);
 
 const providerSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -20,6 +21,7 @@ const providerSchema = z.object({
   accessUrl: z.string().trim().max(300).optional(),
   accessLogin: z.string().trim().max(120).optional(),
   accessSecretRef: z.string().trim().max(160).optional(),
+  preferredDispatchChannel: dispatchChannelPreferenceSchema.optional(),
 });
 
 const recordStatusSchema = z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]);
@@ -167,6 +169,7 @@ type ServiceProviderRecord = {
   accessUrl: string | null;
   accessLogin: string | null;
   accessSecretRef: string | null;
+  preferredDispatchChannel: string | null;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -183,6 +186,7 @@ function sanitizeProvider(provider: ServiceProviderRecord) {
     email: provider.email,
     accessUrl: provider.accessUrl,
     accessLogin: provider.accessLogin,
+    preferredDispatchChannel: provider.preferredDispatchChannel,
     hasSecret: Boolean(provider.accessSecretRef),
     status: provider.status,
     createdAt: provider.createdAt.toISOString(),
@@ -308,7 +312,7 @@ export async function registerServiceRoutes(app: FastifyInstance) {
     const session = await requirePermission(request, { module: "services", action: "manage", scope: "STORE", sensitiveArea: "general" });
     const input = providerSchema.parse(request.body);
     const provider = await prisma.serviceProvider.create({ data: { storeId: session.user.storeId, ...input } });
-    return reply.code(201).send({ data: provider });
+    return reply.code(201).send({ data: sanitizeProvider(provider) });
   });
 
   app.post("/catalog", async (request, reply) => {

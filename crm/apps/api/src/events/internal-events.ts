@@ -54,6 +54,7 @@ export type InternalEventName =
   | "document.deleted"
   | "dispatch.process_created"
   | "dispatch.process_status_changed"
+  | "dispatch.package_sent"
   | "external_query.created"
   | "external_query.result_recorded"
   | "vehicle.price_changed"

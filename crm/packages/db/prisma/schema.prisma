@@ -1100,18 +1100,42 @@ model TechnicalDelivery {
 }
 
 model DispatcherProcess {
-  id         String   @id @default(uuid())
-  storeId    String   @map("store_id")
-  saleId     String   @map("sale_id")
-  providerId String?  @map("provider_id")
-  status     String
-  channel    String?
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id                         String    @id @default(uuid())
+  storeId                    String    @map("store_id")
+  saleId                     String    @map("sale_id")
+  vehicleId                  String?   @map("vehicle_id")
+  customerId                 String?   @map("customer_id")
+  sellerUserId               String?   @map("seller_user_id")
+  providerId                 String?   @map("provider_id")
+  status                     String
+  channel                    String?
+  dispatcherPreferredChannel String?   @map("dispatcher_preferred_channel")
+  transferMode               String?   @map("transfer_mode")
+  documentPackageId          String?   @map("document_package_id")
+  packageStatus              String    @default("AWAITING_DOCUMENTS") @map("package_status")
+  documentsIncluded          Json?     @map("documents_included")
+  missingDocuments           Json?     @map("missing_documents")
+  sentChannel                String?   @map("sent_channel")
+  sentTo                     String?   @map("sent_to")
+  sentAt                     DateTime? @map("sent_at")
+  sentByUserId               String?   @map("sent_by_user_id")
+  printedAt                  DateTime? @map("printed_at")
+  printedByUserId            String?   @map("printed_by_user_id")
+  deliveredToDispatcherAt    DateTime? @map("delivered_to_dispatcher_at")
+  protocolNumber             String?   @map("protocol_number")
+  protocolFileId             String?   @map("protocol_file_id")
+  statusNotes                String?   @map("status_notes")
+  metadata                   Json?
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
 
   @@index([storeId])
+  @@index([storeId, status])
+  @@index([storeId, packageStatus])
   @@index([saleId])
+  @@index([providerId])
+  @@index([documentPackageId])
+  @@index([protocolFileId])
   @@map("dispatcher_processes")
 }
 
@@ -1622,6 +1646,7 @@ model ServiceProvider {
   accessUrl       String?      @map("access_url")
   accessLogin     String?      @map("access_login")
   accessSecretRef String?      @map("access_secret_ref")
+  preferredDispatchChannel String? @map("preferred_dispatch_channel")
   status          RecordStatus @default(ACTIVE)
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
