@@ -31,6 +31,7 @@ import { registerNotificationRoutes } from "./routes/notifications.routes.js";
 import { registerOcrRoutes } from "./routes/ocr.routes.js";
 import { registerOpsRoutes } from "./routes/ops.routes.js";
 import { registerPurchaseRoutes } from "./routes/purchases.routes.js";
+import { registerPostSaleRoutes } from "./routes/post-sale.routes.js";
 import { registerRepasseRoutes } from "./routes/repasse.routes.js";
 import { registerSaleRoutes } from "./routes/sales.routes.js";
 import { registerSaleDossierRoutes } from "./routes/sale-dossiers.routes.js";
@@ -87,6 +88,7 @@ export function buildApp() {
   app.register(registerFinanceRoutes, { prefix: "/finance" });
   app.register(registerCommissionRoutes, { prefix: "/commissions" });
   app.register(registerContractRoutes, { prefix: "/contracts" });
+  app.register(registerPostSaleRoutes, { prefix: "/post-sale" });
   app.register(registerDispatchRoutes, { prefix: "/dispatch" });
   app.register(registerListingRoutes, { prefix: "/listings" });
   app.register(registerNotificationRoutes, { prefix: "/notifications" });

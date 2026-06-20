@@ -363,6 +363,70 @@ model PostSaleCustomer {
   @@map("post_sale_customers")
 }
 
+model PostSaleAlert {
+  id                    String    @id @default(uuid())
+  storeId               String    @map("store_id")
+  customerId            String    @map("customer_id")
+  saleId                String    @map("sale_id")
+  vehicleId             String?   @map("vehicle_id")
+  purchaseDate          DateTime  @map("purchase_date")
+  triggerDate           DateTime  @map("trigger_date")
+  feedbackDueAt         DateTime  @map("feedback_due_at")
+  originalSellerUserId  String?   @map("original_seller_user_id")
+  assignedUserId        String?   @map("assigned_user_id")
+  status                String    @default("PENDING")
+  contactAttemptedAt    DateTime? @map("contact_attempted_at")
+  contactChannel        String?   @map("contact_channel")
+  contactResult         String?   @map("contact_result")
+  feedbackNotes         String?   @map("feedback_notes")
+  nextActionAt          DateTime? @map("next_action_at")
+  overdueNotificationId String?   @map("overdue_notification_id")
+  closedAt              DateTime? @map("closed_at")
+  closedByUserId        String?   @map("closed_by_user_id")
+  reassignedFromUserId  String?   @map("reassigned_from_user_id")
+  reassignedAt          DateTime? @map("reassigned_at")
+  reassignedByUserId    String?   @map("reassigned_by_user_id")
+  reassignedReason      String?   @map("reassigned_reason")
+  createdByAutomation   Boolean   @default(true) @map("created_by_automation")
+  createdByUserId       String?   @map("created_by_user_id")
+  metadata              Json?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  @@unique([storeId, saleId, triggerDate])
+  @@index([storeId, status])
+  @@index([customerId])
+  @@index([saleId])
+  @@index([vehicleId])
+  @@index([assignedUserId])
+  @@index([feedbackDueAt])
+  @@map("post_sale_alerts")
+}
+
+model PostSaleAlertEvent {
+  id                  String   @id @default(uuid())
+  storeId             String   @map("store_id")
+  postSaleAlertId     String   @map("post_sale_alert_id")
+  customerId          String   @map("customer_id")
+  saleId              String   @map("sale_id")
+  eventType           String   @map("event_type")
+  actorUserId         String?  @map("actor_user_id")
+  fromStatus          String?  @map("from_status")
+  toStatus            String?  @map("to_status")
+  fromAssignedUserId  String?  @map("from_assigned_user_id")
+  toAssignedUserId    String?  @map("to_assigned_user_id")
+  payload             Json?
+  occurredAt          DateTime @default(now()) @map("occurred_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([postSaleAlertId, occurredAt])
+  @@index([customerId, occurredAt])
+  @@index([saleId, occurredAt])
+  @@map("post_sale_alert_events")
+}
+
 model CustomerContact {
   id         String   @id @default(uuid())
   storeId    String   @map("store_id")

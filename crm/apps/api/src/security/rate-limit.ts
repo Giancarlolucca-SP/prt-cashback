@@ -35,6 +35,7 @@ const sensitivePrefixes = [
   "/finance",
   "/jobs",
   "/ops",
+  "/post-sale",
   "/sale-dossiers",
   "/settings",
   "/users",

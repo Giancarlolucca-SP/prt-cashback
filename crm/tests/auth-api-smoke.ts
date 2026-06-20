@@ -7716,6 +7716,170 @@ try {
   assert.ok(Number.isFinite(Number(saleDossierMetrics.json().data.additionalRevenue.totalSpread)));
   checkpoint("commercial-sales");
 
+  // --- Sprint 4 US01: 2-year post-sale alert from the real sale purchase date ---
+  const postSalePurchaseDate = new Date("2024-06-10T12:00:00.000Z");
+  const postSaleInitialScanNow = new Date("2026-06-10T13:00:00.000Z");
+  const postSaleOverdueScanNow = new Date("2026-06-20T12:00:00.000Z");
+  await prisma.sale.update({
+    where: { id: transferredSaleId },
+    data: { closedAt: postSalePurchaseDate },
+  });
+
+  const sdrCannotScanPostSaleAlerts = await app.inject({
+    method: "POST",
+    url: "/post-sale/alerts/scan",
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { now: postSaleInitialScanNow.toISOString() },
+  });
+  assert.equal(sdrCannotScanPostSaleAlerts.statusCode, 403);
+
+  const postSaleAlertScan = await app.inject({
+    method: "POST",
+    url: "/post-sale/alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { now: postSaleInitialScanNow.toISOString() },
+  });
+  assert.equal(postSaleAlertScan.statusCode, 200);
+  assert.ok(postSaleAlertScan.json().data.alertsCreated >= 1);
+  const generatedPostSaleAlert = postSaleAlertScan.json().data.alerts.find((alert: { saleId: string }) => alert.saleId === transferredSaleId);
+  assert.ok(generatedPostSaleAlert);
+  assert.equal(generatedPostSaleAlert.status, "PENDING");
+  assert.equal(generatedPostSaleAlert.customerId, createdCustomerId);
+  assert.equal(generatedPostSaleAlert.vehicleId, inventoryVehicleId);
+  assert.equal(generatedPostSaleAlert.assignedUserId, sellerUserId);
+  assert.equal(generatedPostSaleAlert.context.customer.id, createdCustomerId);
+  assert.equal(generatedPostSaleAlert.context.assignedUser.id, sellerUserId);
+  const postSaleAlertId = generatedPostSaleAlert.id as string;
+
+  const sellerPostSaleAlerts = await app.inject({
+    method: "GET",
+    url: `/post-sale/alerts?sale_id=${transferredSaleId}&page_size=100`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerPostSaleAlerts.statusCode, 200);
+  assert.ok(sellerPostSaleAlerts.json().items.some((alert: { id: string }) => alert.id === postSaleAlertId));
+
+  const sdrCannotListPostSaleAlerts = await app.inject({
+    method: "GET",
+    url: "/post-sale/alerts",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCannotListPostSaleAlerts.statusCode, 403);
+
+  const duplicatePostSaleAlertScan = await app.inject({
+    method: "POST",
+    url: "/post-sale/alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { now: postSaleInitialScanNow.toISOString() },
+  });
+  assert.equal(duplicatePostSaleAlertScan.statusCode, 200);
+  assert.equal(duplicatePostSaleAlertScan.json().data.alertsCreated, 0);
+  assert.ok(duplicatePostSaleAlertScan.json().data.duplicated >= 1);
+  const postSaleAlertCount = await prisma.postSaleAlert.count({
+    where: { storeId: ownerBody.user.storeId, saleId: transferredSaleId },
+  });
+  assert.equal(postSaleAlertCount, 1);
+
+  const overduePostSaleAlertScan = await app.inject({
+    method: "POST",
+    url: "/post-sale/alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { now: postSaleOverdueScanNow.toISOString() },
+  });
+  assert.equal(overduePostSaleAlertScan.statusCode, 200);
+  assert.equal(overduePostSaleAlertScan.json().data.alertsCreated, 0);
+  assert.ok(overduePostSaleAlertScan.json().data.overdueAlerts >= 1);
+  assert.ok(overduePostSaleAlertScan.json().data.overdueNotificationsCreated >= 1);
+
+  const overduePostSaleNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=post_sale_alert_overdue&entity_id=${postSaleAlertId}&status=NEW&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(overduePostSaleNotifications.statusCode, 200);
+  assert.ok(
+    overduePostSaleNotifications
+      .json()
+      .items.some(
+        (notification: { actionUrl: string; priority: string; sourceModule: string }) =>
+          notification.actionUrl === `/post-sale/alerts/${postSaleAlertId}` &&
+          notification.priority === "CRITICAL" &&
+          notification.sourceModule === "post_sale",
+      ),
+  );
+
+  const reassignPostSaleAlert = await app.inject({
+    method: "POST",
+    url: `/post-sale/alerts/${postSaleAlertId}/reassign`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      assignedUserId: administrativeBody.user.id,
+      reason: "Vendedor original indisponivel para contato pos-venda",
+    },
+  });
+  assert.equal(reassignPostSaleAlert.statusCode, 200);
+  assert.equal(reassignPostSaleAlert.json().data.status, "REASSIGNED");
+  assert.equal(reassignPostSaleAlert.json().data.assignedUserId, administrativeBody.user.id);
+  assert.equal(reassignPostSaleAlert.json().data.reassignedFromUserId, sellerUserId);
+
+  const sellerCannotReadReassignedPostSaleAlert = await app.inject({
+    method: "GET",
+    url: `/post-sale/alerts/${postSaleAlertId}`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerCannotReadReassignedPostSaleAlert.statusCode, 404);
+
+  const postSaleAlertEvents = await app.inject({
+    method: "GET",
+    url: `/post-sale/alerts/${postSaleAlertId}/events`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(postSaleAlertEvents.statusCode, 200);
+  assert.ok(postSaleAlertEvents.json().items.some((event: { eventType: string }) => event.eventType === "alert_created"));
+  assert.ok(postSaleAlertEvents.json().items.some((event: { eventType: string }) => event.eventType === "alert_reassigned"));
+
+  const postSaleFeedback = await app.inject({
+    method: "POST",
+    url: `/post-sale/alerts/${postSaleAlertId}/feedback`,
+    headers: { authorization: `Bearer ${administrativeBody.token}` },
+    payload: {
+      contactAttemptedAt: postSaleOverdueScanNow.toISOString(),
+      contactChannel: "WHATSAPP",
+      contactResult: "INTERESTED_PURCHASE",
+      feedbackNotes: "Cliente satisfeito com o veiculo e avaliando nova compra.",
+    },
+  });
+  assert.equal(postSaleFeedback.statusCode, 200);
+  assert.equal(postSaleFeedback.json().data.status, "COMPLETED");
+  assert.equal(postSaleFeedback.json().commercialLeadPreparation.postSaleAlertId, postSaleAlertId);
+  assert.equal(postSaleFeedback.json().commercialLeadPreparation.customerId, createdCustomerId);
+
+  const postSaleHistory = await prisma.customerHistoryEvent.findFirst({
+    where: { storeId: ownerBody.user.storeId, customerId: createdCustomerId, type: "post_sale_feedback_recorded" },
+    orderBy: { occurredAt: "desc" },
+  });
+  assert.ok(postSaleHistory);
+  assert.equal((postSaleHistory.metadata as { alertId?: string }).alertId, postSaleAlertId);
+  const postSaleInteraction = await prisma.customerInteraction.findFirst({
+    where: {
+      storeId: ownerBody.user.storeId,
+      customerId: createdCustomerId,
+      entityType: "post_sale_alert",
+      entityId: postSaleAlertId,
+      channel: "WHATSAPP",
+    },
+  });
+  assert.ok(postSaleInteraction);
+
+  const resolvedPostSaleNotifications = await app.inject({
+    method: "GET",
+    url: `/notifications?entity_type=post_sale_alert_overdue&entity_id=${postSaleAlertId}&status=RESOLVED&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(resolvedPostSaleNotifications.statusCode, 200);
+  assert.ok(resolvedPostSaleNotifications.json().items.some((notification: { entityId: string }) => notification.entityId === postSaleAlertId));
+  checkpoint("post-sale-alerts");
+
   const sellerDeleteCustomer = await app.inject({
     method: "DELETE",
     url: `/customers/${createdCustomerId}`,
