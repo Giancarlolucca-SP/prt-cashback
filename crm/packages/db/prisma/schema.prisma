@@ -954,6 +954,62 @@ model SalePaymentTerm {
   @@map("sale_payment_terms")
 }
 
+model SaleAdditionalRevenueItem {
+  id                     String   @id @default(uuid())
+  storeId                String   @map("store_id")
+  saleId                 String   @map("sale_id")
+  vehicleId              String?  @map("vehicle_id")
+  buyerId                String?  @map("buyer_id")
+  sellerId               String?  @map("seller_id")
+  itemType               String   @map("item_type")
+  itemDescription        String?  @map("item_description")
+  soldByUserId           String   @map("sold_by_user_id")
+  soldAt                 DateTime @default(now()) @map("sold_at")
+  chargedAmount          Decimal  @map("charged_amount") @db.Decimal(14, 2)
+  includedInVehiclePrice Boolean  @default(false) @map("included_in_vehicle_price")
+  itemStatus             String   @default("SOLD") @map("item_status")
+  commercialNotes        String?  @map("commercial_notes")
+  metadata               Json?
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@index([vehicleId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([itemType])
+  @@index([storeId, itemStatus])
+  @@map("sale_additional_revenue_items")
+}
+
+model SaleAdditionalCost {
+  id                      String    @id @default(uuid())
+  storeId                 String    @map("store_id")
+  saleId                  String    @map("sale_id")
+  additionalRevenueItemId String    @map("additional_revenue_item_id")
+  costCategory            String    @map("cost_category")
+  providerId              String?   @map("provider_id")
+  expectedCostAmount      Decimal?  @map("expected_cost_amount") @db.Decimal(14, 2)
+  realizedCostAmount      Decimal?  @map("realized_cost_amount") @db.Decimal(14, 2)
+  costStatus              String    @default("EXPECTED") @map("cost_status")
+  costDate                DateTime? @map("cost_date")
+  proofFileId             String?   @map("proof_file_id")
+  launchedByUserId        String    @map("launched_by_user_id")
+  notes                   String?
+  metadata                Json?
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([saleId])
+  @@index([additionalRevenueItemId])
+  @@index([providerId])
+  @@index([proofFileId])
+  @@index([storeId, costStatus])
+  @@map("sale_additional_costs")
+}
+
 model SaleDocumentChecklist {
   id                String    @id @default(uuid())
   storeId           String    @map("store_id")

@@ -85,6 +85,71 @@ const initialDocStatusSchema = z.enum(["PENDING", "PARTIAL", "COLLECTED"]);
 
 // Statuses in which the sales process is still editable/negotiable.
 const EDITABLE_SALE_STATUSES: ReadonlySet<string> = new Set(["DRAFT", "PROPOSAL", "APPROVED"]);
+const additionalRevenueItemTypeSchema = z.enum([
+  "FINANCING_RETURN",
+  "INSURANCE",
+  "WARRANTY_UPGRADE",
+  "TRANSFER_DOCUMENTATION",
+  "DISPATCHER",
+  "INSPECTION_REPORT",
+  "PPF",
+  "WINDOW_FILM",
+  "VITRIFICATION",
+  "ACCESSORY",
+  "OTHER_SERVICE",
+]);
+const additionalRevenueItemStatusSchema = z.enum(["SOLD", "AWAITING_COST", "CANCELLED", "COURTESY"]);
+const additionalCostCategorySchema = z.enum([
+  "DISPATCHER_FEE",
+  "DETRAN_FEE",
+  "INSPECTION_FEE",
+  "STORE_COST",
+  "THIRD_PARTY_SERVICE",
+  "PRODUCT_SUPPLY",
+  "MATERIALS",
+  "PARTS",
+  "OTHER",
+]);
+const additionalCostStatusSchema = z.enum(["EXPECTED", "APPROVED", "REALIZED", "PAID", "CANCELLED"]);
+const additionalRevenueItemParamsSchema = saleParamsSchema.extend({ itemId: z.string().uuid() });
+const additionalCostParamsSchema = additionalRevenueItemParamsSchema.extend({ costId: z.string().uuid() });
+
+const createAdditionalRevenueItemSchema = z.object({
+  itemType: additionalRevenueItemTypeSchema,
+  itemDescription: z.string().trim().max(160).optional(),
+  chargedAmount: z.coerce.number().nonnegative(),
+  includedInVehiclePrice: z.boolean().default(false),
+  itemStatus: additionalRevenueItemStatusSchema.default("SOLD"),
+  commercialNotes: notesField,
+  soldAt: z.coerce.date().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+const updateAdditionalRevenueItemSchema = createAdditionalRevenueItemSchema.partial().refine((input) => Object.values(input).some((value) => value !== undefined), {
+  message: "Informe ao menos um campo para atualizar.",
+});
+
+const additionalCostBaseSchema = z.object({
+  costCategory: additionalCostCategorySchema,
+  providerId: z.string().uuid().nullable().optional(),
+  expectedCostAmount: z.coerce.number().nonnegative().nullable().optional(),
+  realizedCostAmount: z.coerce.number().nonnegative().nullable().optional(),
+  costStatus: additionalCostStatusSchema.default("EXPECTED"),
+  costDate: z.coerce.date().nullable().optional(),
+  proofFileId: z.string().uuid().nullable().optional(),
+  notes: notesField,
+  metadata: z.record(z.unknown()).optional(),
+});
+
+const createAdditionalCostSchema = additionalCostBaseSchema.superRefine((input, ctx) => {
+  if (input.costStatus !== "CANCELLED" && input.expectedCostAmount == null && input.realizedCostAmount == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe custo previsto ou realizado.", path: ["expectedCostAmount"] });
+  }
+});
+
+const updateAdditionalCostSchema = additionalCostBaseSchema.partial().refine((input) => Object.values(input).some((value) => value !== undefined), {
+  message: "Informe ao menos um campo para atualizar.",
+});
 
 const salePatchSchema = z
   .object({
@@ -401,6 +466,170 @@ function sanitizeSaleInspectionReportForCommercial(item: SaleInspectionReportRec
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };
+}
+
+type SaleAdditionalRevenueItemRecord = Prisma.SaleAdditionalRevenueItemGetPayload<Record<string, never>>;
+type SaleAdditionalCostRecord = Prisma.SaleAdditionalCostGetPayload<Record<string, never>>;
+
+const COUNTED_ADDITIONAL_REVENUE_ITEM_STATUSES: ReadonlySet<string> = new Set(["SOLD", "AWAITING_COST"]);
+const COUNTED_ADDITIONAL_COST_STATUSES: ReadonlySet<string> = new Set(["EXPECTED", "APPROVED", "REALIZED", "PAID"]);
+
+function decimalToNumber(value: { toString(): string } | number | null | undefined) {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+  return typeof value === "number" ? value : Number(value.toString());
+}
+
+function moneyString(value: number) {
+  return value.toFixed(2);
+}
+
+function additionalRevenueItemCounts(item: SaleAdditionalRevenueItemRecord) {
+  return COUNTED_ADDITIONAL_REVENUE_ITEM_STATUSES.has(item.itemStatus);
+}
+
+function additionalCostCounts(cost: SaleAdditionalCostRecord) {
+  return COUNTED_ADDITIONAL_COST_STATUSES.has(cost.costStatus);
+}
+
+function additionalCostAmount(cost: SaleAdditionalCostRecord) {
+  return decimalToNumber(cost.realizedCostAmount ?? cost.expectedCostAmount);
+}
+
+function groupAdditionalCostsByItem(costs: SaleAdditionalCostRecord[]) {
+  const grouped = new Map<string, SaleAdditionalCostRecord[]>();
+  for (const cost of costs) {
+    const list = grouped.get(cost.additionalRevenueItemId) ?? [];
+    list.push(cost);
+    grouped.set(cost.additionalRevenueItemId, list);
+  }
+  return grouped;
+}
+
+function additionalRevenueItemFinancials(item: SaleAdditionalRevenueItemRecord, costs: SaleAdditionalCostRecord[]) {
+  const countedRevenue = additionalRevenueItemCounts(item) ? decimalToNumber(item.chargedAmount) : 0;
+  const countedCosts = costs.filter(additionalCostCounts);
+  const totalCost = countedCosts.reduce((sum, cost) => sum + additionalCostAmount(cost), 0);
+  const spread = countedRevenue - totalCost;
+  const costPending =
+    additionalRevenueItemCounts(item) &&
+    (countedCosts.length === 0 || countedCosts.some((cost) => cost.costStatus !== "PAID" && cost.realizedCostAmount === null));
+
+  return { revenue: countedRevenue, cost: totalCost, spread, costPending, negativeSpread: spread < 0 };
+}
+
+function sanitizeAdditionalCost(cost: SaleAdditionalCostRecord) {
+  return {
+    id: cost.id,
+    saleId: cost.saleId,
+    additionalRevenueItemId: cost.additionalRevenueItemId,
+    costCategory: cost.costCategory,
+    providerId: cost.providerId,
+    expectedCostAmount: cost.expectedCostAmount?.toString() ?? null,
+    realizedCostAmount: cost.realizedCostAmount?.toString() ?? null,
+    costStatus: cost.costStatus,
+    costDate: cost.costDate?.toISOString() ?? null,
+    proofFileId: cost.proofFileId,
+    launchedByUserId: cost.launchedByUserId,
+    notes: cost.notes,
+    metadata: cost.metadata,
+    createdAt: cost.createdAt.toISOString(),
+    updatedAt: cost.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeAdditionalRevenueItem(item: SaleAdditionalRevenueItemRecord, costs: SaleAdditionalCostRecord[]) {
+  const financials = additionalRevenueItemFinancials(item, costs);
+  return {
+    id: item.id,
+    saleId: item.saleId,
+    vehicleId: item.vehicleId,
+    buyerId: item.buyerId,
+    sellerId: item.sellerId,
+    itemType: item.itemType,
+    itemDescription: item.itemDescription,
+    soldByUserId: item.soldByUserId,
+    soldAt: item.soldAt.toISOString(),
+    chargedAmount: item.chargedAmount.toString(),
+    includedInVehiclePrice: item.includedInVehiclePrice,
+    itemStatus: item.itemStatus,
+    commercialNotes: item.commercialNotes,
+    metadata: item.metadata,
+    financials: {
+      revenue: moneyString(financials.revenue),
+      cost: moneyString(financials.cost),
+      spread: moneyString(financials.spread),
+      costPending: financials.costPending,
+      negativeSpread: financials.negativeSpread,
+    },
+    costs: costs.map(sanitizeAdditionalCost),
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+function summarizeAdditionalRevenueItems(sale: SaleRecord, items: SaleAdditionalRevenueItemRecord[], costs: SaleAdditionalCostRecord[]) {
+  const costsByItem = groupAdditionalCostsByItem(costs);
+  const itemFinancials = items.map((item) => ({ itemId: item.id, ...additionalRevenueItemFinancials(item, costsByItem.get(item.id) ?? []) }));
+  const totalRevenue = itemFinancials.reduce((sum, item) => sum + item.revenue, 0);
+  const totalCost = itemFinancials.reduce((sum, item) => sum + item.cost, 0);
+  const totalSpread = itemFinancials.reduce((sum, item) => sum + item.spread, 0);
+  const mainVehicleMargin = sale.grossMargin === null ? null : decimalToNumber(sale.grossMargin);
+
+  return {
+    itemsCount: items.length,
+    countedItems: itemFinancials.filter((item) => item.revenue > 0 || item.cost > 0).length,
+    totalRevenue: moneyString(totalRevenue),
+    totalCost: moneyString(totalCost),
+    totalSpread: moneyString(totalSpread),
+    mainVehicleMargin: sale.grossMargin?.toString() ?? null,
+    totalProfitWithAdditional: mainVehicleMargin === null ? null : moneyString(mainVehicleMargin + totalSpread),
+    pendingCostItems: itemFinancials.filter((item) => item.costPending).map((item) => item.itemId),
+    negativeSpreadItems: itemFinancials.filter((item) => item.negativeSpread).map((item) => item.itemId),
+  };
+}
+
+async function loadAdditionalRevenueBundle(storeId: string, sale: SaleRecord) {
+  const [items, costs] = await Promise.all([
+    prisma.saleAdditionalRevenueItem.findMany({ where: { storeId, saleId: sale.id }, orderBy: [{ createdAt: "asc" }] }),
+    prisma.saleAdditionalCost.findMany({ where: { storeId, saleId: sale.id }, orderBy: [{ createdAt: "asc" }] }),
+  ]);
+  return { items, costs, costsByItem: groupAdditionalCostsByItem(costs), summary: summarizeAdditionalRevenueItems(sale, items, costs) };
+}
+
+async function getAdditionalRevenueItemOrThrow(storeId: string, saleId: string, itemId: string) {
+  const item = await prisma.saleAdditionalRevenueItem.findFirst({ where: { id: itemId, storeId, saleId } });
+  if (!item) {
+    throw new ApiError("NOT_FOUND", "Receita adicional da venda nao encontrada.");
+  }
+  return item;
+}
+
+async function getAdditionalCostOrThrow(storeId: string, saleId: string, itemId: string, costId: string) {
+  const cost = await prisma.saleAdditionalCost.findFirst({ where: { id: costId, storeId, saleId, additionalRevenueItemId: itemId } });
+  if (!cost) {
+    throw new ApiError("NOT_FOUND", "Custo da receita adicional nao encontrado.");
+  }
+  return cost;
+}
+
+function assertCanOperateAdditionalRevenue(role: string) {
+  if (!OPERATE_SALES_ROLES.has(role)) {
+    throw new ApiError("FORBIDDEN", "Seu perfil nao opera receitas adicionais da venda.");
+  }
+}
+
+function assertCanManageAdditionalCosts(role: string) {
+  if (!isCommercialFullView(role)) {
+    throw new ApiError("FORBIDDEN", "Somente administrativo/gestao pode lancar custos adicionais.");
+  }
+}
+
+function assertAdditionalRevenueAmount(itemStatus: string, chargedAmount: number) {
+  if (itemStatus !== "COURTESY" && chargedAmount <= 0) {
+    throw new ApiError("BUSINESS_RULE_ERROR", "Informe valor vendido maior que zero para receita adicional nao cortesia.");
+  }
 }
 
 function documentChecklistSummary(items: SaleDocumentChecklistRecord[]) {
@@ -753,6 +982,272 @@ export async function registerCommercialSalesRoutes(app: FastifyInstance) {
         summary: summarizeSaleInspectionReports(items),
         items: items.map(sanitizeSaleInspectionReportForCommercial),
       },
+    };
+  });
+
+  app.get("/:id/additional-revenues", async (request) => {
+    const session = await requirePermission(request, { module: "sales", action: "read", scope: "STORE", sensitiveArea: "general" });
+    const params = saleParamsSchema.parse(request.params);
+    const sale = await loadScopedSale(session, params.id);
+    const bundle = await loadAdditionalRevenueBundle(session.user.storeId, sale);
+
+    return {
+      data: {
+        sale: sanitizeSale(sale, await getSaleStageKey(sale.id)),
+        summary: bundle.summary,
+        items: bundle.items.map((item) => sanitizeAdditionalRevenueItem(item, bundle.costsByItem.get(item.id) ?? [])),
+      },
+    };
+  });
+
+  app.post("/:id/additional-revenues", async (request, reply) => {
+    const session = await requirePermission(request, { module: "leads", action: "update", scope: "STORE", sensitiveArea: "general" });
+    assertCanOperateAdditionalRevenue(session.user.role);
+    const params = saleParamsSchema.parse(request.params);
+    const input = createAdditionalRevenueItemSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    assertAdditionalRevenueAmount(input.itemStatus, input.chargedAmount);
+
+    const created = await prisma.$transaction(async (tx) => {
+      const item = await tx.saleAdditionalRevenueItem.create({
+        data: {
+          storeId: session.user.storeId,
+          saleId: sale.id,
+          vehicleId: sale.vehicleId,
+          buyerId: sale.customerId,
+          sellerId: sale.sellerUserId,
+          itemType: input.itemType,
+          itemDescription: input.itemDescription,
+          soldByUserId: session.user.id,
+          soldAt: input.soldAt,
+          chargedAmount: input.chargedAmount,
+          includedInVehiclePrice: input.includedInVehiclePrice,
+          itemStatus: input.itemStatus,
+          commercialNotes: input.commercialNotes,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "sale_additional_revenue_created",
+          entityType: "sale_additional_revenue_item",
+          entityId: item.id,
+          result: "SUCCESS",
+          metadata: { saleId: sale.id, itemType: item.itemType, chargedAmount: item.chargedAmount.toString(), itemStatus: item.itemStatus },
+        },
+      });
+
+      return item;
+    });
+
+    const bundle = await loadAdditionalRevenueBundle(session.user.storeId, sale);
+    return reply.code(201).send({ data: sanitizeAdditionalRevenueItem(created, []), summary: bundle.summary });
+  });
+
+  app.patch("/:id/additional-revenues/:itemId", async (request) => {
+    const session = await requirePermission(request, { module: "leads", action: "update", scope: "STORE", sensitiveArea: "general" });
+    assertCanOperateAdditionalRevenue(session.user.role);
+    const params = additionalRevenueItemParamsSchema.parse(request.params);
+    const input = updateAdditionalRevenueItemSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    const item = await getAdditionalRevenueItemOrThrow(session.user.storeId, sale.id, params.itemId);
+    const nextStatus = input.itemStatus ?? item.itemStatus;
+    const nextChargedAmount = input.chargedAmount ?? decimalToNumber(item.chargedAmount);
+    assertAdditionalRevenueAmount(nextStatus, nextChargedAmount);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const changed = await tx.saleAdditionalRevenueItem.updateMany({
+        where: { id: item.id, itemStatus: item.itemStatus, updatedAt: item.updatedAt },
+        data: {
+          itemType: input.itemType,
+          itemDescription: input.itemDescription,
+          chargedAmount: input.chargedAmount,
+          includedInVehiclePrice: input.includedInVehiclePrice,
+          itemStatus: input.itemStatus,
+          commercialNotes: input.commercialNotes,
+          soldAt: input.soldAt,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Receita adicional foi alterada por outra acao. Recarregue e tente novamente.");
+      }
+
+      const next = await tx.saleAdditionalRevenueItem.findUniqueOrThrow({ where: { id: item.id } });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "commercial_sales",
+          action: "sale_additional_revenue_updated",
+          entityType: "sale_additional_revenue_item",
+          entityId: item.id,
+          result: "SUCCESS",
+          metadata: {
+            saleId: sale.id,
+            changedFields: Object.keys(input),
+            fromItemStatus: item.itemStatus,
+            toItemStatus: next.itemStatus,
+            fromChargedAmount: item.chargedAmount.toString(),
+            toChargedAmount: next.chargedAmount.toString(),
+          },
+        },
+      });
+
+      return next;
+    });
+
+    const bundle = await loadAdditionalRevenueBundle(session.user.storeId, sale);
+    return { data: sanitizeAdditionalRevenueItem(updated, bundle.costsByItem.get(updated.id) ?? []), summary: bundle.summary };
+  });
+
+  app.post("/:id/additional-revenues/:itemId/costs", async (request, reply) => {
+    const session = await requirePermission(request, { module: "finance", action: "manage", scope: "ALL", sensitiveArea: "financial" });
+    assertCanManageAdditionalCosts(session.user.role);
+    const params = additionalRevenueItemParamsSchema.parse(request.params);
+    const input = createAdditionalCostSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    const item = await getAdditionalRevenueItemOrThrow(session.user.storeId, sale.id, params.itemId);
+    await ensureAttachmentInStore(session.user.storeId, input.proofFileId);
+
+    const created = await prisma.$transaction(async (tx) => {
+      const cost = await tx.saleAdditionalCost.create({
+        data: {
+          storeId: session.user.storeId,
+          saleId: sale.id,
+          additionalRevenueItemId: item.id,
+          costCategory: input.costCategory,
+          providerId: input.providerId ?? null,
+          expectedCostAmount: input.expectedCostAmount ?? null,
+          realizedCostAmount: input.realizedCostAmount ?? null,
+          costStatus: input.costStatus,
+          costDate: input.costDate ?? null,
+          proofFileId: input.proofFileId ?? null,
+          launchedByUserId: session.user.id,
+          notes: input.notes,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+        },
+      });
+
+      if (input.proofFileId) {
+        await tx.fileAttachmentLink.createMany({
+          data: [{ storeId: session.user.storeId, attachmentId: input.proofFileId, entityType: "sale", entityId: sale.id, purpose: `additional_revenue_cost_${input.costCategory}` }],
+          skipDuplicates: true,
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "finance",
+          action: "sale_additional_cost_created",
+          entityType: "sale_additional_cost",
+          entityId: cost.id,
+          result: "SUCCESS",
+          metadata: {
+            saleId: sale.id,
+            additionalRevenueItemId: item.id,
+            costCategory: cost.costCategory,
+            expectedCostAmount: cost.expectedCostAmount?.toString() ?? null,
+            realizedCostAmount: cost.realizedCostAmount?.toString() ?? null,
+            costStatus: cost.costStatus,
+          },
+        },
+      });
+
+      return cost;
+    });
+
+    const bundle = await loadAdditionalRevenueBundle(session.user.storeId, sale);
+    return reply.code(201).send({
+      data: sanitizeAdditionalCost(created),
+      item: sanitizeAdditionalRevenueItem(item, bundle.costsByItem.get(item.id) ?? []),
+      summary: bundle.summary,
+    });
+  });
+
+  app.patch("/:id/additional-revenues/:itemId/costs/:costId", async (request) => {
+    const session = await requirePermission(request, { module: "finance", action: "manage", scope: "ALL", sensitiveArea: "financial" });
+    assertCanManageAdditionalCosts(session.user.role);
+    const params = additionalCostParamsSchema.parse(request.params);
+    const input = updateAdditionalCostSchema.parse(request.body);
+    const sale = await loadScopedSale(session, params.id);
+    const item = await getAdditionalRevenueItemOrThrow(session.user.storeId, sale.id, params.itemId);
+    const cost = await getAdditionalCostOrThrow(session.user.storeId, sale.id, item.id, params.costId);
+    await ensureAttachmentInStore(session.user.storeId, input.proofFileId);
+
+    const nextCostStatus = input.costStatus ?? cost.costStatus;
+    const nextExpectedCostAmount = input.expectedCostAmount === undefined ? (cost.expectedCostAmount === null ? null : decimalToNumber(cost.expectedCostAmount)) : input.expectedCostAmount;
+    const nextRealizedCostAmount = input.realizedCostAmount === undefined ? (cost.realizedCostAmount === null ? null : decimalToNumber(cost.realizedCostAmount)) : input.realizedCostAmount;
+    if (nextCostStatus !== "CANCELLED" && nextExpectedCostAmount == null && nextRealizedCostAmount == null) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Informe custo previsto ou realizado.");
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const changed = await tx.saleAdditionalCost.updateMany({
+        where: { id: cost.id, costStatus: cost.costStatus, updatedAt: cost.updatedAt },
+        data: {
+          costCategory: input.costCategory,
+          providerId: input.providerId === undefined ? undefined : input.providerId,
+          expectedCostAmount: input.expectedCostAmount === undefined ? undefined : input.expectedCostAmount,
+          realizedCostAmount: input.realizedCostAmount === undefined ? undefined : input.realizedCostAmount,
+          costStatus: input.costStatus,
+          costDate: input.costDate === undefined ? undefined : input.costDate,
+          proofFileId: input.proofFileId === undefined ? undefined : input.proofFileId,
+          notes: input.notes,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Custo adicional foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+
+      const next = await tx.saleAdditionalCost.findUniqueOrThrow({ where: { id: cost.id } });
+      if (input.proofFileId) {
+        await tx.fileAttachmentLink.createMany({
+          data: [{ storeId: session.user.storeId, attachmentId: input.proofFileId, entityType: "sale", entityId: sale.id, purpose: `additional_revenue_cost_${next.costCategory}` }],
+          skipDuplicates: true,
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "finance",
+          action: "sale_additional_cost_updated",
+          entityType: "sale_additional_cost",
+          entityId: cost.id,
+          result: "SUCCESS",
+          metadata: {
+            saleId: sale.id,
+            additionalRevenueItemId: item.id,
+            changedFields: Object.keys(input),
+            fromCostStatus: cost.costStatus,
+            toCostStatus: next.costStatus,
+            fromRealizedCostAmount: cost.realizedCostAmount?.toString() ?? null,
+            toRealizedCostAmount: next.realizedCostAmount?.toString() ?? null,
+          },
+        },
+      });
+
+      return next;
+    });
+
+    const bundle = await loadAdditionalRevenueBundle(session.user.storeId, sale);
+    return {
+      data: sanitizeAdditionalCost(updated),
+      item: sanitizeAdditionalRevenueItem(item, bundle.costsByItem.get(item.id) ?? []),
+      summary: bundle.summary,
     };
   });
 

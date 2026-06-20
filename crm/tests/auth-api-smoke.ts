@@ -6682,6 +6682,91 @@ try {
   });
   assert.equal(sdrPatchSale.statusCode, 403);
 
+  // --- Sprint 3 US07: additional sale revenue is separated from vehicle margin ---
+  const additionalRevenue = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/additional-revenues`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {
+      itemType: "PPF",
+      itemDescription: "PPF frontal",
+      chargedAmount: 2500,
+      includedInVehiclePrice: false,
+      commercialNotes: "PPF vendido no fechamento",
+    },
+  });
+  assert.equal(additionalRevenue.statusCode, 201);
+  assert.equal(additionalRevenue.json().data.saleId, transferredSaleId);
+  assert.equal(additionalRevenue.json().data.itemType, "PPF");
+  assert.equal(additionalRevenue.json().data.financials.revenue, "2500.00");
+  assert.equal(additionalRevenue.json().data.financials.spread, "2500.00");
+  const additionalRevenueItemId = additionalRevenue.json().data.id as string;
+  assert.ok(additionalRevenue.json().summary.pendingCostItems.includes(additionalRevenueItemId));
+
+  const sdrAdditionalRevenue = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/additional-revenues`,
+    headers: { authorization: `Bearer ${sdrToken}` },
+    payload: { itemType: "WINDOW_FILM", chargedAmount: 900 },
+  });
+  assert.equal(sdrAdditionalRevenue.statusCode, 403);
+
+  const sellerAdditionalRevenueList = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}/additional-revenues`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerAdditionalRevenueList.statusCode, 200);
+  assert.equal(sellerAdditionalRevenueList.json().data.summary.totalRevenue, "2500.00");
+  assert.equal(sellerAdditionalRevenueList.json().data.summary.totalCost, "0.00");
+  assert.ok(sellerAdditionalRevenueList.json().data.summary.pendingCostItems.includes(additionalRevenueItemId));
+
+  const additionalCost = await app.inject({
+    method: "POST",
+    url: `/commercial-sales/${transferredSaleId}/additional-revenues/${additionalRevenueItemId}/costs`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      costCategory: "THIRD_PARTY_SERVICE",
+      expectedCostAmount: 1200,
+      costStatus: "EXPECTED",
+      notes: "Custo previsto do PPF",
+    },
+  });
+  assert.equal(additionalCost.statusCode, 201);
+  assert.equal(additionalCost.json().data.saleId, transferredSaleId);
+  assert.equal(additionalCost.json().data.additionalRevenueItemId, additionalRevenueItemId);
+  assert.equal(additionalCost.json().summary.totalCost, "1200.00");
+  assert.equal(additionalCost.json().summary.totalSpread, "1300.00");
+  assert.ok(additionalCost.json().summary.pendingCostItems.includes(additionalRevenueItemId));
+  const additionalCostId = additionalCost.json().data.id as string;
+
+  const realizedAdditionalCost = await app.inject({
+    method: "PATCH",
+    url: `/commercial-sales/${transferredSaleId}/additional-revenues/${additionalRevenueItemId}/costs/${additionalCostId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      realizedCostAmount: 3000,
+      costStatus: "REALIZED",
+      notes: "Custo real maior que o valor vendido",
+    },
+  });
+  assert.equal(realizedAdditionalCost.statusCode, 200);
+  assert.equal(realizedAdditionalCost.json().summary.totalCost, "3000.00");
+  assert.equal(realizedAdditionalCost.json().summary.totalSpread, "-500.00");
+  assert.ok(realizedAdditionalCost.json().summary.negativeSpreadItems.includes(additionalRevenueItemId));
+  assert.ok(!realizedAdditionalCost.json().summary.pendingCostItems.includes(additionalRevenueItemId));
+
+  const finalAdditionalRevenueList = await app.inject({
+    method: "GET",
+    url: `/commercial-sales/${transferredSaleId}/additional-revenues`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(finalAdditionalRevenueList.statusCode, 200);
+  assert.equal(finalAdditionalRevenueList.json().data.summary.totalRevenue, "2500.00");
+  assert.equal(finalAdditionalRevenueList.json().data.summary.totalCost, "3000.00");
+  assert.equal(finalAdditionalRevenueList.json().data.summary.totalSpread, "-500.00");
+  assert.ok(finalAdditionalRevenueList.json().data.summary.negativeSpreadItems.includes(additionalRevenueItemId));
+
   // Seller registers the buyer's initial documents -> REAL producer of the US06 prerequisite.
   const initialDocuments = await app.inject({
     method: "POST",
