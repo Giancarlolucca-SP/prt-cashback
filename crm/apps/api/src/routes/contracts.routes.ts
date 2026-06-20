@@ -183,11 +183,17 @@ const printWarrantyTermSchema = z
   })
   .default({ printerConfigured: false });
 
-const confirmWarrantySignatureSchema = z.object({
-  signedStatus: z.enum(["SIGNED", "WAIVED"] as const).default("SIGNED"),
-  observation: z.string().trim().max(1000).optional(),
-  allDocumentsSignedStatus: z.enum(["ALL_SIGNED", "PARTIALLY_SIGNED", "PENDING_SIGNATURES"] as const).optional(),
-});
+const confirmWarrantySignatureSchema = z
+  .object({
+    signedStatus: z.enum(["SIGNED", "WAIVED"] as const).default("SIGNED"),
+    observation: z.string().trim().max(1000).optional(),
+    allDocumentsSignedStatus: z.enum(["ALL_SIGNED", "PARTIALLY_SIGNED", "PENDING_SIGNATURES"] as const).optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.signedStatus === "WAIVED" && (!input.observation || input.observation.trim().length < 8)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Dispensa do termo de garantia exige justificativa.", path: ["observation"] });
+    }
+  });
 
 const deliveryChecklistSchema = z.object({
   saleId: z.string().uuid(),
@@ -1515,7 +1521,7 @@ export async function registerContractRoutes(app: FastifyInstance) {
     });
     const snapshot = await buildSaleSnapshot(session.user.storeId, sale.id, input.snapshot);
 
-    const contract = await prisma.$transaction(async (tx) => {
+    const { contract, warrantyTerm } = await prisma.$transaction(async (tx) => {
       const created = await tx.contract.create({
         data: {
           storeId: session.user.storeId,
@@ -1545,21 +1551,19 @@ export async function registerContractRoutes(app: FastifyInstance) {
         },
       });
 
-      return created;
-    });
-
-    const warrantyTerm = await prisma.$transaction((tx) =>
-      createWarrantyTermDocument(tx, {
+      const warranty = await createWarrantyTermDocument(tx, {
         storeId: session.user.storeId,
         actorId: session.user.id,
         actorRole: session.user.role,
         saleId: sale.id,
-        sourceContractId: contract.id,
+        sourceContractId: created.id,
         templateId: input.templateId,
         terms: undefined,
         action: "warranty_term_auto_generated",
-      }),
-    );
+      });
+
+      return { contract: created, warrantyTerm: warranty };
+    });
     await emitInternalEvent({
       name: "contract.generated",
       storeId: session.user.storeId,

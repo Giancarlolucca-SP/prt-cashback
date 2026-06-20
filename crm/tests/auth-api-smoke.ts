@@ -4107,6 +4107,19 @@ try {
   assert.equal(reprintWarrantyTerm.json().data.status, "REPRINTED");
   assert.equal(reprintWarrantyTerm.json().data.reprintCount, 1);
 
+  const blockedWarrantyWaiverWithoutReason = await app.inject({
+    method: "POST",
+    url: `/contracts/warranty-terms/${warrantyTermId}/confirm-signature`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      signedStatus: "WAIVED",
+    },
+  });
+  assert.equal(blockedWarrantyWaiverWithoutReason.statusCode, 400);
+  assert.equal(blockedWarrantyWaiverWithoutReason.json().error.code, "VALIDATION_ERROR");
+
   const confirmWarrantySignature = await app.inject({
     method: "POST",
     url: `/contracts/warranty-terms/${warrantyTermId}/confirm-signature`,
