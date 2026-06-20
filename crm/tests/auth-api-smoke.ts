@@ -4957,6 +4957,129 @@ try {
   });
   assert.equal(finishDispatch.statusCode, 200);
   assert.equal(finishDispatch.json().data.status, "COMPLETED");
+  // --- Sprint 3 US08: document ready from dispatcher and assisted buyer notice ---
+  const documentReadyWithoutProof = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/document-ready`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { sourceChannel: "MANUAL" },
+  });
+  assert.equal(documentReadyWithoutProof.statusCode, 400);
+
+  const vehicleDocumentReadyUpload = await app.inject({
+    method: "POST",
+    url: "/files/prepare-upload",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      bucket: "sale-documents",
+      originalName: "documento-veiculo-pronto.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1600,
+      classification: "vehicle_document_ready",
+      link: { entityType: "sale", entityId: saleId, purpose: "vehicle_document_ready_received" },
+    },
+  });
+  assert.equal(vehicleDocumentReadyUpload.statusCode, 201);
+  const vehicleDocumentReadyFileId = vehicleDocumentReadyUpload.json().data.id as string;
+
+  const sellerCannotRegisterDocumentReady = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/document-ready`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {
+      sourceChannel: "WHATSAPP",
+      receivedFrom: "Despachante QA",
+      fileId: vehicleDocumentReadyFileId,
+      documentType: "CRLV_TRANSFERRED",
+    },
+  });
+  assert.equal(sellerCannotRegisterDocumentReady.statusCode, 403);
+
+  const registerDocumentReady = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/document-ready`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      sourceChannel: "WHATSAPP",
+      receivedFrom: "Despachante QA",
+      fileId: vehicleDocumentReadyFileId,
+      documentType: "CRLV_TRANSFERRED",
+      linkConfidence: "MANUAL",
+      status: "LINKED",
+    },
+  });
+  assert.equal(registerDocumentReady.statusCode, 201);
+  assert.equal(registerDocumentReady.json().data.saleId, saleId);
+  assert.equal(registerDocumentReady.json().data.fileId, vehicleDocumentReadyFileId);
+  assert.equal(registerDocumentReady.json().data.status, "LINKED");
+  assert.equal(registerDocumentReady.json().process.status, "COMPLETED");
+  const documentReadyId = registerDocumentReady.json().data.id as string;
+
+  const vehicleDocumentReadySaleLink = await prisma.fileAttachmentLink.findFirst({
+    where: { attachmentId: vehicleDocumentReadyFileId, entityType: "sale", entityId: saleId, purpose: "vehicle_document_ready" },
+  });
+  assert.ok(vehicleDocumentReadySaleLink);
+
+  const notifyBuyerDocumentReady = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/document-ready/${documentReadyId}/notify-buyer`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {},
+  });
+  assert.equal(notifyBuyerDocumentReady.statusCode, 201);
+  assert.equal(notifyBuyerDocumentReady.json().data.documentReadyId, documentReadyId);
+  assert.equal(notifyBuyerDocumentReady.json().data.channel, "WHATSAPP");
+  assert.equal(notifyBuyerDocumentReady.json().data.attachmentFileId, vehicleDocumentReadyFileId);
+  assert.equal(notifyBuyerDocumentReady.json().data.status, "PENDING");
+  assert.equal(notifyBuyerDocumentReady.json().delivery.mode, "assisted_whatsapp_prepared");
+  assert.equal(notifyBuyerDocumentReady.json().delivery.providerApproved, false);
+  assert.match(notifyBuyerDocumentReady.json().data.messageTextSnapshot, /documento do veiculo/i);
+  const buyerDocumentReadyNotificationId = notifyBuyerDocumentReady.json().data.id as string;
+
+  const markBuyerNoticeSent = await app.inject({
+    method: "PATCH",
+    url: `/dispatch/processes/${dispatchId}/document-ready/${documentReadyId}/notifications/${buyerDocumentReadyNotificationId}`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { status: "SENT", sentAt: financeDueAt },
+  });
+  assert.equal(markBuyerNoticeSent.statusCode, 200);
+  assert.equal(markBuyerNoticeSent.json().data.status, "SENT");
+  assert.equal(markBuyerNoticeSent.json().data.sentAt, financeDueAt);
+
+  const resendBuyerDocumentReady = await app.inject({
+    method: "POST",
+    url: `/dispatch/processes/${dispatchId}/document-ready/${documentReadyId}/notify-buyer`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      channel: "EMAIL",
+      recipientContact: "cliente.contrato.api@gt3.local",
+      status: "SENT",
+      sentAt: financeDueAt,
+      messageText: "Ola, Cliente Contrato API. Reenviamos o documento pronto do veiculo em anexo.",
+    },
+  });
+  assert.equal(resendBuyerDocumentReady.statusCode, 201);
+  assert.equal(resendBuyerDocumentReady.json().data.channel, "EMAIL");
+  assert.equal(resendBuyerDocumentReady.json().data.status, "SENT");
+  assert.equal(resendBuyerDocumentReady.json().data.retryCount, 1);
+  assert.equal(resendBuyerDocumentReady.json().delivery.mode, "manual_send_registered");
+
+  const sellerDocumentReadyView = await app.inject({
+    method: "GET",
+    url: `/dispatch/processes/${dispatchId}/document-ready`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+  });
+  assert.equal(sellerDocumentReadyView.statusCode, 200);
+  assert.equal(sellerDocumentReadyView.json().data.documents[0].id, documentReadyId);
+  assert.equal(sellerDocumentReadyView.json().data.documents[0].notificationAttempts.length, 2);
+
+  const documentReadyAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=dispatch&action=buyer_document_ready_notification_requested&entity_type=buyer_document_ready_notification&page=1&page_size=20`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(documentReadyAudit.statusCode, 200);
+  assert.ok(documentReadyAudit.json().items.some((log: { metadata: { documentReadyId?: string } }) => log.metadata.documentReadyId === documentReadyId));
 
   const getDispatch = await app.inject({
     method: "GET",

@@ -1,12 +1,14 @@
 import type { FastifyInstance } from "fastify";
-import { Prisma } from "@prisma/client";
+import { Prisma, type UserRole } from "@prisma/client";
 import { z } from "zod";
 import { ApiError } from "../api/errors.js";
 import { requirePermission } from "../api/auth-guards.js";
 import { getPagination, listResponse } from "../api/pagination.js";
 import { emitInternalEvent } from "../events/internal-events.js";
+import { activeStoreUserIdsByRoles, notifyActiveUsers } from "../services/internal-notifications.js";
 import { prisma } from "../lib/db.js";
 import { PAYMENT_RELEASED_STATUS } from "../services/sale-payment-check.js";
+import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
 import { requiredSaleInspectionReportBlockers } from "../services/sale-inspection-report.js";
 
 const dispatchStatuses = [
@@ -37,6 +39,8 @@ type DispatchStatus = (typeof dispatchStatuses)[number];
 type DispatchChannel = z.infer<typeof dispatchChannelSchema>;
 type TransferMode = z.infer<typeof transferModeSchema>;
 type DispatchRecord = Prisma.DispatcherProcessGetPayload<Record<string, never>>;
+type DispatchDocumentReadyRecord = Prisma.DispatchDocumentReadyGetPayload<Record<string, never>>;
+type BuyerDocumentReadyNotificationRecord = Prisma.BuyerDocumentReadyNotificationGetPayload<Record<string, never>>;
 type ProviderRecord = Pick<
   Prisma.ServiceProviderGetPayload<Record<string, never>>,
   "id" | "name" | "serviceTypes" | "contactName" | "phone" | "email" | "preferredDispatchChannel"
@@ -135,6 +139,70 @@ const deliverPackageSchema = z.object({
   protocolFileId: z.string().uuid().optional(),
   notes: z.string().trim().max(1000).optional(),
 });
+const documentReadySourceChannelSchema = z.enum(["EMAIL", "WHATSAPP", "MANUAL"] as const);
+const documentReadyLinkConfidenceSchema = z.enum(["AUTOMATIC", "MANUAL", "REVIEWED"] as const);
+const documentReadyStatusSchema = z.enum(["RECEIVED", "RECONCILIATION", "LINKED", "REJECTED"] as const);
+const buyerDocumentReadyChannelSchema = z.enum(["WHATSAPP", "EMAIL", "MANUAL"] as const);
+const buyerDocumentReadyNotificationStatusSchema = z.enum(["PENDING", "SENT", "DELIVERED", "FAILED", "RESENT", "CANCELLED"] as const);
+const documentReadyParamsSchema = dispatchParamsSchema.extend({ documentReadyId: z.string().uuid() });
+const documentReadyNotificationParamsSchema = documentReadyParamsSchema.extend({ notificationId: z.string().uuid() });
+const documentReadyAdminRoles: readonly UserRole[] = ["ADMINISTRATIVE", "OWNER_MANAGER", "ADMIN"];
+const buyerDocumentReadyContactRequiredType = "buyer_document_ready_contact_required";
+
+const safeMessageField = z
+  .string()
+  .trim()
+  .min(10)
+  .max(1000)
+  .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Mensagem ao comprador") });
+
+const registerDocumentReadySchema = z
+  .object({
+    sourceChannel: documentReadySourceChannelSchema.default("MANUAL"),
+    receivedAt: z.coerce.date().optional(),
+    receivedFrom: z.string().trim().max(160).optional(),
+    fileId: z.string().uuid().nullable().optional(),
+    fileName: z.string().trim().max(180).optional(),
+    documentType: z.string().trim().min(2).max(80).default("VEHICLE_DOCUMENT"),
+    linkConfidence: documentReadyLinkConfidenceSchema.default("MANUAL"),
+    status: documentReadyStatusSchema.default("LINKED"),
+    administrativeConfirmation: z.boolean().default(false),
+    markProcessCompleted: z.boolean().default(true),
+    metadata: z.record(z.unknown()).optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (!input.fileId && !input.administrativeConfirmation) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe arquivo ou confirmacao administrativa do documento pronto.", path: ["fileId"] });
+    }
+  });
+
+const requestBuyerDocumentReadyNotificationSchema = z.object({
+  channel: buyerDocumentReadyChannelSchema.optional(),
+  recipientContact: z.string().trim().max(160).optional(),
+  messageTemplateId: z.string().uuid().nullable().optional(),
+  messageText: safeMessageField.optional(),
+  attachmentFileId: z.string().uuid().nullable().optional(),
+  status: buyerDocumentReadyNotificationStatusSchema.default("PENDING"),
+  sentAt: z.coerce.date().optional(),
+  failureReason: z.string().trim().max(500).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+const updateBuyerDocumentReadyNotificationSchema = z
+  .object({
+    status: buyerDocumentReadyNotificationStatusSchema.optional(),
+    sentAt: z.coerce.date().nullable().optional(),
+    failureReason: z.string().trim().max(500).nullable().optional(),
+    metadata: z.record(z.unknown()).nullable().optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Informe ao menos um campo para atualizar.",
+  })
+  .superRefine((input, ctx) => {
+    if (input.status === "FAILED" && !input.failureReason) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe motivo da falha.", path: ["failureReason"] });
+    }
+  });
 
 function plainMetadata(value: unknown): Record<string, unknown> {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -189,6 +257,159 @@ function sanitizeDispatch(process: DispatchRecord, provider: ProviderRecord | nu
   };
 }
 
+function sanitizeDocumentReady(document: DispatchDocumentReadyRecord, notifications: BuyerDocumentReadyNotificationRecord[] = []) {
+  return {
+    id: document.id,
+    dispatchProcessId: document.dispatchProcessId,
+    saleId: document.saleId,
+    vehicleId: document.vehicleId,
+    buyerId: document.buyerId,
+    dispatcherId: document.dispatcherId,
+    sourceChannel: document.sourceChannel,
+    receivedAt: document.receivedAt.toISOString(),
+    receivedFrom: document.receivedFrom,
+    fileId: document.fileId,
+    fileName: document.fileName,
+    documentType: document.documentType,
+    linkedByUserId: document.linkedByUserId,
+    linkConfidence: document.linkConfidence,
+    status: document.status,
+    metadata: document.metadata,
+    notificationAttempts: notifications.map(sanitizeBuyerDocumentReadyNotification),
+    createdAt: document.createdAt.toISOString(),
+    updatedAt: document.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeBuyerDocumentReadyNotification(notification: BuyerDocumentReadyNotificationRecord) {
+  return {
+    id: notification.id,
+    documentReadyId: notification.documentReadyId,
+    dispatchProcessId: notification.dispatchProcessId,
+    saleId: notification.saleId,
+    buyerId: notification.buyerId,
+    vehicleId: notification.vehicleId,
+    channel: notification.channel,
+    recipientContact: notification.recipientContact,
+    messageTemplateId: notification.messageTemplateId,
+    messageTextSnapshot: notification.messageTextSnapshot,
+    attachmentFileId: notification.attachmentFileId,
+    sentAt: notification.sentAt?.toISOString() ?? null,
+    sentByUserId: notification.sentByUserId,
+    sentBy: notification.sentBy,
+    status: notification.status,
+    failureReason: notification.failureReason,
+    retryCount: notification.retryCount,
+    metadata: notification.metadata,
+    createdAt: notification.createdAt.toISOString(),
+    updatedAt: notification.updatedAt.toISOString(),
+  };
+}
+
+function buyerVehicleLabel(vehicle: { brand: string; model: string; plate: string | null } | null) {
+  if (!vehicle) return "veiculo";
+  const base = [vehicle.brand, vehicle.model].filter(Boolean).join(" ").trim() || "veiculo";
+  return vehicle.plate ? `${base} placa ${vehicle.plate}` : base;
+}
+
+function buildBuyerDocumentReadyMessage(input: { buyerName: string | null; vehicle: { brand: string; model: string; plate: string | null } | null; hasAttachment: boolean }) {
+  const name = input.buyerName?.trim() || "cliente";
+  const attachmentText = input.hasAttachment ? "Segue arquivo em anexo." : "Nossa equipe entrara em contato para orientar a retirada/envio.";
+  return `Ola, ${name}. O documento do veiculo ${buyerVehicleLabel(input.vehicle)} ja esta pronto em seu nome. ${attachmentText} Qualquer duvida, estamos a disposicao.`;
+}
+
+function resolveBuyerDelivery(input: {
+  buyer: { name: string; phone: string | null; email: string | null } | null;
+  requestedChannel?: "WHATSAPP" | "EMAIL" | "MANUAL";
+  recipientContact?: string;
+}) {
+  const override = input.recipientContact?.trim() || null;
+  const phone = input.buyer?.phone?.trim() || null;
+  const email = input.buyer?.email?.trim() || null;
+  const requested = input.requestedChannel;
+
+  if (requested === "MANUAL") return { channel: "MANUAL" as const, recipientContact: override ?? phone ?? email ?? input.buyer?.name ?? null };
+  if (requested === "EMAIL") return email || override ? { channel: "EMAIL" as const, recipientContact: override ?? email } : { channel: "MANUAL" as const, recipientContact: phone ?? input.buyer?.name ?? null };
+  if (requested === "WHATSAPP") {
+    if (phone || override) return { channel: "WHATSAPP" as const, recipientContact: override ?? phone };
+    if (email) return { channel: "EMAIL" as const, recipientContact: email };
+    return { channel: "MANUAL" as const, recipientContact: input.buyer?.name ?? null };
+  }
+
+  if (phone) return { channel: "WHATSAPP" as const, recipientContact: phone };
+  if (email) return { channel: "EMAIL" as const, recipientContact: email };
+  return { channel: "MANUAL" as const, recipientContact: input.buyer?.name ?? null };
+}
+
+function buyerDeliveryMode(channel: "WHATSAPP" | "EMAIL" | "MANUAL", status: string) {
+  if (["SENT", "DELIVERED", "RESENT"].includes(status)) return "manual_send_registered";
+  if (channel === "WHATSAPP") return "assisted_whatsapp_prepared";
+  if (channel === "EMAIL") return "assisted_email_prepared";
+  return "manual_contact_required";
+}
+
+async function loadBuyerDocumentReadyContext(storeId: string, process: DispatchRecord) {
+  const [buyer, vehicle] = await Promise.all([
+    process.customerId
+      ? prisma.customer.findFirst({ where: { id: process.customerId, storeId, deletedAt: null }, select: { id: true, name: true, phone: true, email: true } })
+      : null,
+    process.vehicleId
+      ? prisma.vehicle.findFirst({ where: { id: process.vehicleId, storeId, deletedAt: null }, select: { id: true, brand: true, model: true, plate: true } })
+      : null,
+  ]);
+  return { buyer, vehicle };
+}
+
+async function getDocumentReadyOrThrow(storeId: string, process: DispatchRecord, documentReadyId: string) {
+  const document = await prisma.dispatchDocumentReady.findFirst({ where: { id: documentReadyId, storeId, dispatchProcessId: process.id, saleId: process.saleId } });
+  if (!document) {
+    throw new ApiError("NOT_FOUND", "Documento pronto nao encontrado.");
+  }
+  return document;
+}
+
+async function getBuyerDocumentReadyNotificationOrThrow(storeId: string, documentReadyId: string, notificationId: string) {
+  const notification = await prisma.buyerDocumentReadyNotification.findFirst({ where: { id: notificationId, storeId, documentReadyId } });
+  if (!notification) {
+    throw new ApiError("NOT_FOUND", "Aviso ao comprador nao encontrado.");
+  }
+  return notification;
+}
+
+async function getDispatchForSaleRead(session: Awaited<ReturnType<typeof requirePermission>>, id: string) {
+  const process = await getDispatchOrThrow(session.user.storeId, id);
+  if ((session.user.role === "SELLER" || session.user.role === "SDR") && process.sellerUserId !== session.user.id) {
+    throw new ApiError("NOT_FOUND", "Processo de despachante nao encontrado.");
+  }
+  return process;
+}
+
+async function notifyManualBuyerDocumentContactRequired(storeId: string, process: DispatchRecord, actorId: string) {
+  const userIds = await activeStoreUserIdsByRoles(storeId, documentReadyAdminRoles);
+  await notifyActiveUsers({
+    storeId,
+    userIds,
+    entityType: buyerDocumentReadyContactRequiredType,
+    entityId: process.id,
+    title: "Contato manual necessario para documento pronto",
+    body: `Venda ${process.saleId}: comprador sem canal valido para aviso automatico/assistido do documento pronto.`,
+    priority: "HIGH",
+    sourceModule: "dispatch",
+    actionUrl: `/dispatch/processes/${process.id}`,
+  });
+  await prisma.auditLog.create({
+    data: {
+      storeId,
+      actorId,
+      module: "dispatch",
+      action: "buyer_document_ready_contact_required",
+      entityType: "dispatcher_process",
+      entityId: process.id,
+      result: "SUCCESS",
+      metadata: { saleId: process.saleId, notificationType: buyerDocumentReadyContactRequiredType },
+    },
+  });
+}
 async function ensureSale(storeId: string, saleId: string) {
   const sale = await prisma.sale.findFirst({
     where: { id: saleId, storeId, deletedAt: null },
@@ -221,7 +442,7 @@ async function ensureAttachmentInStore(storeId: string, attachmentId?: string | 
   if (!attachmentId) return null;
   const attachment = await prisma.fileAttachment.findFirst({
     where: { id: attachmentId, storeId, status: "ACTIVE", deletedAt: null },
-    select: { id: true },
+    select: { id: true, originalName: true },
   });
   if (!attachment) {
     throw new ApiError("NOT_FOUND", "Arquivo informado nao encontrado.");
@@ -251,7 +472,7 @@ async function findLinkedAttachmentId(input: { storeId: string; entityType: stri
 
   const attachment = await prisma.fileAttachment.findFirst({
     where: { id: link.attachmentId, storeId: input.storeId, status: "ACTIVE", deletedAt: null },
-    select: { id: true },
+    select: { id: true, originalName: true },
   });
   return attachment?.id ?? null;
 }
@@ -825,6 +1046,260 @@ export async function registerDispatchRoutes(app: FastifyInstance) {
     return { data: sanitizeDispatch(process, provider) };
   });
 
+  app.get("/processes/:id/document-ready", async (request) => {
+    const session = await requirePermission(request, { module: "sales", action: "read", scope: "STORE", sensitiveArea: "general" });
+    const params = dispatchParamsSchema.parse(request.params);
+    const process = await getDispatchForSaleRead(session, params.id);
+    const [documents, notifications] = await Promise.all([
+      prisma.dispatchDocumentReady.findMany({ where: { storeId: session.user.storeId, dispatchProcessId: process.id }, orderBy: { createdAt: "desc" } }),
+      prisma.buyerDocumentReadyNotification.findMany({ where: { storeId: session.user.storeId, dispatchProcessId: process.id }, orderBy: { createdAt: "desc" } }),
+    ]);
+    const notificationsByDocument = new Map<string, BuyerDocumentReadyNotificationRecord[]>();
+    for (const notification of notifications) {
+      const list = notificationsByDocument.get(notification.documentReadyId) ?? [];
+      list.push(notification);
+      notificationsByDocument.set(notification.documentReadyId, list);
+    }
+
+    return {
+      data: {
+        process: sanitizeDispatch(process),
+        documents: documents.map((document) => sanitizeDocumentReady(document, notificationsByDocument.get(document.id) ?? [])),
+      },
+    };
+  });
+
+  app.post("/processes/:id/document-ready", async (request, reply) => {
+    const session = await requirePermission(request, { module: "dispatch", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = dispatchParamsSchema.parse(request.params);
+    const input = registerDocumentReadySchema.parse(request.body);
+    const current = await getDispatchOrThrow(session.user.storeId, params.id);
+    const attachment = await ensureAttachmentInStore(session.user.storeId, input.fileId);
+    const receivedAt = input.receivedAt ?? new Date();
+    const fileName = input.fileName ?? attachment?.originalName ?? null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const document = await tx.dispatchDocumentReady.create({
+        data: {
+          storeId: session.user.storeId,
+          dispatchProcessId: current.id,
+          saleId: current.saleId,
+          vehicleId: current.vehicleId,
+          buyerId: current.customerId,
+          dispatcherId: current.providerId,
+          sourceChannel: input.sourceChannel,
+          receivedAt,
+          receivedFrom: input.receivedFrom,
+          fileId: input.fileId ?? null,
+          fileName,
+          documentType: input.documentType,
+          linkedByUserId: session.user.id,
+          linkConfidence: input.linkConfidence,
+          status: input.status,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+        },
+      });
+
+      if (input.fileId) {
+        const links = [
+          { storeId: session.user.storeId, attachmentId: input.fileId, entityType: "dispatcher_process", entityId: current.id, purpose: "vehicle_document_ready" },
+          { storeId: session.user.storeId, attachmentId: input.fileId, entityType: "sale", entityId: current.saleId, purpose: "vehicle_document_ready" },
+          ...(current.customerId ? [{ storeId: session.user.storeId, attachmentId: input.fileId, entityType: "customer", entityId: current.customerId, purpose: "vehicle_document_ready" }] : []),
+          ...(current.vehicleId ? [{ storeId: session.user.storeId, attachmentId: input.fileId, entityType: "vehicle", entityId: current.vehicleId, purpose: "vehicle_document_ready" }] : []),
+        ];
+        await tx.fileAttachmentLink.createMany({ data: links, skipDuplicates: true });
+      }
+
+      const process =
+        input.markProcessCompleted && input.status === "LINKED"
+          ? await tx.dispatcherProcess.update({
+              where: { id: current.id },
+              data: {
+                status: "COMPLETED",
+                statusNotes: `Documento pronto registrado (${input.sourceChannel}).`,
+                metadata: {
+                  ...plainMetadata(current.metadata),
+                  lastDispatchAction: "document_ready",
+                  documentReadyId: document.id,
+                  documentReadyFileId: document.fileId,
+                } as Prisma.InputJsonObject,
+              },
+            })
+          : current;
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "dispatch",
+          action: "dispatch_document_ready_linked",
+          entityType: "dispatch_document_ready",
+          entityId: document.id,
+          result: "SUCCESS",
+          metadata: {
+            dispatchProcessId: current.id,
+            saleId: current.saleId,
+            sourceChannel: document.sourceChannel,
+            fileId: document.fileId,
+            linkConfidence: document.linkConfidence,
+            status: document.status,
+          },
+        },
+      });
+
+      return { document, process };
+    });
+
+    await emitInternalEvent({
+      name: "dispatch.document_ready_linked",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "dispatch_document_ready",
+      entityId: result.document.id,
+      payload: { dispatchProcessId: current.id, saleId: current.saleId, status: result.document.status, sourceChannel: result.document.sourceChannel },
+    });
+
+    return reply.code(201).send({ data: sanitizeDocumentReady(result.document), process: sanitizeDispatch(result.process) });
+  });
+
+  app.post("/processes/:id/document-ready/:documentReadyId/notify-buyer", async (request, reply) => {
+    const session = await requirePermission(request, { module: "dispatch", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = documentReadyParamsSchema.parse(request.params);
+    const input = requestBuyerDocumentReadyNotificationSchema.parse(request.body ?? {});
+    const process = await getDispatchOrThrow(session.user.storeId, params.id);
+    const document = await getDocumentReadyOrThrow(session.user.storeId, process, params.documentReadyId);
+    if (document.status !== "LINKED") {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Documento sem vinculo seguro nao pode ser enviado ao comprador.", { status: document.status });
+    }
+    const attachmentFileId = input.attachmentFileId === undefined ? document.fileId : input.attachmentFileId;
+    await ensureAttachmentInStore(session.user.storeId, attachmentFileId);
+    const { buyer, vehicle } = await loadBuyerDocumentReadyContext(session.user.storeId, process);
+    const delivery = resolveBuyerDelivery({ buyer, requestedChannel: input.channel, recipientContact: input.recipientContact });
+    const messageText = input.messageText ?? buildBuyerDocumentReadyMessage({ buyerName: buyer?.name ?? null, vehicle, hasAttachment: Boolean(attachmentFileId) });
+    const previousAttempts = await prisma.buyerDocumentReadyNotification.count({ where: { storeId: session.user.storeId, documentReadyId: document.id } });
+    const sentAt = ["SENT", "DELIVERED", "RESENT"].includes(input.status) ? input.sentAt ?? new Date() : input.sentAt;
+
+    const notification = await prisma.$transaction(async (tx) => {
+      const created = await tx.buyerDocumentReadyNotification.create({
+        data: {
+          storeId: session.user.storeId,
+          documentReadyId: document.id,
+          dispatchProcessId: process.id,
+          saleId: process.saleId,
+          buyerId: process.customerId,
+          vehicleId: process.vehicleId,
+          channel: delivery.channel,
+          recipientContact: delivery.recipientContact,
+          messageTemplateId: input.messageTemplateId ?? null,
+          messageTextSnapshot: messageText,
+          attachmentFileId: attachmentFileId ?? null,
+          sentAt,
+          sentByUserId: session.user.id,
+          sentBy: "USER",
+          status: input.status,
+          failureReason: input.failureReason,
+          retryCount: previousAttempts,
+          metadata: {
+            ...(input.metadata ?? {}),
+            deliveryMode: buyerDeliveryMode(delivery.channel, input.status),
+            providerApproved: false,
+          } as Prisma.InputJsonObject,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "dispatch",
+          action: "buyer_document_ready_notification_requested",
+          entityType: "buyer_document_ready_notification",
+          entityId: created.id,
+          result: "SUCCESS",
+          metadata: {
+            documentReadyId: document.id,
+            dispatchProcessId: process.id,
+            saleId: process.saleId,
+            channel: created.channel,
+            status: created.status,
+            retryCount: created.retryCount,
+            attachmentFileId: created.attachmentFileId,
+          },
+        },
+      });
+
+      return created;
+    });
+
+    if (delivery.channel === "MANUAL" || !delivery.recipientContact) {
+      await notifyManualBuyerDocumentContactRequired(session.user.storeId, process, session.user.id);
+    }
+
+    await emitInternalEvent({
+      name: "dispatch.buyer_document_ready_notification_requested",
+      storeId: session.user.storeId,
+      actorId: session.user.id,
+      entityType: "buyer_document_ready_notification",
+      entityId: notification.id,
+      payload: { documentReadyId: document.id, saleId: process.saleId, channel: notification.channel, status: notification.status },
+    });
+
+    return reply.code(201).send({
+      data: sanitizeBuyerDocumentReadyNotification(notification),
+      delivery: {
+        channel: delivery.channel,
+        recipientContact: delivery.recipientContact,
+        mode: buyerDeliveryMode(delivery.channel, notification.status),
+        providerApproved: false,
+      },
+    });
+  });
+
+  app.patch("/processes/:id/document-ready/:documentReadyId/notifications/:notificationId", async (request) => {
+    const session = await requirePermission(request, { module: "dispatch", action: "manage", scope: "STORE", sensitiveArea: "general" });
+    const params = documentReadyNotificationParamsSchema.parse(request.params);
+    const input = updateBuyerDocumentReadyNotificationSchema.parse(request.body);
+    const process = await getDispatchOrThrow(session.user.storeId, params.id);
+    const document = await getDocumentReadyOrThrow(session.user.storeId, process, params.documentReadyId);
+    const current = await getBuyerDocumentReadyNotificationOrThrow(session.user.storeId, document.id, params.notificationId);
+    const nextStatus = input.status ?? current.status;
+    const nextSentAt = input.sentAt === undefined ? (["SENT", "DELIVERED", "RESENT"].includes(nextStatus) ? current.sentAt ?? new Date() : undefined) : input.sentAt;
+
+    const notification = await prisma.$transaction(async (tx) => {
+      const changed = await tx.buyerDocumentReadyNotification.updateMany({
+        where: { id: current.id, status: current.status, updatedAt: current.updatedAt },
+        data: {
+          status: input.status,
+          sentAt: nextSentAt,
+          failureReason: input.failureReason === undefined ? undefined : input.failureReason,
+          metadata: input.metadata === undefined ? undefined : input.metadata === null ? Prisma.JsonNull : (input.metadata as Prisma.InputJsonObject),
+        },
+      });
+      if (changed.count !== 1) {
+        throw new ApiError("CONFLICT", "Aviso ao comprador foi alterado por outra acao. Recarregue e tente novamente.");
+      }
+
+      const updated = await tx.buyerDocumentReadyNotification.findUniqueOrThrow({ where: { id: current.id } });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "dispatch",
+          action: "buyer_document_ready_notification_updated",
+          entityType: "buyer_document_ready_notification",
+          entityId: current.id,
+          result: "SUCCESS",
+          metadata: { documentReadyId: document.id, saleId: process.saleId, changedFields: Object.keys(input), fromStatus: current.status, toStatus: updated.status },
+        },
+      });
+      return updated;
+    });
+
+    return { data: sanitizeBuyerDocumentReadyNotification(notification) };
+  });
   app.post("/processes/:id/status", async (request) => {
     const session = await requirePermission(request, { module: "dispatch", action: "manage", scope: "STORE", sensitiveArea: "general" });
     const params = dispatchParamsSchema.parse(request.params);

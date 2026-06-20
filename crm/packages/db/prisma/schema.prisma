@@ -1215,6 +1215,71 @@ model DispatcherProcess {
   @@map("dispatcher_processes")
 }
 
+model DispatchDocumentReady {
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  dispatchProcessId String?   @map("dispatch_process_id")
+  saleId            String    @map("sale_id")
+  vehicleId         String?   @map("vehicle_id")
+  buyerId           String?   @map("buyer_id")
+  dispatcherId      String?   @map("dispatcher_id")
+  sourceChannel     String    @map("source_channel")
+  receivedAt        DateTime  @default(now()) @map("received_at")
+  receivedFrom      String?   @map("received_from")
+  fileId            String?   @map("file_id")
+  fileName          String?   @map("file_name")
+  documentType      String    @default("VEHICLE_DOCUMENT") @map("document_type")
+  linkedByUserId    String?   @map("linked_by_user_id")
+  linkConfidence    String    @default("MANUAL") @map("link_confidence")
+  status            String    @default("LINKED")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([dispatchProcessId])
+  @@index([saleId])
+  @@index([vehicleId])
+  @@index([buyerId])
+  @@index([dispatcherId])
+  @@index([fileId])
+  @@index([storeId, status])
+  @@map("dispatch_document_ready")
+}
+
+model BuyerDocumentReadyNotification {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  documentReadyId     String    @map("document_ready_id")
+  dispatchProcessId   String?   @map("dispatch_process_id")
+  saleId              String    @map("sale_id")
+  buyerId             String?   @map("buyer_id")
+  vehicleId           String?   @map("vehicle_id")
+  channel             String
+  recipientContact    String?   @map("recipient_contact")
+  messageTemplateId   String?   @map("message_template_id")
+  messageTextSnapshot String    @map("message_text_snapshot")
+  attachmentFileId    String?   @map("attachment_file_id")
+  sentAt              DateTime? @map("sent_at")
+  sentByUserId        String?   @map("sent_by_user_id")
+  sentBy              String    @default("USER") @map("sent_by")
+  status              String    @default("PENDING")
+  failureReason       String?   @map("failure_reason")
+  retryCount          Int       @default(0) @map("retry_count")
+  metadata            Json?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([storeId])
+  @@index([documentReadyId])
+  @@index([dispatchProcessId])
+  @@index([saleId])
+  @@index([buyerId])
+  @@index([vehicleId])
+  @@index([attachmentFileId])
+  @@index([storeId, status])
+  @@map("buyer_document_ready_notifications")
+}
 model PurchaseLead {
   id          String         @id @default(uuid())
   storeId     String         @map("store_id")

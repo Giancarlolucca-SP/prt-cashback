@@ -55,6 +55,8 @@ export type InternalEventName =
   | "dispatch.process_created"
   | "dispatch.process_status_changed"
   | "dispatch.package_sent"
+  | "dispatch.document_ready_linked"
+  | "dispatch.buyer_document_ready_notification_requested"
   | "external_query.created"
   | "external_query.result_recorded"
   | "vehicle.price_changed"
