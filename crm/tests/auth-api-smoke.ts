@@ -7997,6 +7997,270 @@ try {
   assert.ok(postSaleFeedbackMetrics.json().data.internalIssues >= 1);
   assert.ok(postSaleFeedbackMetrics.json().data.byResult.INTERESTED_PURCHASE >= 1);
   assert.ok(postSaleFeedbackMetrics.json().data.byResult.VEHICLE_PROBLEM >= 1);
+
+  // --- Sprint 4 US03: assisted birthday relationship, no full birth date exposure ---
+  const createBirthdayTemplate = await app.inject({
+    method: "POST",
+    url: "/settings/message-templates",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: "birthday_greeting",
+      channel: "WHATSAPP",
+      content: "Ola [NOME], feliz aniversario! A equipe GT3 deseja um excelente dia.",
+      variables: {
+        customer: ["name"],
+      },
+    },
+  });
+  assert.equal(createBirthdayTemplate.statusCode, 201);
+  assert.equal(createBirthdayTemplate.json().data.name, "birthday_greeting");
+  const birthdayTemplateId = createBirthdayTemplate.json().data.id as string;
+
+  const birthdayUnknownCustomer = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: "Cliente Aniversario Desconhecido QA",
+      document: uniqueToken("BIRTH-UNKNOWN"),
+      phone: "11997770001",
+      origin: "qa-birthday",
+    },
+  });
+  assert.equal(birthdayUnknownCustomer.statusCode, 201);
+  const birthdayUnknownCustomerId = birthdayUnknownCustomer.json().data.id as string;
+
+  const unknownBirthdays = await app.inject({
+    method: "GET",
+    url: "/post-sale/birthdays?range=UNKNOWN&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(unknownBirthdays.statusCode, 200);
+  const unknownBirthdayItem = unknownBirthdays
+    .json()
+    .items.find((item: { customerId: string }) => item.customerId === birthdayUnknownCustomerId);
+  assert.ok(unknownBirthdayItem);
+  assert.equal(unknownBirthdayItem.birthDayMonth, null);
+  assert.equal(unknownBirthdayItem.status, "UNKNOWN");
+
+  const confirmBirthday = await app.inject({
+    method: "POST",
+    url: `/post-sale/birthdays/${createdCustomerId}/confirm`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      birthDate: "1990-06-15T12:00:00.000Z",
+      source: "OCR",
+      confidence: 0.93,
+      status: "CONFIRMED",
+      metadata: {
+        source: "s4-us03-smoke",
+      },
+    },
+  });
+  assert.equal(confirmBirthday.statusCode, 201);
+  assert.equal(confirmBirthday.json().data.birthDay, 15);
+  assert.equal(confirmBirthday.json().data.birthMonth, 6);
+  assert.equal(confirmBirthday.json().data.birthDayMonth, "15/06");
+  assert.equal(confirmBirthday.json().data.birthDateSource, "OCR");
+  assert.equal(confirmBirthday.json().data.birthDateConfidence, "0.93");
+  assert.equal(Object.prototype.hasOwnProperty.call(confirmBirthday.json().data, "birthDate"), false);
+
+  const monthlyBirthdays = await app.inject({
+    method: "GET",
+    url: "/post-sale/birthdays?range=MONTH&date=2026-06-01T12:00:00.000Z&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(monthlyBirthdays.statusCode, 200);
+  const monthlyBirthdayItem = monthlyBirthdays
+    .json()
+    .items.find((item: { customerId: string }) => item.customerId === createdCustomerId);
+  assert.ok(monthlyBirthdayItem);
+  assert.equal(monthlyBirthdayItem.birthDayMonth, "15/06");
+  assert.equal(monthlyBirthdayItem.messageStatus, "NOT_PREPARED");
+  assert.equal(monthlyBirthdayItem.communicationAllowed, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(monthlyBirthdayItem, "birthDate"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(monthlyBirthdayItem.customer, "birthDate"), false);
+
+  const nextSevenBirthdayList = await app.inject({
+    method: "GET",
+    url: "/post-sale/birthdays?range=NEXT_7_DAYS&date=2026-06-10T12:00:00.000Z&page_size=100",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(nextSevenBirthdayList.statusCode, 200);
+  assert.ok(nextSevenBirthdayList.json().items.some((item: { customerId: string }) => item.customerId === createdCustomerId));
+
+  const sdrCannotReadBirthdays = await app.inject({
+    method: "GET",
+    url: "/post-sale/birthdays?range=MONTH&date=2026-06-01T12:00:00.000Z",
+    headers: {
+      authorization: `Bearer ${sdrToken}`,
+    },
+  });
+  assert.equal(sdrCannotReadBirthdays.statusCode, 403);
+
+  const createBirthdayOptOutCustomer = await app.inject({
+    method: "POST",
+    url: "/customers",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      name: "Cliente Aniversario Optout QA",
+      document: uniqueToken("BIRTH-OPTOUT"),
+      phone: "11997770002",
+      origin: "qa-birthday",
+    },
+  });
+  assert.equal(createBirthdayOptOutCustomer.statusCode, 201);
+  const birthdayOptOutCustomerId = createBirthdayOptOutCustomer.json().data.id as string;
+
+  const confirmOptOutBirthday = await app.inject({
+    method: "POST",
+    url: `/post-sale/birthdays/${birthdayOptOutCustomerId}/confirm`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      birthDate: "1985-06-15T12:00:00.000Z",
+      source: "DOCUMENT",
+      confidence: 0.99,
+      status: "CONFIRMED",
+    },
+  });
+  assert.equal(confirmOptOutBirthday.statusCode, 201);
+
+  await prisma.privacyPreference.upsert({
+    where: { customerId_channel: { customerId: birthdayOptOutCustomerId, channel: "WHATSAPP" } },
+    update: { allowed: false, reason: "Cliente nao quer mensagens de aniversario" },
+    create: {
+      storeId: ownerBody.user.storeId,
+      customerId: birthdayOptOutCustomerId,
+      channel: "WHATSAPP",
+      allowed: false,
+      reason: "Cliente nao quer mensagens de aniversario",
+    },
+  });
+
+  const prepareOptOutBirthdayMessage = await app.inject({
+    method: "POST",
+    url: "/post-sale/birthday-messages/prepare",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      customerId: birthdayOptOutCustomerId,
+      channel: "WHATSAPP",
+      templateId: birthdayTemplateId,
+    },
+  });
+  assert.equal(prepareOptOutBirthdayMessage.statusCode, 422);
+  assert.equal(prepareOptOutBirthdayMessage.json().error.code, "BUSINESS_RULE_ERROR");
+
+  const prepareBirthdayMessage = await app.inject({
+    method: "POST",
+    url: "/post-sale/birthday-messages/prepare",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      customerId: createdCustomerId,
+      channel: "WHATSAPP",
+      templateId: birthdayTemplateId,
+      responsibleUserId: administrativeBody.user.id,
+    },
+  });
+  assert.equal(prepareBirthdayMessage.statusCode, 201);
+  assert.equal(prepareBirthdayMessage.json().data.sendStatus, "PREPARED");
+  assert.equal(prepareBirthdayMessage.json().data.channel, "WHATSAPP");
+  assert.equal(prepareBirthdayMessage.json().data.templateId, birthdayTemplateId);
+  assert.equal(prepareBirthdayMessage.json().data.templateVersion, createBirthdayTemplate.json().data.version);
+  assert.ok(prepareBirthdayMessage.json().data.messageTextSnapshot.includes("Cliente Contrato API"));
+  assert.ok(prepareBirthdayMessage.json().data.messageTextSnapshot.includes("feliz aniversario"));
+  assert.equal(prepareBirthdayMessage.json().data.responsibleUserId, administrativeBody.user.id);
+  const birthdayMessageId = prepareBirthdayMessage.json().data.id as string;
+
+  const sentBirthdayMessage = await app.inject({
+    method: "POST",
+    url: `/post-sale/birthday-messages/${birthdayMessageId}/send-assisted`,
+    headers: {
+      authorization: `Bearer ${administrativeBody.token}`,
+    },
+    payload: {
+      sentAt: "2026-06-15T09:00:00.000Z",
+    },
+  });
+  assert.equal(sentBirthdayMessage.statusCode, 200);
+  assert.equal(sentBirthdayMessage.json().data.sendStatus, "SENT");
+  assert.equal(sentBirthdayMessage.json().data.sentByUserId, administrativeBody.user.id);
+  assert.equal(sentBirthdayMessage.json().data.sentAt, "2026-06-15T09:00:00.000Z");
+  assert.equal(sentBirthdayMessage.json().data.messageTextSnapshot, prepareBirthdayMessage.json().data.messageTextSnapshot);
+
+  const birthdayMessageResponse = await app.inject({
+    method: "POST",
+    url: `/post-sale/birthday-messages/${birthdayMessageId}/response`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+    payload: {
+      responseText: "Cliente agradeceu e pediu contato para proxima troca.",
+      responseAt: "2026-06-15T10:00:00.000Z",
+    },
+  });
+  assert.equal(birthdayMessageResponse.statusCode, 200);
+  assert.equal(birthdayMessageResponse.json().data.sendStatus, "RESPONDED");
+  assert.equal(birthdayMessageResponse.json().data.responseText, "Cliente agradeceu e pediu contato para proxima troca.");
+  assert.equal(birthdayMessageResponse.json().data.messageTextSnapshot, prepareBirthdayMessage.json().data.messageTextSnapshot);
+
+  const birthdayMessagesList = await app.inject({
+    method: "GET",
+    url: `/post-sale/birthday-messages?customer_id=${createdCustomerId}&page_size=100`,
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(birthdayMessagesList.statusCode, 200);
+  assert.ok(
+    birthdayMessagesList
+      .json()
+      .items.some(
+        (message: { id: string; sendStatus: string; messageTextSnapshot: string }) =>
+          message.id === birthdayMessageId &&
+          message.sendStatus === "RESPONDED" &&
+          message.messageTextSnapshot === prepareBirthdayMessage.json().data.messageTextSnapshot,
+      ),
+  );
+
+  const birthdayResponseHistory = await prisma.customerHistoryEvent.findFirst({
+    where: { storeId: ownerBody.user.storeId, customerId: createdCustomerId, type: "birthday_message_responded" },
+    orderBy: { occurredAt: "desc" },
+  });
+  assert.ok(birthdayResponseHistory);
+  assert.equal((birthdayResponseHistory.metadata as { birthdayMessageId?: string }).birthdayMessageId, birthdayMessageId);
+
+  const birthdayMessageMetrics = await app.inject({
+    method: "GET",
+    url: "/post-sale/birthday-messages/metrics/summary",
+    headers: {
+      authorization: `Bearer ${ownerBody.token}`,
+    },
+  });
+  assert.equal(birthdayMessageMetrics.statusCode, 200);
+  assert.ok(birthdayMessageMetrics.json().data.knownBirthdays >= 2);
+  assert.ok(birthdayMessageMetrics.json().data.unknownBirthdays >= 1);
+  assert.ok(birthdayMessageMetrics.json().data.optOuts >= 1);
+  assert.ok(birthdayMessageMetrics.json().data.messagesByStatus.RESPONDED >= 1);
   checkpoint("post-sale-alerts");
 
   const sellerDeleteCustomer = await app.inject({

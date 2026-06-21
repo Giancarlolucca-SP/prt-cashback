@@ -600,6 +600,63 @@ model CustomerRelationshipFlag {
   @@map("customer_relationship_flags")
 }
 
+model CustomerBirthdayProfile {
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  customerId        String    @unique @map("customer_id")
+  birthDay          Int       @map("birth_day")
+  birthMonth        Int       @map("birth_month")
+  birthDateSource   String    @default("UNKNOWN") @map("birth_date_source")
+  birthDateConfidence Decimal? @map("birth_date_confidence") @db.Decimal(5, 4)
+  confirmedByUserId String?   @map("confirmed_by_user_id")
+  confirmedAt       DateTime? @map("confirmed_at")
+  sourceDocumentId  String?   @map("source_document_id")
+  status            String    @default("CONFIRMED")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  @@index([storeId, birthMonth, birthDay])
+  @@index([storeId, status])
+  @@index([customerId])
+  @@map("customer_birthday_profiles")
+}
+
+model BirthdayMessage {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  customerId          String    @map("customer_id")
+  birthdayProfileId   String    @map("birthday_profile_id")
+  templateId          String?   @map("template_id")
+  templateVersion     Int?      @map("template_version")
+  messageTextSnapshot String    @map("message_text_snapshot")
+  channel             String
+  sendStatus          String    @default("PREPARED") @map("send_status")
+  responsibleUserId   String?   @map("responsible_user_id")
+  preparedByUserId    String?   @map("prepared_by_user_id")
+  preparedAt          DateTime  @default(now()) @map("prepared_at")
+  sentAt              DateTime? @map("sent_at")
+  sentByUserId        String?   @map("sent_by_user_id")
+  responseText        String?   @map("response_text")
+  responseAt          DateTime? @map("response_at")
+  failedAt            DateTime? @map("failed_at")
+  failureReason       String?   @map("failure_reason")
+  optedOutAt          DateTime? @map("opted_out_at")
+  metadata            Json?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+
+  @@index([storeId, sendStatus])
+  @@index([customerId])
+  @@index([birthdayProfileId])
+  @@index([templateId])
+  @@index([preparedAt])
+  @@index([sentAt])
+  @@map("birthday_messages")
+}
+
 model Lead {
   id             String     @id @default(uuid())
   storeId        String     @map("store_id")

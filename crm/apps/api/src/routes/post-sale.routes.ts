@@ -32,6 +32,11 @@ const contactResultSchema = z.enum([
 ]);
 const issueSeveritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 const interestTypeSchema = z.enum(["NONE", "TRADE", "PURCHASE_OTHER", "NOT_INFORMED"]);
+const birthdaySourceSchema = z.enum(["DOCUMENT", "OCR", "MANUAL_CONFIRMED", "IMPORT", "UNKNOWN"]);
+const birthdayStatusSchema = z.enum(["PENDING_REVIEW", "CONFIRMED", "REMOVED"]);
+const birthdayRangeSchema = z.enum(["TODAY", "MONTH", "NEXT_7_DAYS", "UNKNOWN"]);
+const birthdayMessageChannelSchema = z.enum(["WHATSAPP", "EMAIL", "MANUAL"]);
+const birthdayMessageStatusSchema = z.enum(["PREPARED", "SENT", "RESPONDED", "FAILED", "OPT_OUT", "CANCELLED"]);
 
 const alertsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -62,6 +67,62 @@ const internalIssuesQuerySchema = z.object({
   severity: issueSeveritySchema.optional(),
   customer_id: z.string().uuid().optional(),
   sale_id: z.string().uuid().optional(),
+});
+
+const birthdaysQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  range: birthdayRangeSchema.default("MONTH"),
+  date: z.coerce.date().optional(),
+  status: birthdayStatusSchema.optional(),
+});
+
+const birthdayMessagesQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  customer_id: z.string().uuid().optional(),
+  status: birthdayMessageStatusSchema.optional(),
+  channel: birthdayMessageChannelSchema.optional(),
+});
+
+const confirmBirthdayParamsSchema = z.object({ customerId: z.string().uuid() });
+const birthdayMessageParamsSchema = z.object({ id: z.string().uuid() });
+
+const confirmBirthdaySchema = z.object({
+  birthDate: z.coerce.date(),
+  source: birthdaySourceSchema.default("MANUAL_CONFIRMED"),
+  confidence: z.number().min(0).max(1).optional(),
+  sourceDocumentId: z.string().uuid().optional(),
+  status: birthdayStatusSchema.default("CONFIRMED"),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+const prepareBirthdayMessageSchema = z.object({
+  customerId: z.string().uuid(),
+  channel: birthdayMessageChannelSchema.default("WHATSAPP"),
+  templateId: z.string().uuid().optional(),
+  messageText: z
+    .string()
+    .trim()
+    .min(5)
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Mensagem de aniversario") })
+    .optional(),
+  responsibleUserId: z.string().uuid().optional(),
+});
+
+const sendBirthdayMessageSchema = z.object({
+  sentAt: z.coerce.date().optional(),
+});
+
+const birthdayMessageResponseSchema = z.object({
+  responseText: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Resposta de aniversario") }),
+  responseAt: z.coerce.date().optional(),
 });
 
 const alertParamsSchema = z.object({ id: z.string().uuid() });
@@ -205,6 +266,8 @@ type FeedbackInput = z.infer<typeof feedbackAlertSchema>;
 type FeedbackUpdateInput = z.infer<typeof feedbackUpdateSchema>;
 type FeedbackRecord = Prisma.PostSaleFeedbackGetPayload<{}>;
 type InternalIssueRecord = Prisma.PostSaleInternalIssueGetPayload<{}>;
+type BirthdayProfileRecord = Prisma.CustomerBirthdayProfileGetPayload<{}>;
+type BirthdayMessageRecord = Prisma.BirthdayMessageGetPayload<{}>;
 
 function isPostSaleFullView(role: string) {
   return POST_SALE_FULL_VIEW_ROLES.has(role);
@@ -648,6 +711,58 @@ function sanitizeInternalIssue(issue: InternalIssueRecord) {
   };
 }
 
+function sanitizeBirthdayProfile(
+  profile: BirthdayProfileRecord,
+  customer?: { id: string; name: string; phone: string | null; email: string | null } | null,
+  messageStatus?: string | null,
+  communicationAllowed = true,
+) {
+  return {
+    id: profile.id,
+    customerId: profile.customerId,
+    birthDay: profile.birthDay,
+    birthMonth: profile.birthMonth,
+    birthDayMonth: `${String(profile.birthDay).padStart(2, "0")}/${String(profile.birthMonth).padStart(2, "0")}`,
+    birthDateSource: profile.birthDateSource,
+    birthDateConfidence: profile.birthDateConfidence?.toString() ?? null,
+    confirmedByUserId: profile.confirmedByUserId,
+    confirmedAt: profile.confirmedAt?.toISOString() ?? null,
+    sourceDocumentId: profile.sourceDocumentId,
+    status: profile.status,
+    customer: customer ?? null,
+    messageStatus,
+    communicationAllowed,
+    createdAt: profile.createdAt.toISOString(),
+    updatedAt: profile.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeBirthdayMessage(message: BirthdayMessageRecord) {
+  return {
+    id: message.id,
+    customerId: message.customerId,
+    birthdayProfileId: message.birthdayProfileId,
+    templateId: message.templateId,
+    templateVersion: message.templateVersion,
+    messageTextSnapshot: message.messageTextSnapshot,
+    channel: message.channel,
+    sendStatus: message.sendStatus,
+    responsibleUserId: message.responsibleUserId,
+    preparedByUserId: message.preparedByUserId,
+    preparedAt: message.preparedAt.toISOString(),
+    sentAt: message.sentAt?.toISOString() ?? null,
+    sentByUserId: message.sentByUserId,
+    responseText: message.responseText,
+    responseAt: message.responseAt?.toISOString() ?? null,
+    failedAt: message.failedAt?.toISOString() ?? null,
+    failureReason: message.failureReason,
+    optedOutAt: message.optedOutAt?.toISOString() ?? null,
+    metadata: message.metadata,
+    createdAt: message.createdAt.toISOString(),
+    updatedAt: message.updatedAt.toISOString(),
+  };
+}
+
 async function hasPostSaleOptOut(tx: Prisma.TransactionClient, storeId: string, customerId: string) {
   const preference = await tx.privacyPreference.findFirst({
     where: {
@@ -659,6 +774,70 @@ async function hasPostSaleOptOut(tx: Prisma.TransactionClient, storeId: string, 
     select: { id: true },
   });
   return Boolean(preference);
+}
+
+function birthdayChannelOptOutKeys(channel: string) {
+  return ["ALL", "BIRTHDAY", "POST_SALE", channel];
+}
+
+async function hasBirthdayOptOut(client: Prisma.TransactionClient | typeof prisma, storeId: string, customerId: string, channel: string) {
+  const channels = birthdayChannelOptOutKeys(channel);
+  const [privacyPreference, channelPreference] = await Promise.all([
+    client.privacyPreference.findFirst({
+      where: { storeId, customerId, allowed: false, channel: { in: channels } },
+      select: { id: true },
+    }),
+    client.channelPreference.findFirst({
+      where: { storeId, customerId, allowed: false, channel: { in: channels } },
+      select: { id: true },
+    }),
+  ]);
+  return Boolean(privacyPreference || channelPreference);
+}
+
+function monthDayKey(month: number, day: number) {
+  return `${month}-${day}`;
+}
+
+function birthdayKeysForRange(range: z.infer<typeof birthdayRangeSchema>, referenceDate: Date) {
+  if (range === "TODAY") {
+    return new Set([monthDayKey(referenceDate.getUTCMonth() + 1, referenceDate.getUTCDate())]);
+  }
+  if (range === "NEXT_7_DAYS") {
+    const keys = new Set<string>();
+    for (let index = 0; index < 7; index += 1) {
+      const date = new Date(referenceDate);
+      date.setUTCDate(referenceDate.getUTCDate() + index);
+      keys.add(monthDayKey(date.getUTCMonth() + 1, date.getUTCDate()));
+    }
+    return keys;
+  }
+  if (range === "MONTH") {
+    const keys = new Set<string>();
+    const month = referenceDate.getUTCMonth() + 1;
+    for (let day = 1; day <= 31; day += 1) {
+      keys.add(monthDayKey(month, day));
+    }
+    return keys;
+  }
+  return new Set<string>();
+}
+
+function renderBirthdayMessage(template: string, customer: { name: string }) {
+  return template.replace(/\[NOME\]/g, customer.name).replace(/\{\{\s*name\s*\}\}/g, customer.name).replace(/\{\{\s*customerName\s*\}\}/g, customer.name);
+}
+
+async function birthdayTemplate(storeId: string, channel: string, templateId?: string | null) {
+  if (templateId) {
+    const template = await prisma.messageTemplate.findFirst({ where: { id: templateId, storeId, channel, deletedAt: null, status: "ACTIVE" } });
+    if (!template) throw new ApiError("NOT_FOUND", "Template de aniversario nao encontrado.");
+    return template;
+  }
+
+  return prisma.messageTemplate.findFirst({
+    where: { storeId, deletedAt: null, status: "ACTIVE", channel, name: "birthday_greeting" },
+    orderBy: { version: "desc" },
+  });
 }
 
 async function ensureNotification(
@@ -939,6 +1118,377 @@ function feedbackStatus(input: z.infer<typeof feedbackAlertSchema>) {
 }
 
 export async function registerPostSaleRoutes(app: FastifyInstance) {
+  app.get("/birthdays", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const query = birthdaysQuerySchema.parse(request.query);
+    const referenceDate = query.date ?? new Date();
+
+    if (query.range === "UNKNOWN") {
+      const knownProfiles = await prisma.customerBirthdayProfile.findMany({
+        where: { storeId: session.user.storeId, deletedAt: null },
+        select: { customerId: true },
+      });
+      const knownCustomerIds = knownProfiles.map((profile) => profile.customerId);
+      const where: Prisma.CustomerWhereInput = {
+        storeId: session.user.storeId,
+        deletedAt: null,
+        status: "ACTIVE",
+        birthDate: null,
+        ...(knownCustomerIds.length ? { id: { notIn: knownCustomerIds } } : {}),
+      };
+      const { skip, take } = getPagination(query);
+      const [customers, total] = await Promise.all([
+        prisma.customer.findMany({ where, orderBy: { name: "asc" }, skip, take, select: { id: true, name: true, phone: true, email: true } }),
+        prisma.customer.count({ where }),
+      ]);
+      return listResponse(
+        customers.map((customer) => ({
+          id: null,
+          customerId: customer.id,
+          birthDay: null,
+          birthMonth: null,
+          birthDayMonth: null,
+          birthDateSource: "UNKNOWN",
+          status: "UNKNOWN",
+          customer,
+          messageStatus: "UNKNOWN",
+          communicationAllowed: true,
+        })),
+        query,
+        total,
+      );
+    }
+
+    const keys = birthdayKeysForRange(query.range, referenceDate);
+    const profiles = await prisma.customerBirthdayProfile.findMany({
+      where: {
+        storeId: session.user.storeId,
+        deletedAt: null,
+        status: query.status ?? "CONFIRMED",
+        ...(query.range === "MONTH" ? { birthMonth: referenceDate.getUTCMonth() + 1 } : {}),
+      },
+      orderBy: [{ birthMonth: "asc" }, { birthDay: "asc" }],
+    });
+    const filteredProfiles = profiles.filter((profile) => keys.has(monthDayKey(profile.birthMonth, profile.birthDay)));
+    const { skip, take } = getPagination(query);
+    const pageProfiles = filteredProfiles.slice(skip, skip + take);
+    const customerIds = pageProfiles.map((profile) => profile.customerId);
+    const [customers, messages] = await Promise.all([
+      customerIds.length
+        ? prisma.customer.findMany({
+            where: { storeId: session.user.storeId, id: { in: customerIds }, deletedAt: null },
+            select: { id: true, name: true, phone: true, email: true },
+          })
+        : [],
+      customerIds.length
+        ? prisma.birthdayMessage.findMany({
+            where: { storeId: session.user.storeId, customerId: { in: customerIds }, deletedAt: null },
+            orderBy: { preparedAt: "desc" },
+          })
+        : [],
+    ]);
+    const customersById = new Map(customers.map((customer) => [customer.id, customer]));
+    const latestMessageByCustomer = new Map<string, BirthdayMessageRecord>();
+    for (const message of messages) {
+      if (!latestMessageByCustomer.has(message.customerId)) latestMessageByCustomer.set(message.customerId, message);
+    }
+    const items = await Promise.all(
+      pageProfiles.map(async (profile) => {
+        const allowed = !(await hasBirthdayOptOut(prisma, session.user.storeId, profile.customerId, "WHATSAPP"));
+        const message = latestMessageByCustomer.get(profile.customerId);
+        return sanitizeBirthdayProfile(profile, customersById.get(profile.customerId) ?? null, allowed ? (message?.sendStatus ?? "NOT_PREPARED") : "OPT_OUT", allowed);
+      }),
+    );
+    return listResponse(items, query, filteredProfiles.length);
+  });
+
+  app.post("/birthdays/:customerId/confirm", async (request, reply) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const params = confirmBirthdayParamsSchema.parse(request.params);
+    const input = confirmBirthdaySchema.parse(request.body);
+    const customer = await prisma.customer.findFirst({
+      where: { id: params.customerId, storeId: session.user.storeId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!customer) throw new ApiError("NOT_FOUND", "Cliente do aniversario nao encontrado.");
+
+    const birthDay = input.birthDate.getUTCDate();
+    const birthMonth = input.birthDate.getUTCMonth() + 1;
+    const profile = await prisma.$transaction(async (tx) => {
+      if (input.status === "CONFIRMED") {
+        await tx.customer.update({ where: { id: customer.id }, data: { birthDate: input.birthDate, updatedByUserId: session.user.id } });
+      }
+      const saved = await tx.customerBirthdayProfile.upsert({
+        where: { customerId: customer.id },
+        update: {
+          birthDay,
+          birthMonth,
+          birthDateSource: input.source,
+          birthDateConfidence: input.confidence,
+          confirmedByUserId: input.status === "CONFIRMED" ? session.user.id : null,
+          confirmedAt: input.status === "CONFIRMED" ? new Date() : null,
+          sourceDocumentId: input.sourceDocumentId,
+          status: input.status,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+          deletedAt: null,
+        },
+        create: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          birthDay,
+          birthMonth,
+          birthDateSource: input.source,
+          birthDateConfidence: input.confidence,
+          confirmedByUserId: input.status === "CONFIRMED" ? session.user.id : null,
+          confirmedAt: input.status === "CONFIRMED" ? new Date() : null,
+          sourceDocumentId: input.sourceDocumentId,
+          status: input.status,
+          metadata: input.metadata as Prisma.InputJsonObject | undefined,
+        },
+      });
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          type: "customer_birthday_confirmed",
+          title: "Data de aniversario confirmada",
+          description: "Aniversario confirmado para relacionamento pos-venda.",
+          metadata: {
+            birthdayProfileId: saved.id,
+            birthDay,
+            birthMonth,
+            birthDateSource: input.source,
+            confidence: input.confidence ?? null,
+          },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "post_sale",
+          action: "customer_birthday_confirmed",
+          entityType: "customer_birthday_profile",
+          entityId: saved.id,
+          result: "SUCCESS",
+          metadata: { customerId: customer.id, birthDay, birthMonth, source: input.source, status: input.status },
+        },
+      });
+      return saved;
+    });
+    return reply.code(201).send({ data: sanitizeBirthdayProfile(profile, { ...customer, phone: null, email: null }) });
+  });
+
+  app.get("/birthday-messages", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const query = birthdayMessagesQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const where: Prisma.BirthdayMessageWhereInput = {
+      storeId: session.user.storeId,
+      deletedAt: null,
+      ...(query.customer_id ? { customerId: query.customer_id } : {}),
+      ...(query.status ? { sendStatus: query.status } : {}),
+      ...(query.channel ? { channel: query.channel } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.birthdayMessage.findMany({ where, orderBy: { preparedAt: "desc" }, skip, take }),
+      prisma.birthdayMessage.count({ where }),
+    ]);
+    return listResponse(items.map(sanitizeBirthdayMessage), query, total);
+  });
+
+  app.get("/birthday-messages/metrics/summary", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const [knownBirthdays, totalCustomers, byStatus, privacyOptOuts, channelOptOuts] = await Promise.all([
+      prisma.customerBirthdayProfile.count({ where: { storeId: session.user.storeId, deletedAt: null, status: "CONFIRMED" } }),
+      prisma.customer.count({ where: { storeId: session.user.storeId, deletedAt: null, status: "ACTIVE" } }),
+      prisma.birthdayMessage.groupBy({
+        by: ["sendStatus"],
+        where: { storeId: session.user.storeId, deletedAt: null },
+        _count: { _all: true },
+      }),
+      prisma.privacyPreference.findMany({
+        where: { storeId: session.user.storeId, allowed: false, channel: { in: birthdayChannelOptOutKeys("WHATSAPP") } },
+        select: { customerId: true },
+      }),
+      prisma.channelPreference.findMany({
+        where: { storeId: session.user.storeId, allowed: false, channel: { in: birthdayChannelOptOutKeys("WHATSAPP") } },
+        select: { customerId: true },
+      }),
+    ]);
+    const optedOutCustomers = new Set([...privacyOptOuts, ...channelOptOuts].map((preference) => preference.customerId));
+    return {
+      data: {
+        knownBirthdays,
+        unknownBirthdays: Math.max(0, totalCustomers - knownBirthdays),
+        optOuts: optedOutCustomers.size,
+        messagesByStatus: Object.fromEntries(byStatus.map((item) => [item.sendStatus, item._count._all])),
+      },
+    };
+  });
+
+  app.post("/birthday-messages/prepare", async (request, reply) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const input = prepareBirthdayMessageSchema.parse(request.body);
+    const [customer, profile] = await Promise.all([
+      prisma.customer.findFirst({
+        where: { id: input.customerId, storeId: session.user.storeId, deletedAt: null, status: "ACTIVE" },
+        select: { id: true, name: true, phone: true, email: true },
+      }),
+      prisma.customerBirthdayProfile.findFirst({
+        where: { customerId: input.customerId, storeId: session.user.storeId, deletedAt: null, status: "CONFIRMED" },
+      }),
+    ]);
+    if (!customer || !profile) throw new ApiError("NOT_FOUND", "Aniversariante confirmado nao encontrado.");
+    if (input.responsibleUserId) await ensureResponsibleUser(session.user.storeId, input.responsibleUserId);
+    const optedOut = await hasBirthdayOptOut(prisma, session.user.storeId, customer.id, input.channel);
+    if (optedOut) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Cliente possui opt-out para mensagem de aniversario.");
+    }
+    const template = await birthdayTemplate(session.user.storeId, input.channel, input.templateId);
+    const defaultTemplate = "Ola, [NOME]. Passando para desejar feliz aniversario! A equipe da loja deseja um excelente dia para voce.";
+    const snapshot = renderBirthdayMessage(input.messageText ?? template?.content ?? defaultTemplate, customer);
+    const message = await prisma.$transaction(async (tx) => {
+      const created = await tx.birthdayMessage.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          birthdayProfileId: profile.id,
+          templateId: template?.id,
+          templateVersion: template?.version,
+          messageTextSnapshot: snapshot,
+          channel: input.channel,
+          sendStatus: "PREPARED",
+          responsibleUserId: input.responsibleUserId,
+          preparedByUserId: session.user.id,
+          metadata: {
+            assistedFlow: true,
+            providerApproved: false,
+            birthDateSource: profile.birthDateSource,
+            birthDay: profile.birthDay,
+            birthMonth: profile.birthMonth,
+          },
+        },
+      });
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: customer.id,
+          type: "birthday_message_prepared",
+          title: "Mensagem de aniversario preparada",
+          description: snapshot,
+          metadata: { birthdayMessageId: created.id, channel: created.channel, status: created.sendStatus, templateId: created.templateId },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "post_sale",
+          action: "birthday_message_prepared",
+          entityType: "birthday_message",
+          entityId: created.id,
+          result: "SUCCESS",
+          metadata: { customerId: customer.id, channel: created.channel, templateId: created.templateId },
+        },
+      });
+      return created;
+    });
+    return reply.code(201).send({ data: sanitizeBirthdayMessage(message) });
+  });
+
+  app.post("/birthday-messages/:id/send-assisted", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const params = birthdayMessageParamsSchema.parse(request.params);
+    const input = sendBirthdayMessageSchema.parse(request.body ?? {});
+    const current = await prisma.birthdayMessage.findFirst({ where: { id: params.id, storeId: session.user.storeId, deletedAt: null } });
+    if (!current) throw new ApiError("NOT_FOUND", "Mensagem de aniversario nao encontrada.");
+    if (current.sendStatus === "OPT_OUT") throw new ApiError("BUSINESS_RULE_ERROR", "Mensagem bloqueada por opt-out.");
+    const sentAt = input.sentAt ?? new Date();
+    const updated = await prisma.$transaction(async (tx) => {
+      const message = await tx.birthdayMessage.update({
+        where: { id: current.id },
+        data: { sendStatus: "SENT", sentAt, sentByUserId: session.user.id },
+      });
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: current.customerId,
+          type: "birthday_message_sent",
+          title: "Mensagem de aniversario enviada",
+          description: current.messageTextSnapshot,
+          metadata: { birthdayMessageId: current.id, channel: current.channel, status: "SENT", sentByUserId: session.user.id },
+          occurredAt: sentAt,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "post_sale",
+          action: "birthday_message_sent_assisted",
+          entityType: "birthday_message",
+          entityId: current.id,
+          result: "SUCCESS",
+          metadata: { customerId: current.customerId, channel: current.channel, sentAt: sentAt.toISOString() },
+        },
+      });
+      return message;
+    });
+    return { data: sanitizeBirthdayMessage(updated) };
+  });
+
+  app.post("/birthday-messages/:id/response", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const params = birthdayMessageParamsSchema.parse(request.params);
+    const input = birthdayMessageResponseSchema.parse(request.body);
+    const current = await prisma.birthdayMessage.findFirst({ where: { id: params.id, storeId: session.user.storeId, deletedAt: null } });
+    if (!current) throw new ApiError("NOT_FOUND", "Mensagem de aniversario nao encontrada.");
+    const responseAt = input.responseAt ?? new Date();
+    const updated = await prisma.$transaction(async (tx) => {
+      const message = await tx.birthdayMessage.update({
+        where: { id: current.id },
+        data: { sendStatus: "RESPONDED", responseText: input.responseText, responseAt },
+      });
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: current.customerId,
+          type: "birthday_message_responded",
+          title: "Resposta de aniversario registrada",
+          description: input.responseText,
+          metadata: { birthdayMessageId: current.id, channel: current.channel, status: "RESPONDED" },
+          occurredAt: responseAt,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "post_sale",
+          action: "birthday_message_response_recorded",
+          entityType: "birthday_message",
+          entityId: current.id,
+          result: "SUCCESS",
+          metadata: { customerId: current.customerId, channel: current.channel, responseAt: responseAt.toISOString() },
+        },
+      });
+      return message;
+    });
+    return { data: sanitizeBirthdayMessage(updated) };
+  });
+
   app.get("/feedbacks", async (request) => {
     const session = await requirePostSaleSession(request);
     const query = feedbacksQuerySchema.parse(request.query);
