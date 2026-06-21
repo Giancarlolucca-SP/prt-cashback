@@ -6,6 +6,7 @@ import { denyOwnershipAccess, requireAuth, type AuthenticatedContext } from "../
 import { getPagination, listResponse } from "../api/pagination.js";
 import { prisma } from "../lib/db.js";
 import { containsRemoteLoadVector, rejectRemoteLoadVectorsMessage } from "../security/remote-content.js";
+import { COMMERCIAL_BOARD_KEY } from "../services/commercial-kanban.js";
 
 const POST_SALE_ALERT_STATUSES = ["PENDING", "IN_CONTACT", "COMPLETED", "RESCHEDULED", "NO_CONTACT", "REASSIGNED", "CANCELLED_BY_RULE"] as const;
 const POST_SALE_OPEN_STATUSES = ["PENDING", "IN_CONTACT", "RESCHEDULED", "REASSIGNED"] as const;
@@ -25,9 +26,12 @@ const contactResultSchema = z.enum([
   "NO_INTEREST",
   "INTERESTED_TRADE",
   "INTERESTED_PURCHASE",
+  "VEHICLE_PROBLEM",
   "CUSTOMER_SATISFIED",
   "OTHER",
 ]);
+const issueSeveritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+const interestTypeSchema = z.enum(["NONE", "TRADE", "PURCHASE_OTHER", "NOT_INFORMED"]);
 
 const alertsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -37,6 +41,27 @@ const alertsQuerySchema = z.object({
   customer_id: z.string().uuid().optional(),
   sale_id: z.string().uuid().optional(),
   overdue_only: z.coerce.boolean().default(false),
+});
+
+const feedbacksQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  contact_result: contactResultSchema.optional(),
+  contact_channel: contactChannelSchema.optional(),
+  interest_type: interestTypeSchema.optional(),
+  customer_id: z.string().uuid().optional(),
+  sale_id: z.string().uuid().optional(),
+  created_card_only: z.coerce.boolean().default(false),
+  internal_issue_only: z.coerce.boolean().default(false),
+});
+
+const internalIssuesQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().max(100).default(20),
+  status: z.string().trim().max(80).optional(),
+  severity: issueSeveritySchema.optional(),
+  customer_id: z.string().uuid().optional(),
+  sale_id: z.string().uuid().optional(),
 });
 
 const alertParamsSchema = z.object({ id: z.string().uuid() });
@@ -64,29 +89,79 @@ const cancelAlertSchema = z.object({
     .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Motivo do cancelamento") }),
 });
 
-const feedbackAlertSchema = z
-  .object({
-    contactAttemptedAt: z.coerce.date().optional(),
-    contactChannel: contactChannelSchema,
-    contactResult: contactResultSchema,
-    feedbackNotes: z
-      .string()
-      .trim()
-      .max(2000)
-      .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Feedback pos-venda") })
-      .optional(),
-    nextActionAt: z.coerce.date().optional(),
-  })
-  .superRefine((value, ctx) => {
-    const requiresNotes = value.contactResult === "OTHER" || value.contactResult === "INTERESTED_TRADE" || value.contactResult === "INTERESTED_PURCHASE";
+const feedbackAlertBaseSchema = z.object({
+  contactAttemptedAt: z.coerce.date().optional(),
+  contactChannel: contactChannelSchema,
+  contactResult: contactResultSchema,
+  feedbackNotes: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Feedback pos-venda") })
+    .optional(),
+  vehicleInterestId: z.string().uuid().optional(),
+  vehicleInterestNotes: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Veiculo de interesse") })
+    .optional(),
+  nextAction: z
+    .string()
+    .trim()
+    .max(160)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Proxima acao") })
+    .optional(),
+  nextActionAt: z.coerce.date().optional(),
+  createCommercialCard: z.boolean().default(false),
+  responsibleUserId: z.string().uuid().optional(),
+  createInternalIssue: z.boolean().default(true),
+  issueSeverity: issueSeveritySchema.default("MEDIUM"),
+  issueResponsibleUserId: z.string().uuid().optional(),
+});
+
+function validateFeedbackConsistency(
+  value: {
+    contactChannel?: z.infer<typeof contactChannelSchema>;
+    contactResult?: z.infer<typeof contactResultSchema>;
+    createCommercialCard?: boolean;
+    feedbackNotes?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+    const requiresNotes =
+      value.contactChannel === "OTHER" ||
+      value.contactResult === "OTHER" ||
+      value.contactResult === "INTERESTED_TRADE" ||
+      value.contactResult === "INTERESTED_PURCHASE" ||
+      value.contactResult === "VEHICLE_PROBLEM";
     if (requiresNotes && !value.feedbackNotes) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Observacao obrigatoria para outro resultado ou interesse em troca/compra.",
+        message: "Observacao obrigatoria para canal outro, problema, outro resultado ou interesse em troca/compra.",
         path: ["feedbackNotes"],
       });
     }
-  });
+    const hasPurchaseInterest = value.contactResult === "INTERESTED_TRADE" || value.contactResult === "INTERESTED_PURCHASE";
+    if (value.createCommercialCard && !hasPurchaseInterest) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Card comercial so pode ser criado quando houver interesse em troca ou compra.",
+        path: ["createCommercialCard"],
+      });
+    }
+}
+
+const feedbackAlertSchema = feedbackAlertBaseSchema.superRefine(validateFeedbackConsistency);
+
+const feedbackUpdateSchema = feedbackAlertBaseSchema.partial().extend({
+  updateReason: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((value) => !containsRemoteLoadVector(value), { message: rejectRemoteLoadVectorsMessage("Motivo da alteracao") })
+    .optional(),
+}).superRefine(validateFeedbackConsistency);
 
 type AlertRecord = {
   id: string;
@@ -126,6 +201,10 @@ type AlertContext = {
   originalSeller: { id: string; name: string; role: string } | null;
   assignedUser: { id: string; name: string; role: string } | null;
 };
+type FeedbackInput = z.infer<typeof feedbackAlertSchema>;
+type FeedbackUpdateInput = z.infer<typeof feedbackUpdateSchema>;
+type FeedbackRecord = Prisma.PostSaleFeedbackGetPayload<{}>;
+type InternalIssueRecord = Prisma.PostSaleInternalIssueGetPayload<{}>;
 
 function isPostSaleFullView(role: string) {
   return POST_SALE_FULL_VIEW_ROLES.has(role);
@@ -210,6 +289,237 @@ async function ensureResponsibleUser(storeId: string, userId: string) {
   return user;
 }
 
+async function ensureVehicleInterest(storeId: string, vehicleId?: string | null) {
+  if (!vehicleId) return;
+  const vehicle = await prisma.vehicle.findFirst({ where: { id: vehicleId, storeId, deletedAt: null }, select: { id: true } });
+  if (!vehicle) throw new ApiError("NOT_FOUND", "Veiculo de interesse nao encontrado.");
+}
+
+function feedbackVisibilityWhere(user: { id: string; role: string }): Prisma.PostSaleFeedbackWhereInput {
+  return isPostSaleFullView(user.role) ? {} : { OR: [{ assignedUserId: user.id }, { createdByUserId: user.id }] };
+}
+
+function interestTypeFromResult(result: string) {
+  if (result === "INTERESTED_TRADE") return "TRADE";
+  if (result === "INTERESTED_PURCHASE") return "PURCHASE_OTHER";
+  return "NONE";
+}
+
+function hasPurchaseInterest(result: string) {
+  return result === "INTERESTED_TRADE" || result === "INTERESTED_PURCHASE";
+}
+
+function commercialLeadPreparation(input: { alert: AlertRecord; feedback: Pick<FeedbackInput, "contactResult" | "vehicleInterestId" | "vehicleInterestNotes" | "responsibleUserId"> }) {
+  if (!hasPurchaseInterest(input.feedback.contactResult)) return null;
+  return {
+    source: "post_sale_alert",
+    customerId: input.alert.customerId,
+    saleId: input.alert.saleId,
+    originalVehicleId: input.alert.vehicleId,
+    vehicleInterestId: input.feedback.vehicleInterestId ?? null,
+    vehicleInterestNotes: input.feedback.vehicleInterestNotes ?? null,
+    postSaleAlertId: input.alert.id,
+    responsibleUserId: input.feedback.responsibleUserId ?? input.alert.assignedUserId,
+    suggestedTitle: input.feedback.contactResult === "INTERESTED_TRADE" ? "Interesse em troca no pos-venda" : "Interesse em nova compra no pos-venda",
+  };
+}
+
+async function createCommercialCardFromFeedback(
+  tx: Prisma.TransactionClient,
+  input: {
+    actorId: string;
+    actorRole: string;
+    alert: AlertRecord;
+    contactAt: Date;
+    feedback: FeedbackInput;
+    feedbackId: string;
+    storeId: string;
+  },
+) {
+  const customer = await tx.customer.findFirst({
+    where: { id: input.alert.customerId, storeId: input.storeId, deletedAt: null },
+    select: { id: true, name: true, phone: true },
+  });
+  if (!customer) throw new ApiError("NOT_FOUND", "Cliente do feedback nao encontrado.");
+
+  const responsibleUserId = input.feedback.responsibleUserId ?? input.alert.assignedUserId ?? input.actorId;
+  const now = new Date();
+  const lead = await tx.lead.create({
+    data: {
+      storeId: input.storeId,
+      customerId: customer.id,
+      assignedUserId: responsibleUserId,
+      vehicleId: input.feedback.vehicleInterestId,
+      source: "post_sale_2_years",
+      title: `Pos-venda 2 anos - ${customer.name}`,
+      status: "NEW",
+      interest: interestTypeFromResult(input.feedback.contactResult),
+      channel: input.feedback.contactChannel,
+      contactedAt: input.contactAt,
+      lastInteractionAt: input.contactAt,
+      lastInteractionType: "POST_SALE_FEEDBACK",
+      lastInteractionResult: input.feedback.contactResult,
+      nextActionAt: input.feedback.nextActionAt,
+      nextActionType: input.feedback.nextAction,
+      createdByUserId: input.actorId,
+      updatedByUserId: input.actorId,
+    },
+  });
+
+  const card = await tx.leadCard.create({
+    data: {
+      storeId: input.storeId,
+      leadId: lead.id,
+      boardKey: COMMERCIAL_BOARD_KEY,
+      stageKey: "NEW_LEAD",
+      position: 0,
+      stageEnteredAt: now,
+      metadata: {
+        origin: "post_sale_2_years",
+        postSaleAlertId: input.alert.id,
+        postSaleFeedbackId: input.feedbackId,
+        saleId: input.alert.saleId,
+        originalVehicleId: input.alert.vehicleId,
+        vehicleInterestId: input.feedback.vehicleInterestId ?? null,
+        vehicleInterestNotes: input.feedback.vehicleInterestNotes ?? null,
+      },
+    },
+  });
+
+  await tx.leadStageHistory.create({
+    data: {
+      storeId: input.storeId,
+      leadId: lead.id,
+      fromStage: null,
+      toStage: "NEW_LEAD",
+      actorUserId: input.actorId,
+      reason: "Card criado a partir de feedback pos-venda",
+    },
+  });
+
+  await tx.commercialInteraction.create({
+    data: {
+      storeId: input.storeId,
+      cardId: card.id,
+      leadId: lead.id,
+      customerId: customer.id,
+      vehicleId: input.feedback.vehicleInterestId ?? input.alert.vehicleId,
+      vehicleInterest: {
+        vehicleInterestId: input.feedback.vehicleInterestId ?? null,
+        vehicleInterestNotes: input.feedback.vehicleInterestNotes ?? null,
+      },
+      responsibleUserId,
+      interactionType: "POST_SALE_FEEDBACK",
+      channel: input.feedback.contactChannel,
+      result: input.feedback.contactResult,
+      notes: input.feedback.feedbackNotes,
+      occurredAt: input.contactAt,
+      nextActionType: input.feedback.nextAction,
+      nextActionAt: input.feedback.nextActionAt,
+      nextActionOwnerId: responsibleUserId,
+      nextActionStatus: input.feedback.nextActionAt ? "PENDING" : null,
+      createdByUserId: input.actorId,
+    },
+  });
+
+  await tx.auditLog.create({
+    data: {
+      storeId: input.storeId,
+      actorId: input.actorId,
+      actorRole: input.actorRole,
+      module: "leads",
+      action: "commercial_card_created_from_post_sale_feedback",
+      entityType: "lead_card",
+      entityId: card.id,
+      result: "SUCCESS",
+      metadata: {
+        leadId: lead.id,
+        postSaleAlertId: input.alert.id,
+        postSaleFeedbackId: input.feedbackId,
+        saleId: input.alert.saleId,
+        customerId: customer.id,
+        assignedUserId: responsibleUserId,
+      },
+    },
+  });
+
+  return { card, lead };
+}
+
+async function createInternalIssueFromFeedback(
+  tx: Prisma.TransactionClient,
+  input: {
+    actorId: string;
+    actorRole: string;
+    alert: AlertRecord;
+    feedback: FeedbackInput;
+    feedbackId: string;
+    storeId: string;
+  },
+) {
+  const issue = await tx.postSaleInternalIssue.create({
+    data: {
+      storeId: input.storeId,
+      postSaleFeedbackId: input.feedbackId,
+      postSaleAlertId: input.alert.id,
+      customerId: input.alert.customerId,
+      saleId: input.alert.saleId,
+      vehicleId: input.alert.vehicleId,
+      issueType: "VEHICLE_PROBLEM",
+      severity: input.feedback.issueSeverity,
+      status: "PENDING_REVIEW",
+      description: input.feedback.feedbackNotes ?? "Problema relatado no contato pos-venda.",
+      responsibleUserId: input.feedback.issueResponsibleUserId,
+      createdByUserId: input.actorId,
+      metadata: {
+        contactChannel: input.feedback.contactChannel,
+        contactResult: input.feedback.contactResult,
+        postSaleAlertId: input.alert.id,
+      },
+    },
+  });
+
+  const managers = await tx.user.findMany({
+    where: { storeId: input.storeId, isActive: true, deletedAt: null, role: { in: [...POST_SALE_MANAGEMENT_ROLES] } },
+    select: { id: true },
+  });
+  for (const manager of managers) {
+    await ensureNotification(tx, {
+      actionUrl: `/post-sale/internal-issues/${issue.id}`,
+      body: "Cliente relatou problema no contato pos-venda. Avaliar atendimento interno separado do fluxo comercial.",
+      entityId: issue.id,
+      entityType: "post_sale_internal_issue",
+      priority: input.feedback.issueSeverity === "CRITICAL" || input.feedback.issueSeverity === "HIGH" ? "CRITICAL" : "HIGH",
+      sourceModule: "post_sale",
+      storeId: input.storeId,
+      title: "Pendencia interna de pos-venda",
+      userId: manager.id,
+    });
+  }
+
+  await tx.auditLog.create({
+    data: {
+      storeId: input.storeId,
+      actorId: input.actorId,
+      actorRole: input.actorRole,
+      module: "post_sale",
+      action: "post_sale_internal_issue_created",
+      entityType: "post_sale_internal_issue",
+      entityId: issue.id,
+      result: "SUCCESS",
+      metadata: {
+        postSaleAlertId: input.alert.id,
+        postSaleFeedbackId: input.feedbackId,
+        customerId: input.alert.customerId,
+        saleId: input.alert.saleId,
+        severity: issue.severity,
+      },
+    },
+  });
+
+  return issue;
+}
+
 async function buildAlertContexts(storeId: string, alerts: AlertRecord[]) {
   const customerIds = [...new Set(alerts.map((alert) => alert.customerId))];
   const vehicleIds = [...new Set(alerts.map((alert) => alert.vehicleId).filter(Boolean) as string[])];
@@ -281,6 +591,60 @@ function sanitizeAlert(alert: AlertRecord, context?: AlertContext | null) {
     updatedAt: alert.updatedAt.toISOString(),
     context: context ?? null,
     objective: "Saber como esta o veiculo, identificar necessidade de troca ou nova compra.",
+  };
+}
+
+function sanitizeFeedback(feedback: FeedbackRecord) {
+  return {
+    id: feedback.id,
+    postSaleAlertId: feedback.postSaleAlertId,
+    customerId: feedback.customerId,
+    saleId: feedback.saleId,
+    vehicleId: feedback.vehicleId,
+    originalSellerUserId: feedback.originalSellerUserId,
+    assignedUserId: feedback.assignedUserId,
+    contactAt: feedback.contactAt.toISOString(),
+    contactChannel: feedback.contactChannel,
+    contactResult: feedback.contactResult,
+    feedbackNotes: feedback.feedbackNotes,
+    hasPurchaseInterest: feedback.hasPurchaseInterest,
+    interestType: feedback.interestType,
+    vehicleInterestId: feedback.vehicleInterestId,
+    vehicleInterestNotes: feedback.vehicleInterestNotes,
+    nextAction: feedback.nextAction,
+    nextActionAt: feedback.nextActionAt?.toISOString() ?? null,
+    createdLeadId: feedback.createdLeadId,
+    createdCardId: feedback.createdCardId,
+    createdInternalIssueId: feedback.createdInternalIssueId,
+    createdByUserId: feedback.createdByUserId,
+    updatedByUserId: feedback.updatedByUserId,
+    auditLogId: feedback.auditLogId,
+    metadata: feedback.metadata,
+    createdAt: feedback.createdAt.toISOString(),
+    updatedAt: feedback.updatedAt.toISOString(),
+  };
+}
+
+function sanitizeInternalIssue(issue: InternalIssueRecord) {
+  return {
+    id: issue.id,
+    postSaleFeedbackId: issue.postSaleFeedbackId,
+    postSaleAlertId: issue.postSaleAlertId,
+    customerId: issue.customerId,
+    saleId: issue.saleId,
+    vehicleId: issue.vehicleId,
+    issueType: issue.issueType,
+    severity: issue.severity,
+    status: issue.status,
+    description: issue.description,
+    responsibleUserId: issue.responsibleUserId,
+    createdByUserId: issue.createdByUserId,
+    updatedByUserId: issue.updatedByUserId,
+    resolvedAt: issue.resolvedAt?.toISOString() ?? null,
+    resolvedByUserId: issue.resolvedByUserId,
+    metadata: issue.metadata,
+    createdAt: issue.createdAt.toISOString(),
+    updatedAt: issue.updatedAt.toISOString(),
   };
 }
 
@@ -574,18 +938,88 @@ function feedbackStatus(input: z.infer<typeof feedbackAlertSchema>) {
   return "COMPLETED";
 }
 
-function commercialLeadPreparation(input: { alert: AlertRecord; feedback: z.infer<typeof feedbackAlertSchema> }) {
-  if (input.feedback.contactResult !== "INTERESTED_TRADE" && input.feedback.contactResult !== "INTERESTED_PURCHASE") return null;
-  return {
-    source: "post_sale_alert",
-    customerId: input.alert.customerId,
-    saleId: input.alert.saleId,
-    postSaleAlertId: input.alert.id,
-    suggestedTitle: input.feedback.contactResult === "INTERESTED_TRADE" ? "Interesse em troca no pos-venda" : "Interesse em nova compra no pos-venda",
-  };
-}
-
 export async function registerPostSaleRoutes(app: FastifyInstance) {
+  app.get("/feedbacks", async (request) => {
+    const session = await requirePostSaleSession(request);
+    const query = feedbacksQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const where: Prisma.PostSaleFeedbackWhereInput = {
+      storeId: session.user.storeId,
+      deletedAt: null,
+      ...feedbackVisibilityWhere(session.user),
+      ...(query.contact_result ? { contactResult: query.contact_result } : {}),
+      ...(query.contact_channel ? { contactChannel: query.contact_channel } : {}),
+      ...(query.interest_type ? { interestType: query.interest_type } : {}),
+      ...(query.customer_id ? { customerId: query.customer_id } : {}),
+      ...(query.sale_id ? { saleId: query.sale_id } : {}),
+      ...(query.created_card_only ? { createdCardId: { not: null } } : {}),
+      ...(query.internal_issue_only ? { createdInternalIssueId: { not: null } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.postSaleFeedback.findMany({ where, orderBy: { contactAt: "desc" }, skip, take }),
+      prisma.postSaleFeedback.count({ where }),
+    ]);
+    return listResponse(items.map(sanitizeFeedback), query, total);
+  });
+
+  app.get("/feedbacks/metrics/summary", async (request) => {
+    const session = await requirePostSaleSession(request);
+    const where: Prisma.PostSaleFeedbackWhereInput = {
+      storeId: session.user.storeId,
+      deletedAt: null,
+      ...feedbackVisibilityWhere(session.user),
+    };
+    const [total, byResult, byChannel, withPurchaseInterest, createdCards, internalIssues] = await Promise.all([
+      prisma.postSaleFeedback.count({ where }),
+      prisma.postSaleFeedback.groupBy({ by: ["contactResult"], where, _count: { _all: true } }),
+      prisma.postSaleFeedback.groupBy({ by: ["contactChannel"], where, _count: { _all: true } }),
+      prisma.postSaleFeedback.count({ where: { ...where, hasPurchaseInterest: true } }),
+      prisma.postSaleFeedback.count({ where: { ...where, createdCardId: { not: null } } }),
+      prisma.postSaleFeedback.count({ where: { ...where, createdInternalIssueId: { not: null } } }),
+    ]);
+    return {
+      data: {
+        total,
+        withPurchaseInterest,
+        createdCards,
+        internalIssues,
+        byResult: Object.fromEntries(byResult.map((item) => [item.contactResult, item._count._all])),
+        byChannel: Object.fromEntries(byChannel.map((item) => [item.contactChannel, item._count._all])),
+      },
+    };
+  });
+
+  app.get("/internal-issues", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const query = internalIssuesQuerySchema.parse(request.query);
+    const { skip, take } = getPagination(query);
+    const where: Prisma.PostSaleInternalIssueWhereInput = {
+      storeId: session.user.storeId,
+      deletedAt: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.severity ? { severity: query.severity } : {}),
+      ...(query.customer_id ? { customerId: query.customer_id } : {}),
+      ...(query.sale_id ? { saleId: query.sale_id } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.postSaleInternalIssue.findMany({ where, orderBy: [{ status: "asc" }, { createdAt: "desc" }], skip, take }),
+      prisma.postSaleInternalIssue.count({ where }),
+    ]);
+    return listResponse(items.map(sanitizeInternalIssue), query, total);
+  });
+
+  app.get("/internal-issues/:id", async (request) => {
+    const session = await requirePostSaleSession(request);
+    assertPostSaleFullView(session);
+    const params = alertParamsSchema.parse(request.params);
+    const issue = await prisma.postSaleInternalIssue.findFirst({
+      where: { id: params.id, storeId: session.user.storeId, deletedAt: null },
+    });
+    if (!issue) throw new ApiError("NOT_FOUND", "Pendencia interna de pos-venda nao encontrada.");
+    return { data: sanitizeInternalIssue(issue) };
+  });
+
   app.post("/alerts/scan", async (request) => {
     const session = await requirePostSaleSession(request);
     assertPostSaleFullView(session);
@@ -815,12 +1249,23 @@ export async function registerPostSaleRoutes(app: FastifyInstance) {
     if (current.closedAt || current.status === "CANCELLED_BY_RULE") {
       throw new ApiError("BUSINESS_RULE_ERROR", "Alerta pos-venda ja encerrado.");
     }
+    const existingFeedback = await prisma.postSaleFeedback.findUnique({
+      where: { postSaleAlertId: current.id },
+      select: { id: true },
+    });
+    if (existingFeedback) {
+      throw new ApiError("CONFLICT", "Feedback pos-venda ja registrado para este alerta.");
+    }
+
+    await ensureVehicleInterest(session.user.storeId, input.vehicleInterestId);
+    if (input.responsibleUserId) await ensureResponsibleUser(session.user.storeId, input.responsibleUserId);
+    if (input.issueResponsibleUserId) await ensureResponsibleUser(session.user.storeId, input.issueResponsibleUserId);
 
     const nextStatus = feedbackStatus(input);
     const attemptedAt = input.contactAttemptedAt ?? new Date();
     const preparation = commercialLeadPreparation({ alert: current, feedback: input });
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const alert = await tx.postSaleAlert.update({
         where: { id: current.id },
         data: {
@@ -834,9 +1279,79 @@ export async function registerPostSaleRoutes(app: FastifyInstance) {
           closedByUserId: nextStatus === "RESCHEDULED" ? null : session.user.id,
           metadata: {
             commercialLeadPreparation: preparation,
+            createCommercialCardRequested: input.createCommercialCard,
+            createInternalIssueRequested: input.createInternalIssue,
           },
         },
       });
+
+      let feedback = await tx.postSaleFeedback.create({
+        data: {
+          storeId: session.user.storeId,
+          postSaleAlertId: alert.id,
+          customerId: alert.customerId,
+          saleId: alert.saleId,
+          vehicleId: alert.vehicleId,
+          originalSellerUserId: alert.originalSellerUserId,
+          assignedUserId: alert.assignedUserId,
+          contactAt: attemptedAt,
+          contactChannel: input.contactChannel,
+          contactResult: input.contactResult,
+          feedbackNotes: input.feedbackNotes,
+          hasPurchaseInterest: hasPurchaseInterest(input.contactResult),
+          interestType: interestTypeFromResult(input.contactResult),
+          vehicleInterestId: input.vehicleInterestId,
+          vehicleInterestNotes: input.vehicleInterestNotes,
+          nextAction: input.nextAction,
+          nextActionAt: input.nextActionAt,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id,
+          metadata: {
+            commercialLeadPreparation: preparation,
+            commercialCardStatus: preparation ? (input.createCommercialCard ? "REQUESTED" : "PENDING_REVIEW") : "NOT_APPLICABLE",
+            internalIssueStatus: input.contactResult === "VEHICLE_PROBLEM" ? (input.createInternalIssue ? "REQUESTED" : "PENDING_REVIEW") : "NOT_APPLICABLE",
+          },
+        },
+      });
+
+      const commercialCard = preparation && input.createCommercialCard
+        ? await createCommercialCardFromFeedback(tx, {
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            alert,
+            contactAt: attemptedAt,
+            feedback: input,
+            feedbackId: feedback.id,
+            storeId: session.user.storeId,
+          })
+        : null;
+
+      const internalIssue = input.contactResult === "VEHICLE_PROBLEM" && input.createInternalIssue
+        ? await createInternalIssueFromFeedback(tx, {
+            actorId: session.user.id,
+            actorRole: session.user.role,
+            alert,
+            feedback: input,
+            feedbackId: feedback.id,
+            storeId: session.user.storeId,
+          })
+        : null;
+
+      if (commercialCard || internalIssue) {
+        feedback = await tx.postSaleFeedback.update({
+          where: { id: feedback.id },
+          data: {
+            createdLeadId: commercialCard?.lead.id,
+            createdCardId: commercialCard?.card.id,
+            createdInternalIssueId: internalIssue?.id,
+            metadata: {
+              commercialLeadPreparation: preparation,
+              commercialCardStatus: commercialCard ? "CREATED" : preparation ? "PENDING_REVIEW" : "NOT_APPLICABLE",
+              internalIssueStatus: internalIssue ? "CREATED" : input.contactResult === "VEHICLE_PROBLEM" ? "PENDING_REVIEW" : "NOT_APPLICABLE",
+            },
+          },
+        });
+      }
 
       await tx.postSaleAlertEvent.create({
         data: {
@@ -852,8 +1367,11 @@ export async function registerPostSaleRoutes(app: FastifyInstance) {
             contactAttemptedAt: attemptedAt.toISOString(),
             contactChannel: input.contactChannel,
             contactResult: input.contactResult,
+            postSaleFeedbackId: feedback.id,
             nextActionAt: input.nextActionAt?.toISOString() ?? null,
             hasCommercialLeadPreparation: Boolean(preparation),
+            createdCardId: commercialCard?.card.id ?? null,
+            createdInternalIssueId: internalIssue?.id ?? null,
           },
         },
       });
@@ -883,8 +1401,11 @@ export async function registerPostSaleRoutes(app: FastifyInstance) {
             vehicleId: alert.vehicleId,
             contactChannel: input.contactChannel,
             contactResult: input.contactResult,
+            postSaleFeedbackId: feedback.id,
             nextActionAt: input.nextActionAt?.toISOString() ?? null,
             commercialLeadPreparation: preparation,
+            createdCardId: commercialCard?.card.id ?? null,
+            createdInternalIssueId: internalIssue?.id ?? null,
           },
           occurredAt: attemptedAt,
         },
@@ -899,17 +1420,173 @@ export async function registerPostSaleRoutes(app: FastifyInstance) {
           actorRole: session.user.role,
           module: "post_sale",
           action: "post_sale_feedback_recorded",
-          entityType: "post_sale_alert",
-          entityId: alert.id,
+          entityType: "post_sale_feedback",
+          entityId: feedback.id,
           result: "SUCCESS",
-          metadata: { contactChannel: input.contactChannel, contactResult: input.contactResult, nextStatus },
+          metadata: {
+            alertId: alert.id,
+            contactChannel: input.contactChannel,
+            contactResult: input.contactResult,
+            nextStatus,
+            createdCardId: commercialCard?.card.id ?? null,
+            createdInternalIssueId: internalIssue?.id ?? null,
+          },
         },
       });
 
-      return alert;
+      return { alert, commercialCard, feedback, internalIssue };
     });
 
-    const contexts = await buildAlertContexts(session.user.storeId, [updated]);
-    return { data: sanitizeAlert(updated, contexts.get(updated.id)), commercialLeadPreparation: preparation };
+    const contexts = await buildAlertContexts(session.user.storeId, [result.alert]);
+    return {
+      data: sanitizeAlert(result.alert, contexts.get(result.alert.id)),
+      feedback: sanitizeFeedback(result.feedback),
+      commercialLeadPreparation: preparation,
+      createdCommercialCard: result.commercialCard ? { id: result.commercialCard.card.id, leadId: result.commercialCard.lead.id } : null,
+      internalIssue: result.internalIssue ? sanitizeInternalIssue(result.internalIssue) : null,
+    };
+  });
+
+  app.patch("/alerts/:id/feedback", async (request) => {
+    const session = await requirePostSaleSession(request);
+    const params = alertParamsSchema.parse(request.params);
+    const input = feedbackUpdateSchema.parse(request.body);
+    const current = await getAlertOrThrow({ id: params.id, request, session });
+    const feedback = await prisma.postSaleFeedback.findFirst({
+      where: {
+        postSaleAlertId: current.id,
+        storeId: session.user.storeId,
+        deletedAt: null,
+        ...feedbackVisibilityWhere(session.user),
+      },
+    });
+    if (!feedback) throw new ApiError("NOT_FOUND", "Feedback pos-venda nao encontrado.");
+    if (!isPostSaleFullView(session.user.role) && current.closedAt) {
+      throw new ApiError("BUSINESS_RULE_ERROR", "Vendedor nao pode editar feedback de alerta concluido.");
+    }
+
+    await ensureVehicleInterest(session.user.storeId, input.vehicleInterestId);
+    if (input.responsibleUserId) await ensureResponsibleUser(session.user.storeId, input.responsibleUserId);
+
+    const merged = {
+      contactAt: input.contactAttemptedAt ?? feedback.contactAt,
+      contactChannel: input.contactChannel ?? feedback.contactChannel,
+      contactResult: input.contactResult ?? feedback.contactResult,
+      feedbackNotes: input.feedbackNotes ?? feedback.feedbackNotes ?? undefined,
+      vehicleInterestId: input.vehicleInterestId ?? feedback.vehicleInterestId ?? undefined,
+      vehicleInterestNotes: input.vehicleInterestNotes ?? feedback.vehicleInterestNotes ?? undefined,
+      nextAction: input.nextAction ?? feedback.nextAction ?? undefined,
+      nextActionAt: input.nextActionAt ?? feedback.nextActionAt ?? undefined,
+    };
+    const updatedStatus = feedbackStatus({
+      contactAttemptedAt: merged.contactAt,
+      contactChannel: merged.contactChannel as FeedbackInput["contactChannel"],
+      contactResult: merged.contactResult as FeedbackInput["contactResult"],
+      feedbackNotes: merged.feedbackNotes,
+      vehicleInterestId: merged.vehicleInterestId,
+      vehicleInterestNotes: merged.vehicleInterestNotes,
+      nextAction: merged.nextAction,
+      nextActionAt: merged.nextActionAt,
+      createCommercialCard: false,
+      createInternalIssue: false,
+      issueSeverity: "MEDIUM",
+    });
+
+    const changedFields = Object.keys(input).filter((key) => key !== "updateReason");
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedFeedback = await tx.postSaleFeedback.update({
+        where: { id: feedback.id },
+        data: {
+          contactAt: merged.contactAt,
+          contactChannel: merged.contactChannel,
+          contactResult: merged.contactResult,
+          feedbackNotes: merged.feedbackNotes,
+          hasPurchaseInterest: hasPurchaseInterest(merged.contactResult),
+          interestType: interestTypeFromResult(merged.contactResult),
+          vehicleInterestId: merged.vehicleInterestId,
+          vehicleInterestNotes: merged.vehicleInterestNotes,
+          nextAction: merged.nextAction,
+          nextActionAt: merged.nextActionAt,
+          updatedByUserId: session.user.id,
+          metadata: {
+            ...(feedback.metadata && typeof feedback.metadata === "object" && !Array.isArray(feedback.metadata) ? feedback.metadata : {}),
+            lastUpdateReason: input.updateReason ?? null,
+            lastUpdatedBy: session.user.id,
+          },
+        },
+      });
+
+      const updatedAlert = await tx.postSaleAlert.update({
+        where: { id: current.id },
+        data: {
+          status: updatedStatus,
+          contactAttemptedAt: merged.contactAt,
+          contactChannel: merged.contactChannel,
+          contactResult: merged.contactResult,
+          feedbackNotes: merged.feedbackNotes,
+          nextActionAt: merged.nextActionAt,
+          closedAt: updatedStatus === "RESCHEDULED" ? null : (current.closedAt ?? new Date()),
+          closedByUserId: updatedStatus === "RESCHEDULED" ? null : (current.closedByUserId ?? session.user.id),
+        },
+      });
+
+      await tx.postSaleAlertEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          postSaleAlertId: current.id,
+          customerId: current.customerId,
+          saleId: current.saleId,
+          eventType: "feedback_updated",
+          actorUserId: session.user.id,
+          fromStatus: current.status,
+          toStatus: updatedAlert.status,
+          payload: {
+            postSaleFeedbackId: feedback.id,
+            changedFields,
+            reason: input.updateReason ?? null,
+          },
+        },
+      });
+
+      await tx.customerHistoryEvent.create({
+        data: {
+          storeId: session.user.storeId,
+          customerId: current.customerId,
+          type: "post_sale_feedback_updated",
+          title: "Feedback pos-venda atualizado",
+          description: input.updateReason ?? "Feedback pos-venda corrigido/complementado.",
+          metadata: {
+            alertId: current.id,
+            feedbackId: feedback.id,
+            changedFields,
+            contactChannel: updatedFeedback.contactChannel,
+            contactResult: updatedFeedback.contactResult,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId: session.user.storeId,
+          actorId: session.user.id,
+          actorRole: session.user.role,
+          module: "post_sale",
+          action: "post_sale_feedback_updated",
+          entityType: "post_sale_feedback",
+          entityId: feedback.id,
+          result: "SUCCESS",
+          metadata: {
+            alertId: current.id,
+            changedFields,
+            reason: input.updateReason ?? null,
+          },
+        },
+      });
+
+      return { alert: updatedAlert, feedback: updatedFeedback };
+    });
+
+    const contexts = await buildAlertContexts(session.user.storeId, [result.alert]);
+    return { data: sanitizeAlert(result.alert, contexts.get(result.alert.id)), feedback: sanitizeFeedback(result.feedback) };
   });
 }

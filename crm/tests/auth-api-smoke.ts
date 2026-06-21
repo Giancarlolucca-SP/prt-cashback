@@ -7847,12 +7847,53 @@ try {
       contactChannel: "WHATSAPP",
       contactResult: "INTERESTED_PURCHASE",
       feedbackNotes: "Cliente satisfeito com o veiculo e avaliando nova compra.",
+      vehicleInterestNotes: "Procura SUV automatico seminovo",
+      nextAction: "Retornar com opcoes de SUV",
+      nextActionAt: new Date(postSaleOverdueScanNow.getTime() + 86400000).toISOString(),
+      createCommercialCard: true,
+      responsibleUserId: sellerUserId,
     },
   });
   assert.equal(postSaleFeedback.statusCode, 200);
-  assert.equal(postSaleFeedback.json().data.status, "COMPLETED");
+  assert.equal(postSaleFeedback.json().data.status, "RESCHEDULED");
+  assert.equal(postSaleFeedback.json().feedback.postSaleAlertId, postSaleAlertId);
+  assert.equal(postSaleFeedback.json().feedback.interestType, "PURCHASE_OTHER");
+  assert.equal(postSaleFeedback.json().feedback.hasPurchaseInterest, true);
+  assert.ok(postSaleFeedback.json().feedback.createdCardId);
+  assert.equal(postSaleFeedback.json().createdCommercialCard.id, postSaleFeedback.json().feedback.createdCardId);
   assert.equal(postSaleFeedback.json().commercialLeadPreparation.postSaleAlertId, postSaleAlertId);
   assert.equal(postSaleFeedback.json().commercialLeadPreparation.customerId, createdCustomerId);
+  const postSaleFeedbackId = postSaleFeedback.json().feedback.id as string;
+  const createdPostSaleCardId = postSaleFeedback.json().feedback.createdCardId as string;
+  const createdPostSaleLead = await prisma.leadCard.findFirst({
+    where: { id: createdPostSaleCardId, storeId: ownerBody.user.storeId },
+    include: { lead: true },
+  });
+  assert.ok(createdPostSaleLead);
+  assert.equal(createdPostSaleLead.lead.customerId, createdCustomerId);
+  assert.equal(createdPostSaleLead.lead.source, "post_sale_2_years");
+  assert.equal(createdPostSaleLead.lead.assignedUserId, sellerUserId);
+  assert.equal(createdPostSaleLead.lead.interest, "PURCHASE_OTHER");
+
+  const updatedPostSaleFeedback = await app.inject({
+    method: "PATCH",
+    url: `/post-sale/alerts/${postSaleAlertId}/feedback`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: {
+      feedbackNotes: "Gestao complementou: cliente quer receber opcoes ate amanha.",
+      updateReason: "Complemento administrativo do feedback pos-venda",
+    },
+  });
+  assert.equal(updatedPostSaleFeedback.statusCode, 200);
+  assert.equal(updatedPostSaleFeedback.json().feedback.updatedByUserId, ownerBody.user.id);
+
+  const postSaleFeedbackUpdateAudit = await app.inject({
+    method: "GET",
+    url: `/audit/logs?module=post_sale&action=post_sale_feedback_updated&entity_type=post_sale_feedback&entity_id=${postSaleFeedbackId}&page=1&page_size=5`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(postSaleFeedbackUpdateAudit.statusCode, 200);
+  assert.ok(postSaleFeedbackUpdateAudit.json().items.some((item: { entityId: string }) => item.entityId === postSaleFeedbackId));
 
   const postSaleHistory = await prisma.customerHistoryEvent.findFirst({
     where: { storeId: ownerBody.user.storeId, customerId: createdCustomerId, type: "post_sale_feedback_recorded" },
@@ -7878,6 +7919,84 @@ try {
   });
   assert.equal(resolvedPostSaleNotifications.statusCode, 200);
   assert.ok(resolvedPostSaleNotifications.json().items.some((notification: { entityId: string }) => notification.entityId === postSaleAlertId));
+
+  const postSaleComplaintSale = await prisma.sale.create({
+    data: {
+      storeId: ownerBody.user.storeId,
+      customerId: createdCustomerId,
+      vehicleId: inventoryVehicleId,
+      sellerUserId,
+      status: "CLOSED",
+      salePrice: 88000,
+      closedAt: postSalePurchaseDate,
+      snapshot: { source: "s4-us02-complaint-smoke" },
+    },
+  });
+
+  const complaintPostSaleAlertScan = await app.inject({
+    method: "POST",
+    url: "/post-sale/alerts/scan",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+    payload: { now: postSaleInitialScanNow.toISOString() },
+  });
+  assert.equal(complaintPostSaleAlertScan.statusCode, 200);
+  const complaintPostSaleAlert = complaintPostSaleAlertScan.json().data.alerts.find((alert: { saleId: string }) => alert.saleId === postSaleComplaintSale.id);
+  assert.ok(complaintPostSaleAlert);
+
+  const complaintPostSaleFeedback = await app.inject({
+    method: "POST",
+    url: `/post-sale/alerts/${complaintPostSaleAlert.id}/feedback`,
+    headers: { authorization: `Bearer ${sellerInventoryToken}` },
+    payload: {
+      contactAttemptedAt: postSaleOverdueScanNow.toISOString(),
+      contactChannel: "PHONE",
+      contactResult: "VEHICLE_PROBLEM",
+      feedbackNotes: "Cliente relatou barulho na suspensao e pediu acompanhamento da loja.",
+      issueSeverity: "HIGH",
+    },
+  });
+  assert.equal(complaintPostSaleFeedback.statusCode, 200);
+  assert.equal(complaintPostSaleFeedback.json().feedback.contactResult, "VEHICLE_PROBLEM");
+  assert.equal(complaintPostSaleFeedback.json().internalIssue.status, "PENDING_REVIEW");
+  assert.equal(complaintPostSaleFeedback.json().internalIssue.severity, "HIGH");
+  assert.equal(complaintPostSaleFeedback.json().internalIssue.customerId, createdCustomerId);
+  const postSaleInternalIssueId = complaintPostSaleFeedback.json().internalIssue.id as string;
+
+  const postSaleInternalIssues = await app.inject({
+    method: "GET",
+    url: `/post-sale/internal-issues?status=PENDING_REVIEW&customer_id=${createdCustomerId}&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(postSaleInternalIssues.statusCode, 200);
+  assert.ok(postSaleInternalIssues.json().items.some((issue: { id: string }) => issue.id === postSaleInternalIssueId));
+
+  const sdrCannotReadPostSaleIssues = await app.inject({
+    method: "GET",
+    url: "/post-sale/internal-issues",
+    headers: { authorization: `Bearer ${sdrToken}` },
+  });
+  assert.equal(sdrCannotReadPostSaleIssues.statusCode, 403);
+
+  const postSaleFeedbacksList = await app.inject({
+    method: "GET",
+    url: `/post-sale/feedbacks?customer_id=${createdCustomerId}&page_size=100`,
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(postSaleFeedbacksList.statusCode, 200);
+  assert.ok(postSaleFeedbacksList.json().items.some((feedback: { id: string; createdCardId: string | null }) => feedback.id === postSaleFeedbackId && feedback.createdCardId === createdPostSaleCardId));
+  assert.ok(postSaleFeedbacksList.json().items.some((feedback: { createdInternalIssueId: string | null }) => feedback.createdInternalIssueId === postSaleInternalIssueId));
+
+  const postSaleFeedbackMetrics = await app.inject({
+    method: "GET",
+    url: "/post-sale/feedbacks/metrics/summary",
+    headers: { authorization: `Bearer ${ownerBody.token}` },
+  });
+  assert.equal(postSaleFeedbackMetrics.statusCode, 200);
+  assert.ok(postSaleFeedbackMetrics.json().data.total >= 2);
+  assert.ok(postSaleFeedbackMetrics.json().data.createdCards >= 1);
+  assert.ok(postSaleFeedbackMetrics.json().data.internalIssues >= 1);
+  assert.ok(postSaleFeedbackMetrics.json().data.byResult.INTERESTED_PURCHASE >= 1);
+  assert.ok(postSaleFeedbackMetrics.json().data.byResult.VEHICLE_PROBLEM >= 1);
   checkpoint("post-sale-alerts");
 
   const sellerDeleteCustomer = await app.inject({
