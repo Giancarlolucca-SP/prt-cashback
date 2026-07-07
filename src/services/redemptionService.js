@@ -14,7 +14,7 @@ const MIN_REDEMPTION = parseFloat(process.env.MIN_REDEMPTION_AMOUNT || '10');
 const MAX_DAILY_REDEMPTION = parseFloat(process.env.MAX_DAILY_REDEMPTION || '500');
 const COOLDOWN_MINUTES = parseInt(process.env.REDEMPTION_COOLDOWN_MINUTES || '5', 10);
 
-async function redeem({ cpf, amount, source = null, metadata = null }, operator) {
+async function redeem({ cpf, amount, source = null, metadata = null, attendantId = null }, operator) {
   // --- Validation ---
   if (!cpf) throw createError('CPF é obrigatório.', 400);
   if (!isValidCpf(cpf)) throw createError('CPF inválido.', 400);
@@ -109,6 +109,7 @@ async function redeem({ cpf, amount, source = null, metadata = null }, operator)
         receiptCode: generateReceiptCode('RSG'),
         ...(source ? { source } : {}),
         ...(metadata ? { metadata } : {}),
+        ...(attendantId ? { attendantId } : {}),
       },
     }),
     prisma.customer.update({
@@ -202,4 +203,4 @@ async function listByCustomer(cpf, establishmentId) {
   };
 }
 
-module.exports = { redeem, listByCustomer };
+module.exports = { redeem, listByCustomer, MIN_REDEMPTION };

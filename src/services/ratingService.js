@@ -21,11 +21,6 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
   const customerId      = customerPayload.sub;
   const establishmentId = customerPayload.establishmentId;
 
-  // The attendant reference is the same key the ranking groups by ("code-name").
-  // Accept either field name; `attendantCode` is what the mobile client sends.
-  const attendantKey = String(attendantName || attendantCode || '').trim();
-  if (!attendantKey) throw createError('Selecione o atendente que você deseja avaliar.', 400);
-
   const parsedStars = Number(stars);
   if (!Number.isInteger(parsedStars) || parsedStars < 1 || parsedStars > 5) {
     throw createError('A avaliação deve ser um número inteiro de 1 a 5 estrelas.', 400);
@@ -35,16 +30,24 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
     ? comment.trim().slice(0, 1000)
     : null;
 
-  // If a transaction is referenced, make sure it belongs to this customer and
-  // establishment, and that it hasn't been rated yet.
+  // The attendant reference is never trusted blindly from the client — otherwise
+  // any authenticated customer could rate an arbitrary/fabricated attendant.
+  let attendantKey;
+
   if (transactionId) {
+    // Make sure it belongs to this customer/establishment and hasn't been rated
+    // yet, then use the TRANSACTION's own attendantName as the source of truth
+    // (ignoring whatever attendantCode/attendantName the client sent).
     const transaction = await prisma.transaction.findUnique({
       where:  { id: transactionId },
-      select: { customerId: true, establishmentId: true },
+      select: { customerId: true, establishmentId: true, attendantName: true },
     });
     if (!transaction || transaction.customerId !== customerId
         || transaction.establishmentId !== establishmentId) {
       throw createError('Abastecimento não encontrado.', 404);
+    }
+    if (!transaction.attendantName) {
+      throw createError('Este abastecimento não tem um atendente identificado.', 400);
     }
 
     const existing = await prisma.attendantRating.findUnique({
@@ -52,6 +55,27 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
       select: { id: true },
     });
     if (existing) throw createError('Este abastecimento já foi avaliado.', 409);
+
+    attendantKey = attendantService.norm(transaction.attendantName);
+  } else {
+    // No transaction reference: only allow rating an attendant that genuinely
+    // exists for this establishment (registered, or seen on a real transaction).
+    const rawKey = String(attendantName || attendantCode || '').trim();
+    if (!rawKey) throw createError('Selecione o atendente que você deseja avaliar.', 400);
+    const key = attendantService.norm(rawKey);
+
+    const [registered, seen] = await Promise.all([
+      prisma.attendant.findUnique({
+        where: { establishmentId_attendantKey: { establishmentId, attendantKey: key } },
+      }),
+      prisma.transaction.findFirst({
+        where:  { establishmentId, attendantName: { equals: key, mode: 'insensitive' }, status: 'CONFIRMED' },
+        select: { id: true },
+      }),
+    ]);
+    if (!registered && !seen) throw createError('Atendente não encontrado.', 404);
+
+    attendantKey = key;
   }
 
   let rating;
@@ -107,9 +131,10 @@ async function listAttendants(customerPayload) {
     byKey.set(a.attendantKey, { key: a.attendantKey, code: a.code || '', name: a.name, photoUrl: a.photoUrl || null });
   }
   for (const r of rows) {
-    if (byKey.has(r.attendantName)) continue;
-    const { code, name } = parseAttendantRaw(r.attendantName);
-    byKey.set(r.attendantName, { key: r.attendantName, code, name, photoUrl: null });
+    const key = attendantService.norm(r.attendantName);
+    if (byKey.has(key)) continue;
+    const { code, name } = parseAttendantRaw(key);
+    byKey.set(key, { key, code, name, photoUrl: null });
   }
 
   const atendentes = Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -142,10 +167,11 @@ async function listRatings(operator, query = {}) {
   // Per-attendant aggregates
   const agg = new Map();
   for (const r of ratings) {
-    if (!agg.has(r.attendantName)) {
-      agg.set(r.attendantName, { raw: r.attendantName, sum: 0, count: 0 });
+    const key = attendantService.norm(r.attendantName);
+    if (!agg.has(key)) {
+      agg.set(key, { raw: key, sum: 0, count: 0 });
     }
-    const a = agg.get(r.attendantName);
+    const a = agg.get(key);
     a.sum   += r.stars;
     a.count += 1;
   }

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Navbar from './Navbar.jsx';
-import { House, Users, Megaphone, ChartBar, Gear } from '@phosphor-icons/react';
+import { House, Users, Megaphone, ChartBar, Gear, SignOut } from '@phosphor-icons/react';
 
 const PAGE_TITLES = {
   '/dashboard':              'Painel',
@@ -32,9 +32,10 @@ const BOTTOM_TABS = [
 const OPERATOR_PATHS = ['/pista', '/logout'];
 
 export default function ProtectedRoute() {
-  const { token, loading, operator, isOperator } = useAuth();
+  const { token, loading, operator, isOperator, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const page  = PAGE_TITLES[location.pathname] || 'PostoCash';
@@ -70,6 +71,26 @@ export default function ProtectedRoute() {
     return <Navigate to="/pista" replace />;
   }
 
+  // Frentista is locked to the Pista panel alone — the full nav sidebar has
+  // nothing else to offer, so it's dropped in favor of a discreet logout button.
+  if (isOperator) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <button
+          onClick={() => { logout(); navigate('/login'); }}
+          className="fixed top-3 right-3 z-40 p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-200/70 transition-colors"
+          aria-label="Sair"
+          title="Sair"
+        >
+          <SignOut size={20} weight="bold" />
+        </button>
+        <main className="flex-1 px-4 sm:px-6 py-6">
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
 
@@ -91,8 +112,7 @@ export default function ProtectedRoute() {
         </main>
       </div>
 
-      {/* ── Bottom tab bar (mobile only; hidden for frentista/operador) ──────── */}
-      {!isOperator && (
+      {/* ── Bottom tab bar (mobile only) ─────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#1e3a5f] border-t border-white/10 flex">
         {BOTTOM_TABS.map((tab) => (
           <NavLink
@@ -113,7 +133,6 @@ export default function ProtectedRoute() {
           </NavLink>
         ))}
       </nav>
-      )}
 
     </div>
   );

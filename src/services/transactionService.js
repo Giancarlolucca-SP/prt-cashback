@@ -11,9 +11,23 @@ const { DEFAULT_FUEL_TYPES } = require('./cashbackSettingsService');
 
 const prisma = new PrismaClient();
 
+// fuelType values flowing through the app are Portuguese (nfceService/photoValidationService
+// detection, PistaFuelMap admin entries: 'gasolina', 'gasolina_aditivada', 'etanol', 'diesel_s10'),
+// while CashbackSettings.fuelTypes is keyed in English ('gasoline', 'ethanol', ...). Normalize
+// here so per-fuel rates actually apply regardless of which flow produced the fuelType.
+const FUEL_TYPE_ALIASES = {
+  gasolina:           'gasoline',
+  gasolina_aditivada: 'gasoline',
+  etanol:             'ethanol',
+  alcool:             'ethanol',
+  diesel_s10:         'diesel',
+};
+
 // ── Cashback calculation using CashbackSettings ───────────────────────────────
 
 async function computeCashback(amount, fuelType, liters, establishmentId) {
+  fuelType = fuelType ? (FUEL_TYPE_ALIASES[fuelType] || fuelType) : fuelType;
+
   // Load (or create default) settings
   const settings = await prisma.cashbackSettings.upsert({
     where:  { establishmentId },

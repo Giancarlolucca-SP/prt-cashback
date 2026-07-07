@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { createError }  = require('../middlewares/errorMiddleware');
+const { norm } = require('./attendantService');
 
 const prisma = new PrismaClient();
 
@@ -111,8 +112,12 @@ async function getRanking(operator, query = {}) {
   // ── Group by attendant ────────────────────────────────────────────────────────
   const attendantMap = new Map();
 
+  // Group by the normalized key (not the raw stored string): older Transaction
+  // rows may keep the raw OCR-cased attendantName while newer ones store the
+  // canonical registry casing — normalizing here keeps them as one attendant
+  // instead of silently splitting the same person's history in two.
   for (const t of transactions) {
-    const raw = t.attendantName;
+    const raw = norm(t.attendantName);
     if (!attendantMap.has(raw)) {
       const { code, name } = parseAttendantRaw(raw);
       attendantMap.set(raw, {
@@ -151,9 +156,15 @@ async function getRanking(operator, query = {}) {
       _count: { _all: true },
     });
     for (const g of grouped) {
-      ratingMap.set(g.attendantName, {
-        avgStars:     g._avg.stars != null ? round2(g._avg.stars) : null,
-        totalRatings: g._count._all,
+      const key = norm(g.attendantName);
+      const prev = ratingMap.get(key);
+      const count = (prev?.totalRatings || 0) + g._count._all;
+      const avg = prev
+        ? ((prev.avgStars || 0) * prev.totalRatings + (g._avg.stars || 0) * g._count._all) / count
+        : g._avg.stars;
+      ratingMap.set(key, {
+        avgStars:     avg != null ? round2(avg) : null,
+        totalRatings: count,
       });
     }
   } catch (err) {
@@ -203,7 +214,7 @@ async function getRanking(operator, query = {}) {
 
   for (const t of transactions) {
     const dayKey = t.createdAt.toISOString().slice(0, 10);
-    const { name } = parseAttendantRaw(t.attendantName);
+    const { name } = parseAttendantRaw(norm(t.attendantName));
 
     for (const metric of ['transactions', 'liters', 'value']) {
       if (!maps[metric].has(dayKey)) maps[metric].set(dayKey, {});

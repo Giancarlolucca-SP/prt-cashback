@@ -112,18 +112,21 @@ model Transaction {
   photoUrl          String?          @db.Text
   metadata          Json?
   attendantName     String?
+  attendantId       String?          // resolved individual frentista (Pista card map), distinct from the shared operatorId
   encerranteInicial Decimal?         @db.Decimal(12, 3)
   encerranteFinal   Decimal?         @db.Decimal(12, 3)
   createdAt         DateTime         @default(now())
   customer          Customer         @relation(fields: [customerId], references: [id])
   operator          Operator         @relation(fields: [operatorId], references: [id])
   establishment     Establishment    @relation(fields: [establishmentId], references: [id])
+  attendant         Attendant?       @relation(fields: [attendantId], references: [id])
   rating            AttendantRating?
 
   @@index([customerId])
   @@index([establishmentId])
   @@index([createdAt])
   @@index([status])
+  @@index([attendantId])
 }
 
 model Redemption {
@@ -136,13 +139,16 @@ model Redemption {
   receiptCode     String           @unique
   source          String?          // e.g. "PISTA" — internal cashback panel
   metadata        Json?            // non-fiscal comprovante reference (bomba/value/frentista)
+  attendantId     String?          // resolved individual frentista, distinct from the shared operatorId
   createdAt       DateTime         @default(now())
   customer        Customer         @relation(fields: [customerId], references: [id])
   operator        Operator         @relation(fields: [operatorId], references: [id])
   establishment   Establishment    @relation(fields: [establishmentId], references: [id])
+  attendant       Attendant?       @relation(fields: [attendantId], references: [id])
 
   @@index([customerId])
   @@index([establishmentId])
+  @@index([attendantId])
   @@index([createdAt])
 }
 
@@ -380,16 +386,19 @@ model RedemptionRequest {
   establishmentId String
   amount          Decimal       @db.Decimal(10, 2)        // amount the customer wants to redeem
   status          String        @default("PENDING")       // PENDING | CONFIRMED | CANCELLED
-  operatorId      String?                                 // frentista who resolved it
+  operatorId      String?                                 // shared operator login that resolved it
+  attendantId     String?                                 // individual frentista who resolved it (Pista card map)
   redemptionId    String?       @unique                   // created Redemption (when confirmed)
   note            String?                                 // reference abastecimento / bomba
   createdAt       DateTime      @default(now())
   resolvedAt      DateTime?
   customer        Customer      @relation(fields: [customerId], references: [id])
   establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  attendant       Attendant?    @relation(fields: [attendantId], references: [id])
 
   @@index([establishmentId, status])
   @@index([customerId])
+  @@index([attendantId])
 }
 
 model Attendant {
@@ -406,6 +415,9 @@ model Attendant {
   establishment   Establishment @relation(fields: [establishmentId], references: [id])
   operator        Operator?     @relation(fields: [operatorId], references: [id])
   cardMaps        PistaCardMap[]
+  transactions        Transaction[]
+  redemptionRequests  RedemptionRequest[]
+  redemptions         Redemption[]
 
   @@unique([establishmentId, attendantKey])
   @@index([establishmentId])

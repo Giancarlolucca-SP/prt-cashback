@@ -74,6 +74,15 @@ function serialize(a) {
   };
 }
 
+// Reject an operatorId that doesn't belong to the same establishment (cross-tenant guard).
+async function assertOperatorInEstablishment(operatorId, establishmentId) {
+  if (!operatorId) return;
+  const op = await prisma.operator.findUnique({ where: { id: operatorId } });
+  if (!op || op.establishmentId !== establishmentId) {
+    throw createError('Operador inválido para este estabelecimento.', 400);
+  }
+}
+
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 async function listAttendants(operator) {
@@ -98,6 +107,8 @@ async function createAttendant(operator, { name, code, operatorId }) {
     where: { establishmentId_attendantKey: { establishmentId, attendantKey } },
   });
   if (existing) throw createError('Já existe um atendente com este nome/código.', 409);
+
+  await assertOperatorInEstablishment(operatorId, establishmentId);
 
   const attendant = await prisma.attendant.create({
     data: {
@@ -135,6 +146,8 @@ async function updateAttendant(operator, id, { name, code, active, operatorId })
     if (clash && clash.id !== id) throw createError('Já existe um atendente com este nome/código.', 409);
   }
 
+  if (operatorId !== undefined) await assertOperatorInEstablishment(operatorId, attendant.establishmentId);
+
   const updated = await prisma.attendant.update({
     where: { id },
     data: {
@@ -151,13 +164,24 @@ async function updateAttendant(operator, id, { name, code, active, operatorId })
 async function deleteAttendant(operator, id) {
   const attendant = await findOwned(operator, id);
 
-  // Best-effort remove the stored photo
+  // Delete the DB row first: if a PistaCardMap still references this attendant
+  // (FK restrict), fail here with a clear message instead of after the photo
+  // is already gone.
+  try {
+    await prisma.attendant.delete({ where: { id } });
+  } catch (err) {
+    if (err.code === 'P2003') {
+      throw createError('Não é possível remover: há um cartão vinculado a este atendente. Remova o vínculo primeiro.', 409);
+    }
+    throw err;
+  }
+
+  // Best-effort remove the stored photo, now that the row is confirmed gone.
   const supabase = getSupabase();
   if (supabase && attendant.photoUrl) {
     try { await supabase.storage.from(PHOTO_BUCKET).remove([`${attendant.establishmentId}/${attendant.id}.jpg`]); } catch {}
   }
 
-  await prisma.attendant.delete({ where: { id } });
   return { mensagem: 'Atendente removido.' };
 }
 

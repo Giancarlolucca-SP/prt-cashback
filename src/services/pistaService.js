@@ -14,9 +14,11 @@ const { generateReceiptCode } = require('../utils/receiptCode');
 const { createError } = require('../middlewares/errorMiddleware');
 const { computeCashback } = require('./transactionService');
 const redemptionService = require('./redemptionService');
+const { MIN_REDEMPTION } = redemptionService;
 const receiptService = require('./receiptService');
 const fraudService = require('./fraudService');
 const audit = require('./auditService');
+const pistaMaps = require('./pistaMapsService');
 
 const prisma = new PrismaClient();
 
@@ -24,15 +26,27 @@ const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
 
 // ── PHASE 1: accrual by CPF (frentista) ───────────────────────────────────────
 
-async function accrueByCpf({ cpf, amount, fuelType, liters, bomba }, operator) {
+async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId }, operator) {
   if (!cpf || !isValidCpf(cpf)) throw createError('CPF inválido.', 400);
   const parsedAmount = parseFloat(amount);
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
     throw createError('Valor do abastecimento deve ser maior que zero.', 400);
   }
 
-  const { id: operatorId, establishmentId, name: frentista } = operator;
+  const { id: operatorId, establishmentId, name: operatorName } = operator;
   const strippedCpf = stripCpf(cpf);
+
+  // Prefer the individual Attendant identity (resolved via the card map) over the
+  // shared operator login — frentistas at a station share one operator account.
+  let frentista = operatorName;
+  let resolvedAttendantId = null;
+  if (attendantId) {
+    const att = await prisma.attendant.findUnique({ where: { id: attendantId } });
+    if (att && att.establishmentId === establishmentId) {
+      frentista = att.name;
+      resolvedAttendantId = att.id;
+    }
+  }
 
   // Find or create a stub customer (CPF without account yet)
   let customer = await prisma.customer.findUnique({
@@ -64,6 +78,7 @@ async function accrueByCpf({ cpf, amount, fuelType, liters, bomba }, operator) {
         liters:          liters ? parseFloat(liters) : null,
         source:          'PISTA',
         status:          'CONFIRMED',
+        attendantId:     resolvedAttendantId,
         metadata:        { pista: true, bomba: bomba || null, frentista: frentista || null },
       },
     }),
@@ -127,6 +142,9 @@ async function createRequest({ amount }, customerPayload) {
   const parsed = amount != null ? parseFloat(amount) : balance; // default: full balance
   if (isNaN(parsed) || parsed <= 0) throw createError('Valor de resgate inválido.', 400);
   if (parsed > balance) throw createError('Valor maior que o saldo disponível.', 400);
+  if (parsed < MIN_REDEMPTION) {
+    throw createError(`Valor mínimo para resgate é ${formatBRL(MIN_REDEMPTION)}.`, 400);
+  }
 
   // One active request per customer — replace the pending one if it exists
   const existing = await prisma.redemptionRequest.findFirst({ where: { customerId, establishmentId, status: 'PENDING' } });
@@ -182,35 +200,64 @@ async function listRequests(operator) {
 }
 
 // Pista (operator): confirm the baixa — reuses redemptionService.redeem (all rules)
-async function confirmRequest(operator, requestId, { amount, note }) {
+async function confirmRequest(operator, requestId, { amount, note, attendantId }) {
   const establishmentId = operator.establishmentId;
   const reqRow = await prisma.redemptionRequest.findUnique({ where: { id: requestId } });
   if (!reqRow || reqRow.establishmentId !== establishmentId) throw createError('Solicitação não encontrada.', 404);
   if (reqRow.status !== 'PENDING') throw createError('Esta solicitação já foi resolvida.', 409);
 
-  const customer = await prisma.customer.findUnique({ where: { id: reqRow.customerId } });
-  if (!customer) throw createError('Cliente não encontrado.', 404);
+  // Resolve the individual frentista who is confirming (picked in the frontend),
+  // falling back to the shared operator login's name if none was selected.
+  let frentista = operator.name;
+  let resolvedAttendantId = null;
+  if (attendantId) {
+    const att = await prisma.attendant.findUnique({ where: { id: attendantId } });
+    if (att && att.establishmentId === establishmentId) {
+      frentista = att.name;
+      resolvedAttendantId = att.id;
+    }
+  }
 
-  const finalAmount = amount != null ? parseFloat(amount) : parseFloat(reqRow.amount);
-
-  // Enforces MIN_REDEMPTION_AMOUNT, MAX_DAILY_REDEMPTION, COOLDOWN, fraud, balance + audit
-  const result = await redemptionService.redeem(
-    { cpf: customer.cpf, amount: finalAmount, source: 'PISTA', metadata: { note: note || null, frentista: operator.name || null, requestId } },
-    operator,
-  );
-
-  await prisma.redemptionRequest.update({
-    where: { id: requestId },
-    data: { status: 'CONFIRMED', operatorId: operator.id, redemptionId: result.resgate.id, note: note || null, resolvedAt: new Date() },
+  // Atomically claim the request before debiting so two concurrent confirms for the
+  // same requestId can't both pass the PENDING check above and double-redeem.
+  const claim = await prisma.redemptionRequest.updateMany({
+    where: { id: requestId, establishmentId, status: 'PENDING' },
+    data: { status: 'CONFIRMED', operatorId: operator.id, attendantId: resolvedAttendantId, resolvedAt: new Date() },
   });
+  if (claim.count === 0) throw createError('Esta solicitação já foi resolvida.', 409);
 
-  const comprovante = receiptService.generateComprovante({
-    type: 'resgate', controlNumber: result.resgate.codigoCupom, date: result.resgate.createdAt,
-    frentista: operator.name, customerName: result.resgate.clienteNome, cpf: result.resgate.cpf,
-    value: result.resgate.valorNum, balance: result.resgate.novoSaldoNum, reference: note || null,
-  });
+  try {
+    const customer = await prisma.customer.findUnique({ where: { id: reqRow.customerId } });
+    if (!customer) throw createError('Cliente não encontrado.', 404);
 
-  return { mensagem: 'Resgate confirmado.', resgate: result.resgate, comprovante };
+    const finalAmount = amount != null ? parseFloat(amount) : parseFloat(reqRow.amount);
+
+    // Enforces MIN_REDEMPTION_AMOUNT, MAX_DAILY_REDEMPTION, COOLDOWN, fraud, balance + audit
+    const result = await redemptionService.redeem(
+      { cpf: customer.cpf, amount: finalAmount, source: 'PISTA', attendantId: resolvedAttendantId, metadata: { note: note || null, frentista: frentista || null, requestId } },
+      operator,
+    );
+
+    await prisma.redemptionRequest.update({
+      where: { id: requestId },
+      data: { redemptionId: result.resgate.id, note: note || null },
+    });
+
+    const comprovante = receiptService.generateComprovante({
+      type: 'resgate', controlNumber: result.resgate.codigoCupom, date: result.resgate.createdAt,
+      frentista, customerName: result.resgate.clienteNome, cpf: result.resgate.cpf,
+      value: result.resgate.valorNum, balance: result.resgate.novoSaldoNum, reference: note || null,
+    });
+
+    return { mensagem: 'Resgate confirmado.', resgate: result.resgate, comprovante };
+  } catch (err) {
+    // Redemption failed after claiming the request — release the claim so it can be retried.
+    await prisma.redemptionRequest.update({
+      where: { id: requestId },
+      data: { status: 'PENDING', operatorId: null, attendantId: null, resolvedAt: null },
+    }).catch(() => {});
+    throw err;
+  }
 }
 
 // Pista (operator): cancel a pending request
@@ -237,15 +284,15 @@ async function getComprovante(operator, type, id) {
     if (!t || t.establishmentId !== establishmentId) throw createError('Comprovante não encontrado.', 404);
     const ref = t.metadata && t.metadata.bomba ? `${formatBRL(t.amount)} - ${t.metadata.bomba}` : formatBRL(t.amount);
     return { comprovante: receiptService.generateComprovante({
-      type: 'acumulo', controlNumber: t.receiptCode, date: t.createdAt, frentista: t.operator?.name,
+      type: 'acumulo', controlNumber: t.receiptCode, date: t.createdAt, frentista: (t.metadata && t.metadata.frentista) || t.operator?.name,
       customerName: t.customer.name, cpf: t.customer.cpf, value: parseFloat(t.cashbackValue),
       balance: parseFloat(t.customer.balance), reference: ref,
     }) };
   }
-  const r = await prisma.redemption.findUnique({ where: { id }, include: { customer: true, operator: true } });
+  const r = await prisma.redemption.findUnique({ where: { id }, include: { customer: true, operator: true, attendant: true } });
   if (!r || r.establishmentId !== establishmentId) throw createError('Comprovante não encontrado.', 404);
   return { comprovante: receiptService.generateComprovante({
-    type: 'resgate', controlNumber: r.receiptCode, date: r.createdAt, frentista: r.operator?.name,
+    type: 'resgate', controlNumber: r.receiptCode, date: r.createdAt, frentista: r.attendant?.name || (r.metadata && r.metadata.frentista) || r.operator?.name,
     customerName: r.customer.name, cpf: r.customer.cpf, value: parseFloat(r.amountUsed),
     balance: parseFloat(r.customer.balance), reference: (r.metadata && r.metadata.note) || null,
   }) };
@@ -269,28 +316,44 @@ async function caixaReport(operator, query = {}) {
   const establishmentId = operator.establishmentId;
   const { start, end } = resolveRange(query);
 
-  const [accruals, redemptions, operators] = await Promise.all([
+  // Grouped by (attendantId, operatorId): several frentistas share one operator
+  // login, so attendantId (when resolved) is what actually separates them —
+  // operatorId is only the fallback bucket for legacy/unmapped records.
+  const [accruals, redemptions, operators, attendants] = await Promise.all([
     prisma.transaction.groupBy({
-      by: ['operatorId'],
+      by: ['attendantId', 'operatorId'],
       where: { establishmentId, source: 'PISTA', status: 'CONFIRMED', createdAt: { gte: start, lte: end } },
       _sum: { cashbackValue: true, amount: true }, _count: { _all: true },
     }),
     prisma.redemption.groupBy({
-      by: ['operatorId'],
-      where: { establishmentId, status: 'CONFIRMED', createdAt: { gte: start, lte: end } },
+      by: ['attendantId', 'operatorId'],
+      where: { establishmentId, source: 'PISTA', status: 'CONFIRMED', createdAt: { gte: start, lte: end } },
       _sum: { amountUsed: true }, _count: { _all: true },
     }),
     prisma.operator.findMany({ where: { establishmentId }, select: { id: true, name: true } }),
+    prisma.attendant.findMany({ where: { establishmentId }, select: { id: true, name: true } }),
   ]);
 
-  const opName = new Map(operators.map((o) => [o.id, o.name]));
-  const byOp = new Map();
-  const ensure = (id) => { if (!byOp.has(id)) byOp.set(id, { operatorId: id, frentista: opName.get(id) || '—', acumulos: 0, totalAbastecido: 0, totalCashback: 0, resgates: 0, totalResgatado: 0 }); return byOp.get(id); };
+  const opName  = new Map(operators.map((o) => [o.id, o.name]));
+  const attName = new Map(attendants.map((a) => [a.id, a.name]));
+  const byKey = new Map();
+  const ensure = (attendantId, operatorId) => {
+    const key = attendantId || `op:${operatorId}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        attendantId: attendantId || null,
+        operatorId,
+        frentista: (attendantId && attName.get(attendantId)) || opName.get(operatorId) || '—',
+        acumulos: 0, totalAbastecido: 0, totalCashback: 0, resgates: 0, totalResgatado: 0,
+      });
+    }
+    return byKey.get(key);
+  };
 
-  for (const a of accruals) { const e = ensure(a.operatorId); e.acumulos = a._count._all; e.totalAbastecido = round2(a._sum.amount); e.totalCashback = round2(a._sum.cashbackValue); }
-  for (const r of redemptions) { const e = ensure(r.operatorId); e.resgates = r._count._all; e.totalResgatado = round2(r._sum.amountUsed); }
+  for (const a of accruals) { const e = ensure(a.attendantId, a.operatorId); e.acumulos = a._count._all; e.totalAbastecido = round2(a._sum.amount); e.totalCashback = round2(a._sum.cashbackValue); }
+  for (const r of redemptions) { const e = ensure(r.attendantId, r.operatorId); e.resgates = r._count._all; e.totalResgatado = round2(r._sum.amountUsed); }
 
-  const frentistas = Array.from(byOp.values()).sort((a, b) => b.totalResgatado - a.totalResgatado);
+  const frentistas = Array.from(byKey.values()).sort((a, b) => b.totalResgatado - a.totalResgatado);
   const totalResgatado = round2(frentistas.reduce((s, f) => s + f.totalResgatado, 0));
   const totalCashback  = round2(frentistas.reduce((s, f) => s + f.totalCashback, 0));
   const totalAbastecido = round2(frentistas.reduce((s, f) => s + f.totalAbastecido, 0));
@@ -347,19 +410,39 @@ async function accrueFromFueling(operator, { abastecimentoId, cpf }) {
   const establishmentId = operator.establishmentId;
   const ab = await prisma.abastecimento.findUnique({ where: { id: abastecimentoId } });
   if (!ab || ab.establishmentId !== establishmentId) throw createError('Abastecimento não encontrado.', 404);
-  if (ab.cashbackTransactionId) throw createError('Este abastecimento já gerou cashback.', 409);
+  if (ab.cashbackTransactionId || ab.cashbackAppliedAt) throw createError('Este abastecimento já gerou cashback.', 409);
 
-  const result = await accrueByCpf(
-    { cpf, amount: parseFloat(ab.totalValue), fuelType: ab.fuelName || undefined, liters: parseFloat(ab.volumeLiters), bomba: `Bico ${ab.nozzleCode}` },
-    operator,
-  );
-
-  await prisma.abastecimento.update({
-    where: { id: ab.id },
-    data: { cashbackTransactionId: result.transacao.id, cashbackCpf: stripCpf(cpf), cashbackAppliedAt: new Date() },
+  // Atomically claim this fueling so two concurrent requests for the same
+  // abastecimentoId can't both pass the "not yet accrued" check above and
+  // double-credit cashback before either write-back lands.
+  const claim = await prisma.abastecimento.updateMany({
+    where: { id: abastecimentoId, cashbackTransactionId: null, cashbackAppliedAt: null },
+    data: { cashbackAppliedAt: new Date() },
   });
+  if (claim.count === 0) throw createError('Este abastecimento já gerou cashback.', 409);
 
-  return { ...result, abastecimentoId: ab.id };
+  const attendant = ab.identfidCode ? await pistaMaps.resolveAttendant(establishmentId, ab.identfidCode) : null;
+
+  try {
+    const result = await accrueByCpf(
+      {
+        cpf, amount: parseFloat(ab.totalValue), fuelType: ab.fuelName || undefined,
+        liters: parseFloat(ab.volumeLiters), bomba: `Bico ${ab.nozzleCode}`, attendantId: attendant?.id,
+      },
+      operator,
+    );
+
+    await prisma.abastecimento.update({
+      where: { id: ab.id },
+      data: { cashbackTransactionId: result.transacao.id, cashbackCpf: stripCpf(cpf), cashbackAppliedAt: new Date() },
+    });
+
+    return { ...result, abastecimentoId: ab.id };
+  } catch (err) {
+    // Accrual failed after claiming — release the claim so the fueling can be retried.
+    await prisma.abastecimento.update({ where: { id: ab.id }, data: { cashbackAppliedAt: null } }).catch(() => {});
+    throw err;
+  }
 }
 
 module.exports = {

@@ -46,7 +46,7 @@ const upsertCardMap = wrap((req) => pistaMaps.upsertCardMap(req.operator, req.bo
 const deleteCardMap = wrap((req) => pistaMaps.deleteCardMap(req.operator, req.params.id));
 
 // ── Dashboard + fuelings + cashback-from-fueling ──────────────────────────────
-const dashboard       = wrap((req) => pistaDashboard.dashboard(req.operator));
+const dashboard       = wrap((req) => pistaDashboard.dashboard(req.operator, req.query));
 const listFuelings    = wrap((req) => pistaService.listFuelings(req.operator, req.query));
 const accrueFromFueling = wrap((req) => pistaService.accrueFromFueling(req.operator, req.body));
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, Legend, LineChart, Line, XAxis, YAxis } from 'recharts';
 import { pistaAPI, attendantsAPI } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { applyCpfMask, stripCpf } from '../utils/cpfMask.js';
@@ -72,6 +72,34 @@ function ComprovanteModal({ text, onClose }) {
   );
 }
 
+// ── Frentista bar (who's operating this session) ──────────────────────────────
+// Frentistas share one operator login, so acúmulo/resgate/caixa can only credit
+// the right individual person if the session says who's currently at the pump.
+
+const FRENTISTA_SESSION_KEY = 'pista_frentista_id';
+
+function FrentistaBar({ attendants, selectedId, onSelect }) {
+  if (!attendants.length) return null;
+  const selected = attendants.find((a) => a.id === selectedId);
+
+  return (
+    <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-2.5">
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide shrink-0">Você é:</span>
+      <div className="flex items-center gap-2 flex-wrap">
+        {attendants.map((a) => (
+          <button key={a.id} onClick={() => onSelect(a.id)}
+            className={['inline-flex items-center gap-1.5 h-8 pl-1 pr-3 rounded-full border text-sm font-semibold transition-colors',
+              a.id === selectedId ? 'bg-amber-400 border-amber-400 text-white' : 'bg-white border-gray-200 text-slate-600 hover:border-amber-300'].join(' ')}>
+            {a.photoUrl ? <img src={a.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover" /> : <UserCircle size={20} weight="duotone" />}
+            {a.name}
+          </button>
+        ))}
+      </div>
+      {!selected && <span className="text-xs text-amber-600 ml-auto shrink-0">Selecione quem está na pista</span>}
+    </div>
+  );
+}
+
 // ── Reminder banner ───────────────────────────────────────────────────────────
 
 function ReminderBanner() {
@@ -85,7 +113,7 @@ function ReminderBanner() {
 
 // ── Acúmulo tab ───────────────────────────────────────────────────────────────
 
-function AcumuloTab({ onComprovante }) {
+function AcumuloTab({ onComprovante, attendantId }) {
   const [fuelings, setFuelings] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [manual, setManual]     = useState(false);
@@ -114,7 +142,7 @@ function AcumuloTab({ onComprovante }) {
       </div>
 
       {manual
-        ? <ManualAccrualForm onResult={setResult} />
+        ? <ManualAccrualForm onResult={setResult} attendantId={attendantId} />
         : <FuelingPicker fuelings={fuelings} loading={loading} onRefresh={load} onAccrued={(d) => { setResult(d); load(); }} />}
 
       {result && <AccrualResult result={result} onComprovante={onComprovante} />}
@@ -197,7 +225,7 @@ function FuelingPicker({ fuelings, loading, onRefresh, onAccrued }) {
   );
 }
 
-function ManualAccrualForm({ onResult }) {
+function ManualAccrualForm({ onResult, attendantId }) {
   const [cpf, setCpf]       = useState('');
   const [amount, setAmount] = useState('');
   const [fuelType, setFuel] = useState('');
@@ -213,7 +241,7 @@ function ManualAccrualForm({ onResult }) {
     if (!value || value <= 0) { setError('Informe o valor do abastecimento.'); return; }
     setBusy(true);
     try {
-      const { data } = await pistaAPI.accrue({ cpf: stripCpf(cpf), amount: value, fuelType: fuelType || undefined, bomba: bomba || undefined });
+      const { data } = await pistaAPI.accrue({ cpf: stripCpf(cpf), amount: value, fuelType: fuelType || undefined, bomba: bomba || undefined, attendantId: attendantId || undefined });
       onResult(data); setAmount(''); setBomba('');
     } catch (e2) {
       setError(e2.response?.data?.erro ?? 'Não foi possível acumular o cashback.');
@@ -290,7 +318,7 @@ function Stat({ label, value, highlight }) {
 
 // ── Resgates tab (live queue) ─────────────────────────────────────────────────
 
-function ResgatesTab({ onComprovante }) {
+function ResgatesTab({ onComprovante, attendantId }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
@@ -355,6 +383,7 @@ function ResgatesTab({ onComprovante }) {
       {selected && (
         <ConfirmRedemptionModal
           request={selected}
+          attendantId={attendantId}
           onClose={() => setSelected(null)}
           onDone={(comprovante) => { setSelected(null); load(); if (comprovante) onComprovante(comprovante); }}
         />
@@ -363,7 +392,7 @@ function ResgatesTab({ onComprovante }) {
   );
 }
 
-function ConfirmRedemptionModal({ request, onClose, onDone }) {
+function ConfirmRedemptionModal({ request, attendantId, onClose, onDone }) {
   const [amount, setAmount] = useState(String(request.valorSolicitado));
   const [note, setNote]     = useState('');
   const [busy, setBusy]     = useState(false);
@@ -373,7 +402,7 @@ function ConfirmRedemptionModal({ request, onClose, onDone }) {
     setBusy(true); setError('');
     try {
       const value = parseFloat(String(amount).replace(',', '.'));
-      const { data } = await pistaAPI.confirmRequest(request.id, { amount: value, note: note || undefined });
+      const { data } = await pistaAPI.confirmRequest(request.id, { amount: value, note: note || undefined, attendantId: attendantId || undefined });
       onDone(data.comprovante);
     } catch (e) {
       setError(e.response?.data?.erro ?? 'Não foi possível confirmar o resgate.');
@@ -493,7 +522,7 @@ function CaixaTab() {
               ) : !data?.frentistas?.length ? (
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Sem movimentação no período.</td></tr>
               ) : data.frentistas.map((f) => (
-                <tr key={f.operatorId}>
+                <tr key={f.attendantId || `op:${f.operatorId}`}>
                   <td className="px-4 py-2.5 font-semibold text-slate-800">{f.frentista}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{f.acumulos}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-green-600">{fmtBRL(f.totalCashback)}</td>
@@ -530,13 +559,6 @@ function DashboardTab() {
 
   return (
     <div className="space-y-4">
-      {/* Header — collective board (todos os frentistas) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm font-semibold text-slate-700">Vendas do dia — todos os frentistas</p>
-        <span className="text-xs text-gray-400">Hoje · {data?.periodo?.hoje || '—'}</span>
-        <button onClick={load} className="ml-auto text-xs text-gray-400 hover:text-gray-700 inline-flex items-center gap-1"><ArrowClockwise size={14} /> Atualizar</button>
-      </div>
-
       {loading && !data ? (
         <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />
       ) : (
@@ -546,6 +568,46 @@ function DashboardTab() {
           <Metric label="Valor vendido (dia)" value={fmtBRL(totais.valorTotal)} bg="bg-green-50 border-green-100" val="text-green-700" />
         </div>
       )}
+
+      {/* Mix aditivada — últimos a abastecer (números grandes) + tendência dia a dia */}
+      <div className="grid lg:grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Mix aditivada — últimos a abastecer</p>
+          {!data?.ultimosMix?.length ? (
+            <div className="py-10 text-center text-gray-400 text-sm">Sem abastecimentos hoje.</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {data.ultimosMix.map((u) => (
+                <div key={u.key} className="text-center">
+                  <p className="text-5xl font-black text-purple-600 tabular-nums leading-tight">
+                    {u.mixAditivada != null ? `${u.mixAditivada.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%` : '—'}
+                  </p>
+                  <p className="text-sm text-slate-500 truncate mt-1">{u.nome}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Mix aditivada — evolução por frentista</p>
+          {!data?.mixHistoricoSeries?.length ? (
+            <div className="py-10 text-center text-gray-400 text-sm">Sem histórico suficiente.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={data.mixHistorico} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="data" tickFormatter={(d) => d.slice(5).replace('-', '/')} fontSize={11} />
+                <YAxis tickFormatter={(v) => `${v}%`} fontSize={11} width={40} domain={[0, 100]} />
+                <RTooltip formatter={(v) => (v != null ? `${v}%` : '—')} labelFormatter={(d) => new Date(`${d}T00:00:00`).toLocaleDateString('pt-BR')} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {data.mixHistoricoSeries.map((s, i) => (
+                  <Line key={s.id} type="monotone" dataKey={s.id} name={s.nome} stroke={PIE_COLORS[i % PIE_COLORS.length]} strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
 
       {/* Pie por atendente */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
@@ -756,12 +818,30 @@ function CartoesTab() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function PainelPista() {
-  const { isAdmin, isSuperAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin, operator } = useAuth();
   const canConfig = isAdmin || isSuperAdmin;
   const visibleTabs = TABS.filter((t) => !t.adminOnly || canConfig);
 
   const [tab, setTab] = useState('dashboard');
   const [comprovante, setComprovante] = useState(null);
+  const [attendants, setAttendants] = useState([]);
+  const [attendantId, setAttendantId] = useState(() => sessionStorage.getItem(FRENTISTA_SESSION_KEY) || '');
+
+  useEffect(() => {
+    attendantsAPI.list().then((res) => setAttendants((res.data.attendants || []).filter((a) => a.active))).catch(() => {});
+  }, []);
+
+  // Auto-select if this operator login maps 1:1 to a single registered attendant.
+  useEffect(() => {
+    if (attendantId || !attendants.length || !operator?.id) return;
+    const mine = attendants.filter((a) => a.operatorId === operator.id);
+    if (mine.length === 1) setAttendantId(mine[0].id);
+  }, [attendants, attendantId, operator]);
+
+  function selectAttendant(id) {
+    setAttendantId(id);
+    sessionStorage.setItem(FRENTISTA_SESSION_KEY, id);
+  }
 
   // Guard: if a hidden tab is somehow selected, fall back to Dashboard.
   const activeTab = visibleTabs.some((t) => t.id === tab) ? tab : 'dashboard';
@@ -774,6 +854,7 @@ export default function PainelPista() {
       </div>
 
       <ReminderBanner />
+      <FrentistaBar attendants={attendants} selectedId={attendantId} onSelect={selectAttendant} />
 
       {/* Sub-tabs */}
       <div className="flex gap-2 flex-wrap">
@@ -789,8 +870,8 @@ export default function PainelPista() {
       </div>
 
       {activeTab === 'dashboard'    && <DashboardTab />}
-      {activeTab === 'acumulo'      && <AcumuloTab onComprovante={setComprovante} />}
-      {activeTab === 'resgates'     && <ResgatesTab onComprovante={setComprovante} />}
+      {activeTab === 'acumulo'      && <AcumuloTab onComprovante={setComprovante} attendantId={attendantId} />}
+      {activeTab === 'resgates'     && <ResgatesTab onComprovante={setComprovante} attendantId={attendantId} />}
       {activeTab === 'caixa'        && <CaixaTab />}
       {activeTab === 'combustiveis' && <CombustiveisTab />}
       {activeTab === 'cartoes'      && <CartoesTab />}
