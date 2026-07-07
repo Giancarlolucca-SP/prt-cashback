@@ -35,4 +35,8 @@ router.get   ('/card-map',                       ctrl.listCardMap);
 router.post  ('/card-map',                       ctrl.upsertCardMap);
 router.delete('/card-map/:id',                   ctrl.deleteCardMap);
 
+// Config — concentrador (Companytec TCP connection settings for the local agent)
+router.get('/concentrador-config',               ctrl.getConcentradorConfig);
+router.put('/concentrador-config',               ctrl.updateConcentradorConfig);
+
 module.exports = router;

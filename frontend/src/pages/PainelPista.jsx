@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { applyCpfMask, stripCpf } from '../utils/cpfMask.js';
 import {
   GasPump, HandCoins, Receipt, Warning, Printer, X, ArrowClockwise, CheckCircle, ClockCounterClockwise,
-  ChartPie, Drop, IdentificationCard, Plus, Trash, UserCircle,
+  ChartPie, Drop, IdentificationCard, Plus, Trash, UserCircle, Plugs,
 } from '@phosphor-icons/react';
 
 // Fuel keys (match each establishment's cashback config)
@@ -28,6 +28,7 @@ const TABS = [
   { id: 'caixa',        label: 'Caixa',        icon: <Receipt size={18} weight="duotone" /> },
   { id: 'combustiveis', label: 'Combustíveis', icon: <Drop size={18} weight="duotone" />, adminOnly: true },
   { id: 'cartoes',      label: 'Cartões',      icon: <IdentificationCard size={18} weight="duotone" />, adminOnly: true },
+  { id: 'concentrador', label: 'Concentrador', icon: <Plugs size={18} weight="duotone" />, adminOnly: true },
 ];
 
 function fmtL(v) { return `${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`; }
@@ -815,6 +816,159 @@ function CartoesTab() {
   );
 }
 
+// ── Concentrador tab (Companytec TCP connection settings for the pista-agent) ──
+
+const HEARTBEAT_STALE_MS = 60000; // agent heartbeats every ~20s; 3 misses = considered offline
+
+function timeAgo(iso) {
+  const diffS = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diffS < 60) return `${diffS}s atrás`;
+  if (diffS < 3600) return `${Math.round(diffS / 60)} min atrás`;
+  return `${Math.round(diffS / 3600)} h atrás`;
+}
+
+function AgentStatusCard({ status }) {
+  if (!status) return null;
+
+  const heartbeatAge = status.lastHeartbeatAt ? Date.now() - new Date(status.lastHeartbeatAt).getTime() : null;
+  const online = status.lastHeartbeatOk && heartbeatAge != null && heartbeatAge < HEARTBEAT_STALE_MS;
+  const neverSeen = !status.lastHeartbeatAt;
+
+  const dotColor = neverSeen ? 'bg-gray-300' : online ? 'bg-green-500' : 'bg-red-500';
+  const label = neverSeen ? 'Agente nunca conectou' : online ? 'Agente online' : 'Agente offline';
+  const labelColor = neverSeen ? 'text-gray-500' : online ? 'text-green-700' : 'text-red-700';
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-wrap items-center gap-x-6 gap-y-1">
+      <div className="flex items-center gap-2">
+        <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
+        <span className={`text-sm font-semibold ${labelColor}`}>{label}</span>
+      </div>
+      {status.lastHeartbeatAt && <span className="text-xs text-gray-400">Último contato: {timeAgo(status.lastHeartbeatAt)}</span>}
+      {status.agentVersion && <span className="text-xs text-gray-400">Versão: {status.agentVersion}</span>}
+      {!online && status.lastError && <span className="text-xs text-red-500 truncate">Erro: {status.lastError}</span>}
+    </div>
+  );
+}
+
+function ConcentradorTab() {
+  const [form, setForm]     = useState(null); // null while loading; editable fields, only set on load/save
+  const [status, setStatus] = useState(null); // heartbeat fields, refreshed on a timer (form isn't, to avoid clobbering edits)
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError]   = useState('');
+
+  useEffect(() => {
+    let isFirstLoad = true;
+    const poll = () => pistaAPI.concentradorConfig().then((r) => {
+      const c = r.data.configuracao;
+      setStatus({ lastHeartbeatAt: c.lastHeartbeatAt, lastHeartbeatOk: c.lastHeartbeatOk, lastError: c.lastError, agentVersion: c.agentVersion });
+      if (isFirstLoad) { setForm(c); isFirstLoad = false; }
+    }).catch(() => { if (isFirstLoad) setError('Não foi possível carregar a configuração.'); });
+    poll();
+    const t = setInterval(poll, 15000);
+    return () => clearInterval(t);
+  }, []);
+
+  function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
+
+  async function save(e) {
+    e.preventDefault(); setError(''); setNotice(''); setSaving(true);
+    try {
+      const { data } = await pistaAPI.updateConcentradorConfig({
+        host: form.host,
+        port: parseInt(form.port, 10),
+        pollIntervalMs: parseInt(form.pollIntervalMs, 10),
+        retryIntervalMs: parseInt(form.retryIntervalMs, 10),
+        socketTimeoutMs: parseInt(form.socketTimeoutMs, 10),
+        useChecksum: form.useChecksum,
+        readMode: form.readMode,
+      });
+      setForm(data.configuracao);
+      setNotice(data.mensagem);
+    } catch (e2) {
+      setError(e2.response?.data?.erro ?? 'Não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!form) {
+    return (
+      <div className="max-w-2xl">
+        {error
+          ? <p className="text-sm text-red-600">{error}</p>
+          : <div className="h-40 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center text-sm text-gray-400">Carregando configuração…</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm text-gray-500">
+        Conexão TCP do <b>agente da pista</b> com o concentrador Companytec. O agente busca esta
+        configuração da nuvem ao iniciar — reinicie o agente na máquina do posto após salvar.
+      </p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {notice && <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-2.5">{notice}</div>}
+
+      <AgentStatusCard status={status} />
+
+      <form onSubmit={save} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div><label className="block text-xs text-gray-500 mb-1">Host / IP do concentrador</label>
+            <input value={form.host} onChange={(e) => set('host', e.target.value)} placeholder="Ex: 192.168.0.50"
+              className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">Porta</label>
+            <input value={form.port} onChange={(e) => set('port', e.target.value)} inputMode="numeric" placeholder="857"
+              className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" /></div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Modo de leitura</label>
+          <div className="flex gap-4 h-9 items-center">
+            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input type="radio" name="readMode" checked={form.readMode === 'identified'} onChange={() => set('readMode', 'identified')} />
+              Identificada — "&A67" (captura o frentista via cartão Identfid)
+            </label>
+          </div>
+          <div className="flex gap-4 items-center mt-1">
+            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input type="radio" name="readMode" checked={form.readMode === 'plain'} onChange={() => set('readMode', 'plain')} />
+              Simples — "&A" (sem identificação do frentista)
+            </label>
+          </div>
+        </div>
+
+        <label className="flex items-center gap-1.5 text-sm text-gray-600">
+          <input type="checkbox" checked={form.useChecksum} onChange={(e) => set('useChecksum', e.target.checked)} className="rounded text-amber-500" />
+          Usar checksum no comando (necessário para concentrador real; simuladores geralmente não precisam)
+        </label>
+
+        <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-gray-100">
+          <div><label className="block text-xs text-gray-500 mb-1">Intervalo de leitura (ms)</label>
+            <input value={form.pollIntervalMs} onChange={(e) => set('pollIntervalMs', e.target.value)} inputMode="numeric"
+              className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">Nova tentativa (ms)</label>
+            <input value={form.retryIntervalMs} onChange={(e) => set('retryIntervalMs', e.target.value)} inputMode="numeric"
+              className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">Timeout do socket (ms)</label>
+            <input value={form.socketTimeoutMs} onChange={(e) => set('socketTimeoutMs', e.target.value)} inputMode="numeric"
+              className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" /></div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button type="submit" disabled={saving}
+            className="h-9 px-4 inline-flex items-center gap-1.5 bg-amber-400 text-white text-sm font-semibold rounded-lg hover:bg-amber-500 disabled:opacity-50">
+            {saving ? 'Salvando…' : 'Salvar'}
+          </button>
+          {form.updatedAt && <span className="text-xs text-gray-400">Última atualização: {new Date(form.updatedAt).toLocaleString('pt-BR')}</span>}
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function PainelPista() {
@@ -875,6 +1029,7 @@ export default function PainelPista() {
       {activeTab === 'caixa'        && <CaixaTab />}
       {activeTab === 'combustiveis' && <CombustiveisTab />}
       {activeTab === 'cartoes'      && <CartoesTab />}
+      {activeTab === 'concentrador' && <ConcentradorTab />}
 
       {comprovante && <ComprovanteModal text={comprovante} onClose={() => setComprovante(null)} />}
     </div>

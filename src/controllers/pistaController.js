@@ -1,6 +1,7 @@
 const pistaService = require('../services/pistaService');
 const pistaMaps = require('../services/pistaMapsService');
 const pistaDashboard = require('../services/pistaDashboardService');
+const concentradorConfigService = require('../services/concentradorConfigService');
 
 const wrap = (fn) => async (req, res, next) => { try { res.json(await fn(req)); } catch (err) { next(err); } };
 
@@ -50,9 +51,14 @@ const dashboard       = wrap((req) => pistaDashboard.dashboard(req.operator, req
 const listFuelings    = wrap((req) => pistaService.listFuelings(req.operator, req.query));
 const accrueFromFueling = wrap((req) => pistaService.accrueFromFueling(req.operator, req.body));
 
+// ── Concentrador config (Companytec TCP connection settings) ─────────────────
+const getConcentradorConfig    = wrap((req) => concentradorConfigService.getConfig(req.operator.establishmentId));
+const updateConcentradorConfig = wrap((req) => concentradorConfigService.updateConfig(req.body, req.operator.establishmentId));
+
 module.exports = {
   accrue, listRequests, confirmRequest, cancelRequest, comprovante, caixa,
   listFuelMap, upsertFuelMap, deleteFuelMap, backfillFuel,
   listCardMap, upsertCardMap, deleteCardMap,
   dashboard, listFuelings, accrueFromFueling,
+  getConcentradorConfig, updateConcentradorConfig,
 };

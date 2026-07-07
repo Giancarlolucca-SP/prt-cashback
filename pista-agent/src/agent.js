@@ -12,8 +12,31 @@ const proto = require('./protocol');
 const queue = require('./queue');
 const cloud = require('./cloud');
 const Concentrator = require('./concentrator');
+const pkg = require('../package.json');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const HEARTBEAT_INTERVAL_MS = 20000;
+
+// Updated by the main loop on every connect success/failure; read by the
+// heartbeat timer below. Kept independent of the read loop so a heartbeat
+// still goes out even while the loop is blocked waiting on a slow socket.
+const state = { connected: false, lastError: null };
+
+function startHeartbeat() {
+  const send = () => {
+    cloud.postHeartbeat(config.apiUrl, config.agentToken, {
+      establishmentId: config.establishmentId,
+      connected: state.connected,
+      error: state.lastError,
+      agentVersion: pkg.version,
+    }).catch((e) => log.warn('Heartbeat falhou (sem impacto na leitura):', e.message));
+  };
+  // No immediate call: at t=0 the first connect() attempt hasn't resolved yet,
+  // so `state.connected` would still read its stale initial value and report
+  // a false "offline". The first real heartbeat fires once state is accurate.
+  return setInterval(send, HEARTBEAT_INTERVAL_MS);
+}
 
 function validateConfig() {
   const missing = [];
@@ -23,6 +46,38 @@ function validateConfig() {
   if (missing.length) {
     log.error('Configuração faltando no .env:', missing.join(', '));
     process.exit(1);
+  }
+}
+
+// Concentrador connection settings (host/port/timeouts/checksum/readMode) are
+// configurable remotely (Painel da Pista → Concentrador) so a station doesn't
+// need someone editing its local .env on every change. Fetched once at
+// startup; falls back to local .env values if the cloud is unreachable or no
+// remote config has been saved yet.
+async function loadRemoteConfig() {
+  try {
+    const res = await cloud.getConcentradorConfig(config.apiUrl, config.agentToken, config.establishmentId);
+    if (res.status < 200 || res.status >= 300) {
+      log.warn(`Config remota indisponível (HTTP ${res.status}); usando valores locais do .env.`);
+      return;
+    }
+    const remote = JSON.parse(res.body).configuracao;
+    if (!remote) {
+      log.info('Nenhuma configuração remota salva ainda; usando valores locais do .env.');
+      return;
+    }
+    Object.assign(config, {
+      host:            remote.host,
+      port:            remote.port,
+      pollIntervalMs:  remote.pollIntervalMs,
+      retryIntervalMs: remote.retryIntervalMs,
+      socketTimeoutMs: remote.socketTimeoutMs,
+      useChecksum:     remote.useChecksum,
+      readMode:        remote.readMode,
+    });
+    log.info('Configuração do concentrador carregada da nuvem.', remote);
+  } catch (e) {
+    log.warn('Falha ao buscar configuração remota; usando valores locais do .env.', e.message);
   }
 }
 
@@ -59,6 +114,7 @@ async function pushToCloud(f) {
 
 async function runLoop() {
   validateConfig();
+  await loadRemoteConfig();
   const identified = config.readMode === 'identified';
   log.info('Agente da Pista iniciando', {
     concentrador: `${config.host}:${config.port}`,
@@ -68,6 +124,7 @@ async function runLoop() {
     comando: identified ? '(&A67)' : '(&A)',
   });
   log.info(`Fila local pendente: ${queue.pendingCount()} abastecimento(s).`);
+  startHeartbeat();
 
   // Identified read uses the checksummed command "(&A67)". Plain read starts
   // without checksum and toggles on if the concentrator ignores "(&A)".
@@ -80,6 +137,8 @@ async function runLoop() {
       log.step(`Conectando ao concentrador ${config.host}:${config.port}…`);
       await conc.connect();
       log.info('Conectado ao concentrador.');
+      state.connected = true;
+      state.lastError = null;
 
       // Read status once
       try {
@@ -159,6 +218,8 @@ async function runLoop() {
       }
     } catch (e) {
       log.error('Erro de comunicação com o concentrador:', e.message, `— reconectando em ${config.retryIntervalMs}ms.`);
+      state.connected = false;
+      state.lastError = e.message;
       conc.close();
       await sleep(config.retryIntervalMs);
     }

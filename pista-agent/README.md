@@ -10,6 +10,20 @@ Copie `.env.example` para `.env` e ajuste:
 - `POLL_INTERVAL_MS`, `RETRY_INTERVAL_MS`, `SOCKET_TIMEOUT_MS`, `USE_CHECKSUM`.
 - `POSTOCASH_API_URL`, `AGENT_TOKEN`, `ESTABLISHMENT_ID`.
 
+### Configuração remota (Painel da Pista → Concentrador)
+Ao iniciar, o agente busca `CONCENTRADOR_HOST`/`PORT`/intervalos/`USE_CHECKSUM`/`READ_MODE` da
+nuvem (tela **Concentrador** no Painel da Pista, admin) e eles **sobrepõem** os valores do `.env`
+quando existir uma configuração salva. Isso evita ter que editar o `.env` de cada posto na mão
+para mudar host/porta/timeout. Se a nuvem estiver inacessível no boot, ou nenhuma configuração
+tiver sido salva ainda, o agente cai de volta nos valores locais do `.env`. **Mudanças feitas na
+tela só valem depois de reiniciar o agente** (a busca é feita uma vez, no start).
+
+### Heartbeat (status online/offline)
+A cada ~20s o agente reporta à nuvem se está conectado ao concentrador (independente de haver
+abastecimento — evita marcar um posto parado como "offline" só por falta de movimento). A tela
+**Concentrador** mostra "Agente online/offline", há quanto tempo foi o último contato, a versão
+e o último erro, se houver. Sem contato por mais de ~60s (3 heartbeats perdidos) = offline.
+
 ## Rodar
 ```bash
 npm install

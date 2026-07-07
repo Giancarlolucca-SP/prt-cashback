@@ -69,6 +69,9 @@ export const pistaAPI = {
   cardMap:           ()          => api.get('/pista/card-map'),
   upsertCardMap:     (data)      => api.post('/pista/card-map', data),
   deleteCardMap:     (id)        => api.delete(`/pista/card-map/${id}`),
+  // Config — concentrador (Companytec, conexão TCP do agente local)
+  concentradorConfig:       ()      => api.get('/pista/concentrador-config'),
+  updateConcentradorConfig: (data)  => api.put('/pista/concentrador-config', data),
 };
 
 // ── Transactions ──────────────────────────────────────────────────────────────

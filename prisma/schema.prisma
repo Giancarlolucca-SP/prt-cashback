@@ -39,6 +39,7 @@ model Establishment {
   abastecimentos       Abastecimento[]
   pistaFuelMaps        PistaFuelMap[]
   pistaCardMaps        PistaCardMap[]
+  concentradorConfig   ConcentradorConfig?
   stripeCustomerId     String?
   stripeSubscriptionId String?
   subscriptionStatus   String            @default("ACTIVE")
@@ -378,6 +379,30 @@ model PistaCardMap {
   @@unique([establishmentId, identfidCode])
   @@index([establishmentId])
   @@index([attendantId])
+}
+
+// Companytec concentrador (DT435 protocol) TCP connection settings for the local
+// pista-agent — configured centrally here so a station's agent can pick up
+// changes on restart instead of requiring someone to edit its local .env.
+model ConcentradorConfig {
+  id              String        @id @default(uuid())
+  establishmentId String        @unique
+  host            String        @default("127.0.0.1")
+  port            Int           @default(2001)
+  pollIntervalMs  Int           @default(1000)
+  retryIntervalMs Int           @default(5000)
+  socketTimeoutMs Int           @default(8000)
+  useChecksum     Boolean       @default(false)
+  readMode        String        @default("identified")  // identified ("&A67", §3.1.3) | plain ("&A", §3.1.1)
+  // Heartbeat — reported by the agent every ~20s so the admin screen can show
+  // online/offline instead of "configured and hope for the best".
+  lastHeartbeatAt DateTime?
+  lastHeartbeatOk Boolean?                               // was the agent connected to the concentrador at that heartbeat
+  lastError       String?       @db.Text
+  agentVersion    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
 }
 
 model RedemptionRequest {
