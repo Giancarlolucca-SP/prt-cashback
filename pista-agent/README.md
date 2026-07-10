@@ -15,8 +15,11 @@ Ao iniciar, o agente busca `CONCENTRADOR_HOST`/`PORT`/intervalos/`USE_CHECKSUM`/
 nuvem (tela **Concentrador** no Painel da Pista, admin) e eles **sobrepõem** os valores do `.env`
 quando existir uma configuração salva. Isso evita ter que editar o `.env` de cada posto na mão
 para mudar host/porta/timeout. Se a nuvem estiver inacessível no boot, ou nenhuma configuração
-tiver sido salva ainda, o agente cai de volta nos valores locais do `.env`. **Mudanças feitas na
-tela só valem depois de reiniciar o agente** (a busca é feita uma vez, no start).
+tiver sido salva ainda, o agente cai de volta nos valores locais do `.env`.
+
+Depois do boot, o agente **reconfere a nuvem a cada ~60s**; se algo relevante mudou (host, porta,
+timeouts, modo de leitura, checksum), ele reconecta sozinho com os novos valores no próximo ciclo
+— não precisa reiniciar o processo manualmente para uma mudança feita na tela ter efeito.
 
 ### Heartbeat (status online/offline)
 A cada ~20s o agente reporta à nuvem se está conectado ao concentrador (independente de haver

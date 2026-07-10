@@ -24,9 +24,49 @@ const prisma = new PrismaClient();
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
 
+// Builds the same response shape as a fresh accrueByCpf() success, from an
+// existing Transaction row matched by idempotencyKey. `saldo` reflects the
+// customer's balance NOW, not a stored snapshot from the original attempt.
+function buildAccrualReplayResult(existing) {
+  const customer = existing.customer;
+  const cashbackValue = parseFloat(existing.cashbackValue);
+  const balanceNow = parseFloat(customer.balance);
+  const frentista = existing.attendant?.name || (existing.metadata && existing.metadata.frentista) || null;
+  const bomba = existing.metadata && existing.metadata.bomba;
+  const reference = bomba ? `${formatBRL(existing.amount)} - ${bomba}` : formatBRL(existing.amount);
+
+  let comprovante;
+  try {
+    comprovante = receiptService.generateComprovante({
+      type: 'acumulo', controlNumber: existing.receiptCode, date: existing.createdAt,
+      frentista, customerName: customer.name, cpf: customer.cpf,
+      value: cashbackValue, balance: balanceNow, reference,
+    });
+  } catch (err) {
+    console.error(`[pistaService] Falha ao gerar comprovante (retentativa idempotente) do acúmulo ${existing.id}:`, err.message);
+    comprovante = null;
+  }
+
+  return {
+    mensagem: 'Cashback acumulado com sucesso.',
+    novoCliente: false,
+    transacao: {
+      id: existing.id,
+      controle: existing.receiptCode,
+      valorAbastecimento: formatBRL(existing.amount),
+      percentual: `${parseFloat(existing.cashbackPercent).toFixed(2)}%`,
+      cashback: formatBRL(cashbackValue),
+      saldo: formatBRL(balanceNow),
+      saldoNum: balanceNow,
+      clienteNome: customer.name,
+    },
+    comprovante,
+  };
+}
+
 // ── PHASE 1: accrual by CPF (frentista) ───────────────────────────────────────
 
-async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId }, operator) {
+async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId, idempotencyKey = null }, operator) {
   if (!cpf || !isValidCpf(cpf)) throw createError('CPF inválido.', 400);
   const parsedAmount = parseFloat(amount);
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -35,6 +75,27 @@ async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId }
 
   const { id: operatorId, establishmentId, name: operatorName } = operator;
   const strippedCpf = stripCpf(cpf);
+
+  // Idempotency: a retry (after ANY failure, including one after the write
+  // already committed) with the same client-supplied key returns the
+  // existing result instead of reprocessing — safe by construction, not by
+  // inferring from which line threw whether anything committed.
+  if (idempotencyKey) {
+    const existing = await prisma.transaction.findUnique({
+      where: { establishmentId_idempotencyKey: { establishmentId, idempotencyKey } },
+      include: { customer: true, attendant: true },
+    });
+    if (existing) {
+      // A legitimate retry always resubmits the same cpf. If it doesn't
+      // match, this idempotencyKey collided with a DIFFERENT customer's
+      // transaction — refuse instead of returning that customer's balance,
+      // receipt and name to the caller.
+      if (existing.customer.cpf !== strippedCpf) {
+        throw createError('Conflito de identificador de requisição.', 409);
+      }
+      return buildAccrualReplayResult(existing);
+    }
+  }
 
   // Prefer the individual Attendant identity (resolved via the card map) over the
   // shared operator login — frentistas at a station share one operator account.
@@ -54,51 +115,113 @@ async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId }
   });
   let stubCreated = false;
   if (!customer) {
-    customer = await prisma.customer.create({
-      data: { cpf: strippedCpf, establishmentId, name: '(não cadastrado)', phone: '', registered: false },
-    });
-    stubCreated = true;
+    try {
+      customer = await prisma.customer.create({
+        data: { cpf: strippedCpf, establishmentId, name: '(não cadastrado)', phone: '', registered: false },
+      });
+      stubCreated = true;
+    } catch (err) {
+      // Two concurrent accruals for the same brand-new CPF: the loser hits the
+      // unique constraint instead of a stale null read — use the winner's row.
+      if (err.code === 'P2002') {
+        customer = await prisma.customer.findUnique({
+          where: { cpf_establishmentId: { cpf: strippedCpf, establishmentId } },
+        });
+        if (!customer) throw createError('Cliente não encontrado após conflito de criação simultânea. Tente novamente.', 409);
+      } else {
+        throw err;
+      }
+    }
   }
 
   const { cashbackValue, effectivePercent } = await computeCashback(parsedAmount, fuelType, liters, establishmentId);
   await fraudService.checkTransaction(strippedCpf, parsedAmount, cashbackValue, establishmentId);
 
   const receiptCode = generateReceiptCode('PST');
-  const [transaction] = await prisma.$transaction([
-    prisma.transaction.create({
-      data: {
-        customerId:      customer.id,
-        operatorId,
-        establishmentId,
-        amount:          parsedAmount,
-        cashbackPercent: effectivePercent,
-        cashbackValue,
-        receiptCode,
-        fuelType:        fuelType || null,
-        liters:          liters ? parseFloat(liters) : null,
-        source:          'PISTA',
-        status:          'CONFIRMED',
-        attendantId:     resolvedAttendantId,
-        metadata:        { pista: true, bomba: bomba || null, frentista: frentista || null },
-      },
-    }),
-    prisma.customer.update({ where: { id: customer.id }, data: { balance: { increment: cashbackValue } } }),
-  ]);
+  let transaction;
+  try {
+    [transaction] = await prisma.$transaction([
+      prisma.transaction.create({
+        data: {
+          customerId:      customer.id,
+          operatorId,
+          establishmentId,
+          amount:          parsedAmount,
+          cashbackPercent: effectivePercent,
+          cashbackValue,
+          receiptCode,
+          fuelType:        fuelType || null,
+          liters:          liters ? parseFloat(liters) : null,
+          source:          'PISTA',
+          status:          'CONFIRMED',
+          attendantId:     resolvedAttendantId,
+          metadata:        { pista: true, bomba: bomba || null, frentista: frentista || null },
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        },
+      }),
+      prisma.customer.update({ where: { id: customer.id }, data: { balance: { increment: cashbackValue } } }),
+    ]);
+  } catch (err) {
+    // Race: a concurrent call with the same idempotencyKey won the insert
+    // between our check above and this one.
+    if (err.code === 'P2002' && idempotencyKey) {
+      const existing = await prisma.transaction.findUnique({
+        where: { establishmentId_idempotencyKey: { establishmentId, idempotencyKey } },
+        include: { customer: true, attendant: true },
+      });
+      if (existing) {
+        if (existing.customer.cpf !== strippedCpf) {
+          throw createError('Conflito de identificador de requisição.', 409);
+        }
+        return buildAccrualReplayResult(existing);
+      }
+    }
+    throw err;
+  }
 
-  const updated = await prisma.customer.findUnique({ where: { id: customer.id } });
-  const newBalance = parseFloat(updated.balance);
+  // The $transaction above already committed (Transaction created, balance
+  // credited) — everything below is best-effort. A transient failure here
+  // must NOT throw out of accrueByCpf(), or a caller (e.g. accrueFromFueling)
+  // that releases its own claim on any exception from accrueByCpf() would
+  // treat an already-committed credit as if it never happened, and a retry
+  // would double-credit cashback for the same fueling.
+  let newBalance;
+  let balanceVerified = false;
+  for (let attempt = 1; attempt <= 3 && !balanceVerified; attempt++) {
+    try {
+      const updated = await prisma.customer.findUnique({ where: { id: customer.id } });
+      newBalance = parseFloat(updated.balance);
+      balanceVerified = true;
+    } catch (err) {
+      console.error(`[pistaService] Falha ao reler saldo após acúmulo (tentativa ${attempt}/3, transação ${transaction.id} já confirmada):`, err.message);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+  if (!balanceVerified) {
+    newBalance = Math.round((parseFloat(customer.balance) + cashbackValue) * 100) / 100;
+  }
 
-  await audit.log({
-    action: 'PISTA_ACCRUAL', entity: 'Transaction', entityId: transaction.id, operatorId,
-    metadata: { cpf: strippedCpf, amount: parsedAmount, cashbackValue, fuelType: fuelType || null, bomba: bomba || null, stubCreated, establishmentId },
-  });
+  try {
+    await audit.log({
+      action: 'PISTA_ACCRUAL', entity: 'Transaction', entityId: transaction.id, operatorId,
+      metadata: { cpf: strippedCpf, amount: parsedAmount, cashbackValue, fuelType: fuelType || null, bomba: bomba || null, stubCreated, establishmentId },
+    });
+  } catch (err) {
+    console.error(`[pistaService] Falha ao registrar auditoria do acúmulo (transação ${transaction.id} já confirmada):`, err.message);
+  }
 
   const reference = bomba ? `${formatBRL(parsedAmount)} - ${bomba}` : formatBRL(parsedAmount);
-  const comprovante = receiptService.generateComprovante({
-    type: 'acumulo', controlNumber: receiptCode, date: transaction.createdAt,
-    frentista, customerName: customer.name, cpf: customer.cpf,
-    value: cashbackValue, balance: newBalance, reference,
-  });
+  let comprovante;
+  try {
+    comprovante = receiptService.generateComprovante({
+      type: 'acumulo', controlNumber: receiptCode, date: transaction.createdAt,
+      frentista, customerName: customer.name, cpf: customer.cpf,
+      value: cashbackValue, balance: newBalance, reference,
+    });
+  } catch (err) {
+    console.error(`[pistaService] Falha ao gerar comprovante do acúmulo (transação ${transaction.id} já confirmada):`, err.message);
+    comprovante = null;
+  }
 
   return {
     mensagem: 'Cashback acumulado com sucesso.',
@@ -226,38 +349,69 @@ async function confirmRequest(operator, requestId, { amount, note, attendantId }
   });
   if (claim.count === 0) throw createError('Esta solicitação já foi resolvida.', 409);
 
+  let result;
   try {
     const customer = await prisma.customer.findUnique({ where: { id: reqRow.customerId } });
     if (!customer) throw createError('Cliente não encontrado.', 404);
 
     const finalAmount = amount != null ? parseFloat(amount) : parseFloat(reqRow.amount);
 
-    // Enforces MIN_REDEMPTION_AMOUNT, MAX_DAILY_REDEMPTION, COOLDOWN, fraud, balance + audit
-    const result = await redemptionService.redeem(
-      { cpf: customer.cpf, amount: finalAmount, source: 'PISTA', attendantId: resolvedAttendantId, metadata: { note: note || null, frentista: frentista || null, requestId } },
+    // Enforces MIN_REDEMPTION_AMOUNT, MAX_DAILY_REDEMPTION, COOLDOWN, fraud, balance + audit.
+    // idempotencyKey=requestId: redeem() is keyed to THIS request, so releasing
+    // the claim and retrying below is always safe — a retry either finds
+    // nothing (redeem() never committed) and proceeds fresh, or finds the
+    // already-CONFIRMED redemption and returns it instead of reprocessing.
+    // Safety no longer depends on inferring, from which line threw, whether
+    // anything committed.
+    result = await redemptionService.redeem(
+      { cpf: customer.cpf, amount: finalAmount, source: 'PISTA', attendantId: resolvedAttendantId, metadata: { note: note || null, frentista: frentista || null, requestId }, idempotencyKey: requestId },
       operator,
     );
+  } catch (err) {
+    if (err.needsManualReview) {
+      // redeem() detected a negative-balance race and tried to compensate,
+      // but the compensation itself failed — the CUSTOMER'S BALANCE may still
+      // be wrong and needs manual reconciliation directly. The request itself
+      // is still safe to release: a retry with the same idempotencyKey will
+      // just find and return the existing (still CONFIRMED) redemption.
+      console.error(`[pistaService] Solicitação ${requestId} requer verificação manual de saldo (compensação falhou):`, err.message);
+    }
+    // Safe to release the claim regardless of what failed — see comment above
+    // the redeem() call. A retry can never double-debit now.
+    await prisma.redemptionRequest.update({
+      where: { id: requestId },
+      data: { status: 'PENDING', operatorId: null, attendantId: null, resolvedAt: null },
+    }).catch((releaseErr) => {
+      console.error(`[pistaService] Falha ao liberar a solicitação ${requestId} de volta para PENDING:`, releaseErr.message);
+    });
+    throw err;
+  }
 
+  // redeem() already committed (balance debited, Redemption row created) — a
+  // failure past this point must NOT reset the request to PENDING, or a retry
+  // would call redeem() again and double-debit the customer. Best-effort only.
+  try {
     await prisma.redemptionRequest.update({
       where: { id: requestId },
       data: { redemptionId: result.resgate.id, note: note || null },
     });
+  } catch (err) {
+    console.error(`[pistaService] Falha ao vincular redemptionId à solicitação ${requestId} (resgate ${result.resgate.id} já confirmado):`, err.message);
+  }
 
-    const comprovante = receiptService.generateComprovante({
+  let comprovante;
+  try {
+    comprovante = receiptService.generateComprovante({
       type: 'resgate', controlNumber: result.resgate.codigoCupom, date: result.resgate.createdAt,
       frentista, customerName: result.resgate.clienteNome, cpf: result.resgate.cpf,
       value: result.resgate.valorNum, balance: result.resgate.novoSaldoNum, reference: note || null,
     });
-
-    return { mensagem: 'Resgate confirmado.', resgate: result.resgate, comprovante };
   } catch (err) {
-    // Redemption failed after claiming the request — release the claim so it can be retried.
-    await prisma.redemptionRequest.update({
-      where: { id: requestId },
-      data: { status: 'PENDING', operatorId: null, attendantId: null, resolvedAt: null },
-    }).catch(() => {});
-    throw err;
+    console.error(`[pistaService] Falha ao gerar comprovante do resgate ${requestId} (resgate ${result.resgate.id} já confirmado):`, err.message);
+    comprovante = null;
   }
+
+  return { mensagem: 'Resgate confirmado.', resgate: result.resgate, comprovante };
 }
 
 // Pista (operator): cancel a pending request
@@ -412,6 +566,12 @@ async function accrueFromFueling(operator, { abastecimentoId, cpf }) {
   if (!ab || ab.establishmentId !== establishmentId) throw createError('Abastecimento não encontrado.', 404);
   if (ab.cashbackTransactionId || ab.cashbackAppliedAt) throw createError('Este abastecimento já gerou cashback.', 409);
 
+  // Resolved BEFORE the claim: it's a read-only lookup, so if it throws
+  // (transient DB error) nothing has been claimed yet and there's nothing to
+  // roll back — doing this after the claim would strand the fueling forever
+  // (claimed but never accrued, permanently failing the guard above on retry).
+  const attendant = ab.identfidCode ? await pistaMaps.resolveAttendant(establishmentId, ab.identfidCode) : null;
+
   // Atomically claim this fueling so two concurrent requests for the same
   // abastecimentoId can't both pass the "not yet accrued" check above and
   // double-credit cashback before either write-back lands.
@@ -421,28 +581,41 @@ async function accrueFromFueling(operator, { abastecimentoId, cpf }) {
   });
   if (claim.count === 0) throw createError('Este abastecimento já gerou cashback.', 409);
 
-  const attendant = ab.identfidCode ? await pistaMaps.resolveAttendant(establishmentId, ab.identfidCode) : null;
-
+  let result;
   try {
-    const result = await accrueByCpf(
+    // idempotencyKey=abastecimentoId: accrueByCpf() is keyed to THIS fueling,
+    // so releasing the claim and retrying below is always safe — a retry
+    // either finds nothing (accrueByCpf() never committed) and proceeds
+    // fresh, or finds the already-CONFIRMED transaction and returns it
+    // instead of double-crediting.
+    result = await accrueByCpf(
       {
         cpf, amount: parseFloat(ab.totalValue), fuelType: ab.fuelName || undefined,
         liters: parseFloat(ab.volumeLiters), bomba: `Bico ${ab.nozzleCode}`, attendantId: attendant?.id,
+        idempotencyKey: abastecimentoId,
       },
       operator,
     );
+  } catch (err) {
+    await prisma.abastecimento.update({ where: { id: ab.id }, data: { cashbackAppliedAt: null } }).catch((releaseErr) => {
+      console.error(`[pistaService] Falha ao liberar o abastecimento ${ab.id}:`, releaseErr.message);
+    });
+    throw err;
+  }
 
+  // accrueByCpf already committed (Transaction created, balance credited) — a
+  // failure past this point must NOT release the claim, or a retry would call
+  // accrueByCpf again and double-credit cashback for the same fueling.
+  try {
     await prisma.abastecimento.update({
       where: { id: ab.id },
       data: { cashbackTransactionId: result.transacao.id, cashbackCpf: stripCpf(cpf), cashbackAppliedAt: new Date() },
     });
-
-    return { ...result, abastecimentoId: ab.id };
   } catch (err) {
-    // Accrual failed after claiming — release the claim so the fueling can be retried.
-    await prisma.abastecimento.update({ where: { id: ab.id }, data: { cashbackAppliedAt: null } }).catch(() => {});
-    throw err;
+    console.error(`[pistaService] Falha ao vincular cashbackTransactionId ao abastecimento ${ab.id} (transação ${result.transacao.id} já criada):`, err.message);
   }
+
+  return { ...result, abastecimentoId: ab.id };
 }
 
 module.exports = {

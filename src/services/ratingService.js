@@ -36,17 +36,28 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
 
   if (transactionId) {
     // Make sure it belongs to this customer/establishment and hasn't been rated
-    // yet, then use the TRANSACTION's own attendantName as the source of truth
-    // (ignoring whatever attendantCode/attendantName the client sent).
+    // yet, then use the TRANSACTION's own attendant reference as the source of
+    // truth (ignoring whatever attendantCode/attendantName the client sent).
+    // PISTA-sourced transactions never populate attendantName, only the
+    // attendantId FK — fall back to that. Deliberately NOT falling back to
+    // metadata.frentista: that's just the shared operator login's display
+    // name when no individual frentista was resolved, and rating would then
+    // attach to that shared login instead of a real attendant or a clean
+    // "not identified" rejection.
     const transaction = await prisma.transaction.findUnique({
       where:  { id: transactionId },
-      select: { customerId: true, establishmentId: true, attendantName: true },
+      select: {
+        customerId: true, establishmentId: true, attendantName: true,
+        attendant: { select: { attendantKey: true } },
+      },
     });
     if (!transaction || transaction.customerId !== customerId
         || transaction.establishmentId !== establishmentId) {
       throw createError('Abastecimento não encontrado.', 404);
     }
-    if (!transaction.attendantName) {
+
+    const rawAttendantRef = transaction.attendantName || transaction.attendant?.attendantKey;
+    if (!rawAttendantRef) {
       throw createError('Este abastecimento não tem um atendente identificado.', 400);
     }
 
@@ -56,7 +67,7 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
     });
     if (existing) throw createError('Este abastecimento já foi avaliado.', 409);
 
-    attendantKey = attendantService.norm(transaction.attendantName);
+    attendantKey = attendantService.norm(rawAttendantRef);
   } else {
     // No transaction reference: only allow rating an attendant that genuinely
     // exists for this establishment (registered, or seen on a real transaction).

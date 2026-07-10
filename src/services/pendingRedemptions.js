@@ -33,6 +33,10 @@ function markUsed(code) {
   usedCodes.set(code, Date.now());
 }
 
+function unmarkUsed(code) {
+  usedCodes.delete(code);
+}
+
 /**
  * Returns true if this code was already successfully redeemed
  * (within the last hour — helps detect duplicate scan fraud).
@@ -64,4 +68,4 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-module.exports = { set, get, del, expiresAt, markUsed, wasUsed };
+module.exports = { set, get, del, expiresAt, markUsed, wasUsed, unmarkUsed };

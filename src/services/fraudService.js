@@ -33,10 +33,20 @@ async function getSettings(establishmentId) {
 
   if (existing) return existing;
 
-  // Create with all defaults on first access
-  return prisma.fraudSettings.create({
-    data: { establishmentId },
-  });
+  // Create with all defaults on first access. checkTransaction/checkRedemption
+  // call this on every transaction, so a brand-new establishment's first
+  // concurrent requests can race here — the establishmentId unique
+  // constraint is the real guard; on a P2002 just fetch what the winner created.
+  try {
+    return await prisma.fraudSettings.create({
+      data: { establishmentId },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return prisma.fraudSettings.findUnique({ where: { establishmentId } });
+    }
+    throw err;
+  }
 }
 
 // ── 2. updateSettings ─────────────────────────────────────────────────────────

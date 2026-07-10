@@ -68,4 +68,20 @@ const registerLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter, redemptionLimiter, nfceLimiter, registerLimiter };
+/**
+ * OTP send/verify limiter — same budget as password login (10/15min).
+ * Previously these endpoints only had the generic apiLimiter (200/15min,
+ * shared across the whole /app surface), far weaker than what a comparable
+ * credential-guessing risk (password login) already gets.
+ */
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    erro: 'Muitas tentativas. Tente novamente em 15 minutos.',
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, redemptionLimiter, nfceLimiter, registerLimiter, otpLimiter };

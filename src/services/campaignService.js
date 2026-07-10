@@ -95,7 +95,30 @@ async function preview({ filterType, filterPeriod, rewardType, rewardValue }, es
   };
 }
 
+// In-process mutex: create() has no DB-level idempotency key to rely on (no
+// natural one exists for a bulk operator action), so the duplicate-submission
+// guard below is a check-then-act read that a truly concurrent second request
+// (double-click, slow connection firing the POST twice) can still race past
+// before either commits. This serializes campaign creation per establishment
+// — consistent with the same in-process-mutex assumption pendingRedemptions.js
+// already relies on elsewhere in this codebase (single Node process).
+const campaignCreationInFlight = new Set();
+
 async function create({ name, filterType, filterPeriod, rewardType, rewardValue, message }, operator) {
+  const { id: operatorId, establishmentId } = operator;
+
+  if (campaignCreationInFlight.has(establishmentId)) {
+    throw createError('Já existe uma criação de campanha em andamento para este estabelecimento. Aguarde alguns segundos e tente novamente.', 409);
+  }
+  campaignCreationInFlight.add(establishmentId);
+  try {
+    return await createInternal({ name, filterType, filterPeriod, rewardType, rewardValue, message }, operator);
+  } finally {
+    campaignCreationInFlight.delete(establishmentId);
+  }
+}
+
+async function createInternal({ name, filterType, filterPeriod, rewardType, rewardValue, message }, operator) {
   const { id: operatorId, establishmentId } = operator;
 
   if (!name || !name.trim()) {
@@ -122,6 +145,39 @@ async function create({ name, filterType, filterPeriod, rewardType, rewardValue,
     throw createError('Mensagem da campanha é obrigatória.', 400);
   }
 
+  // Duplicate-submission guard: create() has no client-supplied idempotency
+  // key, and a FIXED-reward campaign bulk-credits every matched customer's
+  // balance and enqueues a WhatsApp message to each of them — an operator
+  // re-clicking "criar campanha" after seeing an error (see the post-commit
+  // handling below) would otherwise double-credit and double-message every
+  // customer at once, a much larger blast radius than any single-customer
+  // flow. An identical resubmission (same filters/reward/message) within a
+  // short window is treated as a duplicate and returns the original result.
+  const CAMPAIGN_DUPLICATE_WINDOW_MS = 60 * 1000;
+  const recentDuplicate = await prisma.campaign.findFirst({
+    where: {
+      establishmentId, name: name.trim(), filterType, filterPeriod, rewardType,
+      rewardValue: parsedValue, message: message.trim(),
+      createdAt: { gte: new Date(Date.now() - CAMPAIGN_DUPLICATE_WINDOW_MS) },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (recentDuplicate) {
+    return {
+      mensagem: 'Campanha criada! As mensagens serão enviadas em breve.',
+      clientesAtingidos: recentDuplicate.customerCount,
+      mensagensNaFila:   recentDuplicate.customerCount,
+      previsaoEnvio:     null,
+      campanha: {
+        id: recentDuplicate.id,
+        totalClientes: recentDuplicate.customerCount,
+        custoTotal: formatBRL(recentDuplicate.totalCost),
+        status: recentDuplicate.status,
+        criadaEm: formatDateBR(recentDuplicate.createdAt),
+      },
+    };
+  }
+
   const [customers, establishment] = await Promise.all([
     getFilteredCustomers(filterType, filterPeriod, establishmentId),
     prisma.establishment.findUnique({ where: { id: establishmentId }, select: { name: true } }),
@@ -133,53 +189,69 @@ async function create({ name, filterType, filterPeriod, rewardType, rewardValue,
 
   const totalCost = rewardType === 'FIXED' ? parsedValue * customers.length : 0;
 
-  // Create campaign record
-  const campaign = await prisma.campaign.create({
-    data: {
-      establishmentId,
-      operatorId,
-      name: name.trim(),
-      filterType,
-      filterPeriod,
-      rewardType,
-      rewardValue: parsedValue,
-      message: message.trim(),
-      customerCount: customers.length,
-      totalCost,
-      status: 'SENT',
-    },
+  // Campaign row + FIXED-reward credits committed atomically: previously
+  // these were two separate writes, so a failure in the credit step left an
+  // orphaned Campaign row behind — which the duplicate-guard above would
+  // then treat as proof the campaign "already succeeded" on any retry,
+  // silently masking that zero customers were ever credited.
+  const campaign = await prisma.$transaction(async (tx) => {
+    const camp = await tx.campaign.create({
+      data: {
+        establishmentId,
+        operatorId,
+        name: name.trim(),
+        filterType,
+        filterPeriod,
+        rewardType,
+        rewardValue: parsedValue,
+        message: message.trim(),
+        customerCount: customers.length,
+        totalCost,
+        status: 'SENT',
+      },
+    });
+
+    if (rewardType === 'FIXED') {
+      await Promise.all(
+        customers.map((c) =>
+          tx.customer.update({
+            where: { id: c.id },
+            data: { balance: { increment: parsedValue } },
+          })
+        )
+      );
+    }
+
+    return camp;
   });
 
-  // FIXED: credit each customer's balance immediately
-  if (rewardType === 'FIXED') {
-    await prisma.$transaction(
+  // Everything below is best-effort: the campaign row is created and (for
+  // FIXED rewards) every customer's balance already credited above — a
+  // failure past this point must not throw, or the caller would see an error
+  // for an action that already moved money for potentially hundreds of
+  // customers, and might retry (the duplicate guard above only catches a
+  // retry with identical filters/reward/message — this avoids relying on it).
+  try {
+    await Promise.all(
       customers.map((c) =>
-        prisma.customer.update({
-          where: { id: c.id },
-          data: { balance: { increment: parsedValue } },
+        audit.log({
+          action: 'CAMPAIGN_REWARD_APPLIED',
+          entity: 'Campaign',
+          entityId: campaign.id,
+          operatorId,
+          metadata: {
+            customerId: c.id,
+            rewardType,
+            rewardValue: parsedValue,
+            campaignId: campaign.id,
+            establishmentId,
+          },
         })
       )
     );
+  } catch (err) {
+    console.error(`[campaignService] Falha ao registrar auditoria da campanha ${campaign.id} (recompensas já aplicadas):`, err.message);
   }
-
-  // Audit each reward
-  await Promise.all(
-    customers.map((c) =>
-      audit.log({
-        action: 'CAMPAIGN_REWARD_APPLIED',
-        entity: 'Campaign',
-        entityId: campaign.id,
-        operatorId,
-        metadata: {
-          customerId: c.id,
-          rewardType,
-          rewardValue: parsedValue,
-          campaignId: campaign.id,
-          establishmentId,
-        },
-      })
-    )
-  );
 
   // Enqueue WhatsApp messages — controlled delivery at 3–6 s intervals
   const queueMessages = customers.map((c) => ({
@@ -192,8 +264,13 @@ async function create({ name, filterType, filterPeriod, rewardType, rewardValue,
     priority:     0,
   }));
 
-  const queueResult = await messageQueueService.addToQueue(queueMessages);
-  console.log(`[CAMPANHA] ${queueResult.queued} mensagens adicionadas à fila. Previsão: ${queueResult.previsao}`);
+  let queueResult = { queued: 0, previsao: null };
+  try {
+    queueResult = await messageQueueService.addToQueue(queueMessages);
+    console.log(`[CAMPANHA] ${queueResult.queued} mensagens adicionadas à fila. Previsão: ${queueResult.previsao}`);
+  } catch (err) {
+    console.error(`[campaignService] Falha ao enfileirar mensagens da campanha ${campaign.id} (recompensas já aplicadas):`, err.message);
+  }
 
   return {
     mensagem: 'Campanha criada! As mensagens serão enviadas em breve.',

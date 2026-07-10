@@ -48,6 +48,7 @@ export default function SelfieScreen() {
     cpf:   string;
     phone: string;
     cnpj:  string;
+    recoveryToken: string;
   }>();
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -151,6 +152,7 @@ export default function SelfieScreen() {
             cpf:               stripCpf(params.cpf ?? ''),
             establishmentCnpj: (params.cnpj ?? '').replace(/\D/g, ''),
             deviceId,
+            recoveryToken: params.recoveryToken ?? '',
             selfieThumb: base64Clean,
             selfieFull:  base64Clean,
           }),

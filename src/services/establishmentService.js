@@ -238,33 +238,54 @@ async function createFromStripe({
 
   const hashedPassword = await bcrypt.hash(operatorPassword, 10);
 
-  const { est, op } = await prisma.$transaction(async (tx) => {
-    const est = await tx.establishment.create({
-      data: {
-        name:                 nome.trim(),
-        cnpj:                 cleanCnpj,
-        cashbackPercent:      5,
-        phone:                telefone?.trim() || null,
-        stripeCustomerId,
-        stripeSubscriptionId,
-        subscriptionStatus:   'ACTIVE',
-      },
-    });
+  let est, op;
+  try {
+    ({ est, op } = await prisma.$transaction(async (tx) => {
+      const est = await tx.establishment.create({
+        data: {
+          name:                 nome.trim(),
+          cnpj:                 cleanCnpj,
+          cashbackPercent:      5,
+          phone:                telefone?.trim() || null,
+          stripeCustomerId,
+          stripeSubscriptionId,
+          subscriptionStatus:   'ACTIVE',
+        },
+      });
 
-    const op = await tx.operator.create({
-      data: {
-        name:            (operatorName || nome).trim(),
-        email:           cleanEmail,
-        password:        hashedPassword,
-        role:            'ADMIN',
-        establishmentId: est.id,
-      },
-    });
+      const op = await tx.operator.create({
+        data: {
+          name:            (operatorName || nome).trim(),
+          email:           cleanEmail,
+          password:        hashedPassword,
+          role:            'ADMIN',
+          establishmentId: est.id,
+        },
+      });
 
-    await tx.fraudSettings.create({ data: { establishmentId: est.id } });
+      await tx.fraudSettings.create({ data: { establishmentId: est.id } });
 
-    return { est, op };
-  });
+      return { est, op };
+    }));
+  } catch (err) {
+    // A truly concurrent double-submit (e.g. a double-click) can race past
+    // the existingEst/existingOp check above before either commits — since
+    // both requests reuse the same Stripe idempotency key when a
+    // subscriptionId is involved, this is the SAME logical signup, not two
+    // different ones. Treat the loser as a no-op instead of surfacing a raw
+    // conflict for a signup that, from the customer's perspective, worked.
+    if (err.code === 'P2002' && stripeSubscriptionId) {
+      const winner = await prisma.establishment.findFirst({ where: { stripeSubscriptionId } });
+      if (winner) {
+        const winnerOp = await prisma.operator.findFirst({ where: { establishmentId: winner.id } });
+        // alreadyExisted=true tells the caller NOT to send/return `password`
+        // — it was generated locally by the losing request and does not
+        // match the winner's actual (already-emailed) password.
+        return { est: winner, op: winnerOp, alreadyExisted: true };
+      }
+    }
+    throw err;
+  }
 
   await audit.log({
     action:   'ESTABLISHMENT_CREATED_STRIPE',
@@ -273,7 +294,7 @@ async function createFromStripe({
     metadata: { cnpj: cleanCnpj, operatorEmail: cleanEmail, stripeSubscriptionId },
   });
 
-  return { est, op };
+  return { est, op, alreadyExisted: false };
 }
 
 // ── OAuth registration completion ──────────────────────────────────────────────

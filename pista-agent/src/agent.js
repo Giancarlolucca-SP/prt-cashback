@@ -17,11 +17,18 @@ const pkg = require('../package.json');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const HEARTBEAT_INTERVAL_MS = 20000;
+const CONFIG_CHECK_INTERVAL_MS = 60000;
 
 // Updated by the main loop on every connect success/failure; read by the
 // heartbeat timer below. Kept independent of the read loop so a heartbeat
 // still goes out even while the loop is blocked waiting on a slow socket.
 const state = { connected: false, lastError: null };
+
+// Set by startConfigWatcher() when the remote config changes; the read loop
+// checks this and reconnects with the new values instead of requiring someone
+// to manually restart the agent process every time an admin saves a change.
+let configChanged = false;
+let configChangeFlags = {};
 
 function startHeartbeat() {
   const send = () => {
@@ -49,36 +56,51 @@ function validateConfig() {
   }
 }
 
+const CONCENTRADOR_CONFIG_FIELDS = ['host', 'port', 'pollIntervalMs', 'retryIntervalMs', 'socketTimeoutMs', 'useChecksum', 'readMode'];
+
 // Concentrador connection settings (host/port/timeouts/checksum/readMode) are
 // configurable remotely (Painel da Pista → Concentrador) so a station doesn't
-// need someone editing its local .env on every change. Fetched once at
-// startup; falls back to local .env values if the cloud is unreachable or no
-// remote config has been saved yet.
+// need someone editing its local .env on every change. Falls back to local
+// .env values if the cloud is unreachable or no remote config has been saved
+// yet. Reports which *remote* fields actually changed since the last sync —
+// not whether local runtime state (e.g. an auto-learned checksum toggle,
+// which never writes back to `config`) differs from it, or the read loop
+// below would misfire on every unrelated field change too.
 async function loadRemoteConfig() {
   try {
     const res = await cloud.getConcentradorConfig(config.apiUrl, config.agentToken, config.establishmentId);
     if (res.status < 200 || res.status >= 300) {
       log.warn(`Config remota indisponível (HTTP ${res.status}); usando valores locais do .env.`);
-      return;
+      return { changed: false };
     }
     const remote = JSON.parse(res.body).configuracao;
     if (!remote) {
       log.info('Nenhuma configuração remota salva ainda; usando valores locais do .env.');
-      return;
+      return { changed: false };
     }
-    Object.assign(config, {
-      host:            remote.host,
-      port:            remote.port,
-      pollIntervalMs:  remote.pollIntervalMs,
-      retryIntervalMs: remote.retryIntervalMs,
-      socketTimeoutMs: remote.socketTimeoutMs,
-      useChecksum:     remote.useChecksum,
-      readMode:        remote.readMode,
-    });
+    const diffs = {};
+    for (const k of CONCENTRADOR_CONFIG_FIELDS) diffs[k] = remote[k] !== config[k];
+    for (const k of CONCENTRADOR_CONFIG_FIELDS) config[k] = remote[k];
     log.info('Configuração do concentrador carregada da nuvem.', remote);
+    return { changed: Object.values(diffs).some(Boolean), readModeChanged: diffs.readMode, useChecksumChanged: diffs.useChecksum };
   } catch (e) {
     log.warn('Falha ao buscar configuração remota; usando valores locais do .env.', e.message);
+    return { changed: false };
   }
+}
+
+// Re-checks the remote config every ~60s so a change saved from the admin
+// screen takes effect on the next reconnect instead of requiring someone to
+// manually restart the agent process on-site.
+function startConfigWatcher() {
+  return setInterval(async () => {
+    const result = await loadRemoteConfig();
+    if (result.changed) {
+      log.info('Configuração do concentrador mudou na nuvem — reconectando com os novos valores.');
+      configChanged = true;
+      configChangeFlags = result;
+    }
+  }, CONFIG_CHECK_INTERVAL_MS);
 }
 
 function toPayload(f) {
@@ -115,26 +137,30 @@ async function pushToCloud(f) {
 async function runLoop() {
   validateConfig();
   await loadRemoteConfig();
-  const identified = config.readMode === 'identified';
   log.info('Agente da Pista iniciando', {
     concentrador: `${config.host}:${config.port}`,
     api: config.apiUrl,
     establishmentId: config.establishmentId,
     readMode: config.readMode,
-    comando: identified ? '(&A67)' : '(&A)',
   });
   log.info(`Fila local pendente: ${queue.pendingCount()} abastecimento(s).`);
   startHeartbeat();
+  startConfigWatcher();
 
-  // Identified read uses the checksummed command "(&A67)". Plain read starts
-  // without checksum and toggles on if the concentrator ignores "(&A)".
+  // Declared outside the outer loop so a learned checksum requirement (see
+  // the plain-mode fallback below) survives ordinary reconnects (socket
+  // errors) instead of being rediscovered — with its failed round-trip and
+  // warning log — every single time. Only reset when the remote config's
+  // readMode itself actually changes.
+  let identified = config.readMode === 'identified';
   let useChecksum = identified ? true : config.useChecksum;
 
   // Outer loop: (re)connect forever
   while (true) {
     const conc = new Concentrator({ host: config.host, port: config.port, timeoutMs: config.socketTimeoutMs });
+    let reconnectRequested = false;
     try {
-      log.step(`Conectando ao concentrador ${config.host}:${config.port}…`);
+      log.step(`Conectando ao concentrador ${config.host}:${config.port}… (comando ${identified ? '(&A67)' : '(&A)'})`);
       await conc.connect();
       log.info('Conectado ao concentrador.');
       state.connected = true;
@@ -150,6 +176,26 @@ async function runLoop() {
 
       // Inner loop: read -> push -> increment
       while (true) {
+        if (configChanged) {
+          configChanged = false;
+          reconnectRequested = true;
+          const { readModeChanged, useChecksumChanged } = configChangeFlags;
+          if (readModeChanged) {
+            // readMode itself changed — recompute from scratch.
+            identified = config.readMode === 'identified';
+            useChecksum = identified ? true : config.useChecksum;
+          } else if (!identified && useChecksumChanged) {
+            // Still plain mode, but the admin explicitly changed the checksum
+            // setting remotely — apply it (overrides any auto-learned toggle).
+            // A host/port/timeout-only change leaves the learned value alone
+            // (checked against what actually changed remotely, not against
+            // the local runtime-learned value, which never syncs back to
+            // `config` and would otherwise misfire on any unrelated field).
+            useChecksum = config.useChecksum;
+          }
+          break;
+        }
+
         let content;
         try {
           content = await conc.sendCommand(proto.CMD.READ_FUELING, { withChecksum: useChecksum });
@@ -222,6 +268,11 @@ async function runLoop() {
       state.lastError = e.message;
       conc.close();
       await sleep(config.retryIntervalMs);
+      continue;
+    }
+    conc.close();
+    if (reconnectRequested) {
+      log.info('Configuração do concentrador foi atualizada — reconectando com os novos valores.');
     }
   }
 }

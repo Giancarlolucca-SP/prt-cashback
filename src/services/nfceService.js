@@ -656,7 +656,12 @@ async function validateNfce(qrCodeUrl, customerId, establishmentId) {
   const receiptCode = generateReceiptCode('NFC');
   console.log(`[NFCE] Criando transação — customerId=${customer.id} establishmentId=${establishmentId} valor=${nfce.valorTotal} cashback=${cashbackValue}`);
 
-  const [transaction] = await prisma.$transaction([
+  // The customer.update below already returns the post-increment row, so
+  // reusing it (instead of a separate findUnique after the transaction
+  // commits) removes an unprotected post-commit read that could otherwise
+  // throw — and with it, the null-check risk on that read's result — after
+  // the cashback has already been credited.
+  const [transaction, updated] = await prisma.$transaction([
     prisma.transaction.create({
       data: {
         customerId:       customer.id,
@@ -682,22 +687,27 @@ async function validateNfce(qrCodeUrl, customerId, establishmentId) {
     }),
   ]);
 
-  const updated = await prisma.customer.findUnique({ where: { id: customer.id } });
-
-  await audit.log({
-    action:     'NFCE_CASHBACK_EARNED',
-    entity:     'Transaction',
-    entityId:   transaction.id,
-    operatorId: operator.id,
-    metadata: {
-      chaveAcesso:     nfce.chaveAcesso,
-      cnpj:            nfce.cnpj,
-      valorNota:       nfce.valorTotal,
-      cashbackGerado:  cashbackValue,
-      tipoCombustivel: nfce.tipoCombustivel,
-      customerId:      customer.id,
-    },
-  });
+  // Best-effort: the transaction above already committed (cashback credited)
+  // — a failure here must not surface as an error for an operation that
+  // already succeeded.
+  try {
+    await audit.log({
+      action:     'NFCE_CASHBACK_EARNED',
+      entity:     'Transaction',
+      entityId:   transaction.id,
+      operatorId: operator.id,
+      metadata: {
+        chaveAcesso:     nfce.chaveAcesso,
+        cnpj:            nfce.cnpj,
+        valorNota:       nfce.valorTotal,
+        cashbackGerado:  cashbackValue,
+        tipoCombustivel: nfce.tipoCombustivel,
+        customerId:      customer.id,
+      },
+    });
+  } catch (err) {
+    console.error(`[nfceService] Falha ao registrar auditoria do acúmulo (transação ${transaction.id} já confirmada):`, err.message);
+  }
 
   return {
     mensagem: 'Cashback gerado com sucesso via NFC-e!',

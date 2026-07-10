@@ -14,7 +14,7 @@ import { useAuthStore } from '../../src/store/auth';
 import { maskPhone } from '../../src/utils/formatters';
 
 // Navigate to selfie with full params
-function goToSelfie(mode: string, params: Record<string, string>) {
+function goToSelfie(mode: string, params: Record<string, string>, recoveryToken?: string) {
   router.push({
     pathname: '/(auth)/selfie',
     params: {
@@ -23,6 +23,7 @@ function goToSelfie(mode: string, params: Record<string, string>) {
       cpf:   params.cpf   ?? '',
       phone: params.phone ?? '',
       cnpj:  params.cnpj  ?? '',
+      recoveryToken: recoveryToken ?? '',
     },
   });
 }
@@ -65,10 +66,10 @@ export default function OtpScreen() {
         code,
         establishmentCnpj: (params.cnpj ?? '').replace(/\D/g, ''),
       }),
-    onSuccess: async () => {
+    onSuccess: async ({ data: verifyData }) => {
       if (params.mode === 'recovery') {
         // Recovery always goes to selfie for identity re-verification
-        goToSelfie('recovery', params as Record<string, string>);
+        goToSelfie('recovery', params as Record<string, string>, verifyData.recoveryToken);
         return;
       }
 
@@ -88,7 +89,7 @@ export default function OtpScreen() {
               `Olá, ${data.nome}! Encontramos sua conta. Vamos confirmar sua identidade para restaurar o acesso.`,
               [{
                 text: 'Continuar',
-                onPress: () => goToSelfie('recovery', { ...params as Record<string, string>, nome: data.nome }),
+                onPress: () => goToSelfie('recovery', { ...params as Record<string, string>, nome: data.nome }, verifyData.recoveryToken),
               }],
             );
           } else {

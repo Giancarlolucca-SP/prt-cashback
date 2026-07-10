@@ -863,6 +863,7 @@ function ConcentradorTab() {
     const poll = () => pistaAPI.concentradorConfig().then((r) => {
       const c = r.data.configuracao;
       setStatus({ lastHeartbeatAt: c.lastHeartbeatAt, lastHeartbeatOk: c.lastHeartbeatOk, lastError: c.lastError, agentVersion: c.agentVersion });
+      setError('');
       if (isFirstLoad) { setForm(c); isFirstLoad = false; }
     }).catch(() => { if (isFirstLoad) setError('Não foi possível carregar a configuração.'); });
     poll();
@@ -907,7 +908,7 @@ function ConcentradorTab() {
     <div className="space-y-4 max-w-2xl">
       <p className="text-sm text-gray-500">
         Conexão TCP do <b>agente da pista</b> com o concentrador Companytec. O agente busca esta
-        configuração da nuvem ao iniciar — reinicie o agente na máquina do posto após salvar.
+        configuração da nuvem e aplica mudanças automaticamente em até ~60s (sem precisar reiniciar).
       </p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {notice && <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-2.5">{notice}</div>}

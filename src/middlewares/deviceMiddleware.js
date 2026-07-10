@@ -6,9 +6,9 @@ const prisma = new PrismaClient();
 /**
  * Validates that the X-Device-Id header matches the device ID stored for this customer.
  *
- * - If the customer has no deviceId stored yet → allow (first use after a legacy registration)
+ * - If the customer has no deviceId stored yet → bind whatever is presented now (first use)
  * - If deviceId matches → allow
- * - If deviceId does NOT match → log FraudAlert and return 403
+ * - If deviceId is missing or does NOT match a stored one → log FraudAlert and return 403
  *
  * Attach after `authenticateCustomer` so `req.customer` is populated.
  */
@@ -18,9 +18,6 @@ async function validateDeviceId(req, res, next) {
 
   if (!customerId) return next(); // No customer payload — other middleware will handle
 
-  // No device ID header sent → skip check (allows older clients to work)
-  if (!headerDeviceId) return next();
-
   try {
     const customer = await prisma.customer.findUnique({
       where:  { id: customerId },
@@ -29,24 +26,33 @@ async function validateDeviceId(req, res, next) {
 
     if (!customer) return next(); // Customer not found — auth middleware will catch
 
-    // No device ID stored yet → bind this device now
+    // No device ID stored yet → bind this device now (first use after a
+    // legacy registration). Only binds when a header is actually present —
+    // an omitted header shouldn't erase the requirement for future requests.
     if (!customer.deviceId) {
-      await prisma.customer.update({
-        where: { id: customerId },
-        data:  { deviceId: headerDeviceId },
-      });
+      if (headerDeviceId) {
+        await prisma.customer.update({
+          where: { id: customerId },
+          data:  { deviceId: headerDeviceId },
+        });
+      }
       return next();
     }
 
     // Device matches → allow
-    if (customer.deviceId === headerDeviceId) return next();
+    if (headerDeviceId && customer.deviceId === headerDeviceId) return next();
 
-    // Mismatch → log fraud alert and block
+    // Missing or mismatched header on an already-bound device → log fraud
+    // alert and block. The header is attached automatically by every current
+    // client (see mobile/src/api/client.ts's request interceptor), so an
+    // absent header on a bound account is itself a signal, not a legacy case
+    // — treating it as "skip the check" let a stolen JWT bypass device
+    // binding entirely just by omitting one header.
     await fraudAlertService.logAlert(
       'WRONG_DEVICE',
       customerId,
       customer.establishmentId,
-      { storedDevice: customer.deviceId, requestDevice: headerDeviceId },
+      { storedDevice: customer.deviceId, requestDevice: headerDeviceId || null },
     );
 
     return res.status(403).json({

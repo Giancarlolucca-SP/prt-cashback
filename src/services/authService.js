@@ -119,11 +119,21 @@ async function findOrCreateOAuthOperator(email, name) {
 
   if (!operator) {
     const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-    operator = await prisma.operator.create({
-      data: { name, email, password: hash, role: 'OPERATOR', establishmentId: null },
-      include: { establishment: true },
-    });
-    isNewUser = true;
+    try {
+      operator = await prisma.operator.create({
+        data: { name, email, password: hash, role: 'OPERATOR', establishmentId: null },
+        include: { establishment: true },
+      });
+      isNewUser = true;
+    } catch (err) {
+      // Two concurrent first-time OAuth logins for the same brand-new email
+      // (double-tap, slow-request retry) can both pass the findUnique above
+      // as null — the loser hits this unique violation instead of crashing.
+      if (err.code === 'P2002') {
+        operator = await prisma.operator.findUnique({ where: { email }, include: { establishment: true } });
+      }
+      if (!operator) throw err;
+    }
   }
 
   const est   = operator.establishment;

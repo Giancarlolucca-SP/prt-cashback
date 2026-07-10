@@ -202,6 +202,7 @@ export const authApi = {
     cpf:              string;
     establishmentCnpj: string;
     deviceId:         string;
+    recoveryToken:    string;
     selfieThumb?:     string;
     selfieFull?:      string;
     selfieBase64?:    string;

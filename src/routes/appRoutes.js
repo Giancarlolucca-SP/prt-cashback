@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const ctrl = require('../controllers/appController');
 const { validateDeviceId } = require('../middlewares/deviceMiddleware');
-const { nfceLimiter, registerLimiter } = require('../middlewares/rateLimitMiddleware');
+const { nfceLimiter, registerLimiter, otpLimiter } = require('../middlewares/rateLimitMiddleware');
 
 // ── Customer auth middleware ───────────────────────────────────────────────────
 
@@ -53,14 +53,14 @@ function authenticateExpiredCustomer(req, res, next) {
 router.get ('/establishment/:id/qrcode-data', ctrl.getEstablishmentQRCodeData);
 
 router.post('/register',              registerLimiter, ctrl.register);
-router.post('/login',                 ctrl.login);
+router.post('/login',                 otpLimiter, ctrl.login);
 router.post('/verify-cpf',            ctrl.verifyCpf);
 router.post('/verify-face',           ctrl.verifyFace);
-router.post('/otp/send',              ctrl.sendOtp);
-router.post('/otp/verify',            ctrl.verifyOtp);
+router.post('/otp/send',              otpLimiter, ctrl.sendOtp);
+router.post('/otp/verify',            otpLimiter, ctrl.verifyOtp);
 router.get ('/config',                ctrl.getConfig);  // public — also works with auth
-router.post('/recovery/lookup',       ctrl.recoveryLookup);
-router.post('/recovery/complete',     ctrl.recoveryComplete);
+router.post('/recovery/lookup',       otpLimiter, ctrl.recoveryLookup);
+router.post('/recovery/complete',     otpLimiter, ctrl.recoveryComplete);
 
 // Validate QR code — no customer auth; the code itself is the credential
 router.post('/redeem/validate',       ctrl.validateRedemption);

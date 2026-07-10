@@ -73,7 +73,14 @@
       "Bash(git tag *)",
       "Bash(git push *)",
       "Bash(npm audit *)",
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "Bash(awk -F/ ' *)",
+      "Bash(git --no-pager diff origin/main..HEAD -- render.yaml)",
+      "Bash(git --no-pager log --oneline -1)",
+      "Bash(command -v gh)",
+      "Bash(echo \"gh path: $\\(command -v gh || echo 'NAO INSTALADO'\\)\")",
+      "Bash(gh --version)",
+      "Bash(gh auth *)"
     ]
   }
 }

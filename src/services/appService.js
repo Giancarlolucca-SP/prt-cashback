@@ -306,6 +306,14 @@ async function validateRedemption({ code, latitude, longitude }) {
 
   // Atomic redemption: SELECT FOR UPDATE locks the customer row so concurrent
   // validations cannot both pass the balance check before either commits.
+  // idempotencyKey=code: a non-operational error (e.g. a connection drop
+  // between Postgres committing and the ack reaching this process) can't be
+  // told apart from "nothing committed" from the exception alone — that
+  // ambiguity is exactly why the redemption is keyed on the code itself
+  // (Redemption.idempotencyKey, unique per establishment). Reviving the code
+  // below is therefore safe even when something DID commit: a retry with the
+  // same code hits the unique constraint and returns the existing redemption
+  // instead of debiting a second time.
   let redemption;
   try {
     redemption = await prisma.$transaction(async (tx) => {
@@ -326,6 +334,7 @@ async function validateRedemption({ code, latitude, longitude }) {
           establishmentId,
           amountUsed:     amount,
           receiptCode:    generateReceiptCode('RDM'),
+          idempotencyKey: code,
         },
       });
 
@@ -337,36 +346,80 @@ async function validateRedemption({ code, latitude, longitude }) {
       return rdm;
     });
   } catch (err) {
-    // Re-throw operational errors (insufficient balance, etc.) as-is
-    throw err;
+    if (err.code === 'P2002') {
+      // A prior attempt with this same code already committed (this is the
+      // revived-code retry path) — return that result instead of debiting
+      // again. The code stays consumed; there's nothing to revive.
+      const existing = await prisma.redemption.findUnique({
+        where: { establishmentId_idempotencyKey: { establishmentId, idempotencyKey: code } },
+      });
+      if (existing) {
+        redemption = existing;
+      } else {
+        throw err;
+      }
+    } else if (!err.isOperational) {
+      // A transient failure (not insufficient balance / customer not found —
+      // those are legitimate rejections and the code should stay consumed).
+      // Nothing was actually debited here, but the code was already consumed
+      // above as a mutex against concurrent double-use — revive it so the
+      // customer isn't permanently stuck with a burned code for money that
+      // never moved. Safe even if this guess is wrong: see comment above.
+      pending.set(code, entry);
+      pending.unmarkUsed(code);
+      throw err;
+    } else {
+      throw err;
+    }
   }
 
-  await audit.log({
-    action:    'CASHBACK_REDEEMED_MOBILE',
-    entity:    'Redemption',
-    entityId:  redemption.id,
-    operatorId: operator.id,
-    metadata:  { customerId, amount, code, establishmentId },
-  });
+  // The $transaction above already committed (Redemption created, balance
+  // debited) — everything below is best-effort. A transient failure here
+  // must NOT throw, or the caller would see an error for a redemption that
+  // already succeeded.
+  try {
+    await audit.log({
+      action:    'CASHBACK_REDEEMED_MOBILE',
+      entity:    'Redemption',
+      entityId:  redemption.id,
+      operatorId: operator.id,
+      metadata:  { customerId, amount, code, establishmentId },
+    });
+  } catch (err) {
+    console.error(`[appService] Falha ao registrar auditoria do resgate ${redemption.id} (já confirmado):`, err.message);
+  }
 
   // Fire push notification (non-blocking)
   notify.notifyRedemptionConfirmed(customerId, { amount }).catch(() => {});
 
   // Daily limit check — alert after 3+ redemptions today
-  const dailyCount = await fraudAlert.checkDailyRedemptions(customerId, establishmentId);
-  if (dailyCount >= 3) {
-    await fraudAlert.logAlert('DAILY_LIMIT_EXCEEDED', customerId, establishmentId, {
-      count: dailyCount,
-      amount,
-    });
+  try {
+    const dailyCount = await fraudAlert.checkDailyRedemptions(customerId, establishmentId);
+    if (dailyCount >= 3) {
+      await fraudAlert.logAlert('DAILY_LIMIT_EXCEEDED', customerId, establishmentId, {
+        count: dailyCount,
+        amount,
+      });
+    }
+  } catch (err) {
+    console.error(`[appService] Falha na checagem de limite diário do resgate ${redemption.id} (já confirmado):`, err.message);
   }
 
-  const updated = await prisma.customer.findUnique({ where: { id: customerId } });
+  let novoSaldo = null;
+  for (let attempt = 1; attempt <= 3 && novoSaldo === null; attempt++) {
+    try {
+      const updated = await prisma.customer.findUnique({ where: { id: customerId } });
+      novoSaldo = formatBRL(updated.balance);
+    } catch (err) {
+      console.error(`[appService] Falha ao reler saldo após o resgate ${redemption.id} (tentativa ${attempt}/3, já confirmado):`, err.message);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 150));
+    }
+  }
 
   return {
     mensagem:       'Resgate processado com sucesso.',
     valorResgatado: formatBRL(amount),
-    novoSaldo:      formatBRL(updated.balance),
+    novoSaldo:      novoSaldo ?? 'indisponível no momento',
     nomeCliente:    name,
   };
 }
@@ -521,6 +574,21 @@ async function sendOtp({ phone, establishmentCnpj }) {
 
 // ── verifyOtp ─────────────────────────────────────────────────────────────────
 
+const RECOVERY_PROOF_EXPIRES = '5m';
+
+// Short-lived proof that the caller just verified an OTP sent to `phone` at
+// `establishmentId`. recoveryComplete() requires this instead of trusting
+// CPF+CNPJ alone — without it, anyone who knows a customer's CPF (printed on
+// receipts, not secret) could call the public recovery endpoint directly and
+// take over the account with no phone possession check at all.
+function signRecoveryProof({ phone, establishmentId }) {
+  return jwt.sign(
+    { phone, establishmentId, purpose: 'recovery' },
+    process.env.JWT_SECRET,
+    { expiresIn: RECOVERY_PROOF_EXPIRES },
+  );
+}
+
 async function verifyOtp({ phone, code, establishmentCnpj }) {
   if (!phone || !code) throw createError('Telefone e código são obrigatórios.', 400);
   if (!establishmentCnpj) throw createError('CNPJ do estabelecimento é obrigatório.', 400);
@@ -531,7 +599,9 @@ async function verifyOtp({ phone, code, establishmentCnpj }) {
   const valid = otpService.verify(rawPhone, establishment.id, String(code));
   if (!valid) throw createError('Código inválido ou expirado.', 400);
 
-  return { mensagem: 'Código verificado com sucesso.', verificado: true };
+  const recoveryToken = signRecoveryProof({ phone: rawPhone, establishmentId: establishment.id });
+
+  return { mensagem: 'Código verificado com sucesso.', verificado: true, recoveryToken };
 }
 
 // ── getConfig ─────────────────────────────────────────────────────────────────
@@ -649,10 +719,11 @@ async function recoveryLookup({ cpf, establishmentCnpj }) {
 // Step 3 of reinstall recovery: called after OTP verified.
 // Binds the new device, optionally updates selfie, issues a fresh token.
 
-async function recoveryComplete({ cpf, establishmentCnpj, deviceId, selfieBase64, selfieThumb, selfieFull }) {
+async function recoveryComplete({ cpf, establishmentCnpj, deviceId, selfieBase64, selfieThumb, selfieFull, recoveryToken }) {
   if (!cpf || !isValidCpf(cpf)) throw createError('CPF inválido.', 400);
   if (!establishmentCnpj)       throw createError('CNPJ do estabelecimento é obrigatório.', 400);
   if (!deviceId)                throw createError('ID do dispositivo é obrigatório.', 400);
+  if (!recoveryToken)           throw createError('Verificação por SMS obrigatória.', 401);
 
   const strippedCpf   = stripCpf(cpf);
   const establishment = await findEstablishment(establishmentCnpj);
@@ -661,6 +732,22 @@ async function recoveryComplete({ cpf, establishmentCnpj, deviceId, selfieBase64
     where: { cpf_establishmentId: { cpf: strippedCpf, establishmentId: establishment.id } },
   });
   if (!customer) throw createError('Cliente não encontrado.', 404);
+
+  // Require proof (minted by verifyOtp) that the caller just demonstrated
+  // control of THIS customer's phone number — CPF alone is not a secret.
+  let proof;
+  try {
+    proof = jwt.verify(recoveryToken, process.env.JWT_SECRET);
+  } catch {
+    throw createError('Verificação por SMS expirada. Solicite um novo código.', 401);
+  }
+  if (
+    proof.purpose !== 'recovery' ||
+    proof.establishmentId !== establishment.id ||
+    proof.phone !== customer.phone
+  ) {
+    throw createError('Verificação por SMS inválida para esta conta.', 403);
+  }
 
   const incomingSelfie = selfieThumb || selfieBase64;
 

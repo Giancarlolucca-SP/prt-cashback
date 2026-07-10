@@ -20,6 +20,8 @@ const OPERATOR_WHITELIST = [
   { method: 'GET',  re: /^\/pista\/redemption-requests$/ },
   { method: 'POST', re: /^\/pista\/redemption-requests\/[^/]+\/(confirm|cancel)$/ },
   { method: 'GET',  re: /^\/pista\/comprovante\/[^/]+\/[^/]+$/ },
+  // Read-only, establishment-scoped: lets the FrentistaBar picker load who's on shift.
+  { method: 'GET',  re: /^\/attendants\/?$/ },
 ];
 
 function operatorLockdown(req, res, next) {

@@ -133,6 +133,47 @@ async function computeCashback(amount, fuelType, liters, establishmentId) {
 
 // ── earn ──────────────────────────────────────────────────────────────────────
 
+const EARN_DUPLICATE_WINDOW_MS = 60 * 1000;
+
+// Builds the same response shape as a fresh earn() success, from an existing
+// Transaction row matched by the duplicate-submission guard. `novoSaldo`
+// reflects the customer's balance NOW, not a stored snapshot.
+function buildEarnReplayResult(existing, customer) {
+  const cashbackValue = parseFloat(existing.cashbackValue);
+  const balanceNow = parseFloat(customer.balance);
+
+  let receipt;
+  try {
+    receipt = receiptService.generateEarnReceipt({
+      customerName: customer.name,
+      cpf: customer.cpf,
+      amount: parseFloat(existing.amount),
+      cashbackPercent: parseFloat(existing.cashbackPercent),
+      cashbackValue,
+      newBalance: balanceNow,
+      receiptCode: existing.receiptCode,
+      date: existing.createdAt,
+    });
+  } catch (err) {
+    console.error(`[transactionService] Falha ao gerar comprovante (retentativa) do acúmulo ${existing.id}:`, err.message);
+    receipt = null;
+  }
+
+  return {
+    mensagem: 'Cashback gerado com sucesso.',
+    transacao: {
+      id:                  existing.id,
+      codigoCupom:         existing.receiptCode,
+      valorAbastecimento:  formatBRL(existing.amount),
+      percentualCashback:  `${parseFloat(existing.cashbackPercent).toFixed(2)}%`,
+      cashbackGerado:      formatBRL(cashbackValue),
+      novoSaldo:           formatBRL(balanceNow),
+      data:                formatDateBR(existing.createdAt),
+    },
+    cupom: receipt,
+  };
+}
+
 async function earn({ cpf, amount, fuelType, liters }, operator) {
   if (!cpf) throw createError('CPF é obrigatório.', 400);
   if (!isValidCpf(cpf)) throw createError('CPF inválido.', 400);
@@ -148,6 +189,28 @@ async function earn({ cpf, amount, fuelType, liters }, operator) {
     where: { cpf_establishmentId: { cpf: stripCpf(cpf), establishmentId } },
   });
   if (!customer) throw createError('Cliente não encontrado. Realize o cadastro primeiro.', 404);
+
+  // Duplicate-submission guard: this manual-entry flow (operator console AND
+  // the customer's own mobile app via POST /app/transaction) has no
+  // client-supplied idempotency key to check — unlike the Pista flows
+  // (keyed on abastecimentoId/requestId) or the NFC-e flow (keyed on the
+  // fiscal receipt's unique access key). A client that resubmits the exact
+  // same amount/fuel/liters within a short window (mobile auto-retry after a
+  // lost response, or a double-tap) is treated as a duplicate and gets the
+  // original result back instead of a second credit. This is a heuristic,
+  // not a guarantee — a genuinely identical second fill-up within the window
+  // would also be deduped — but it closes the common case without requiring
+  // a client-side change.
+  const parsedLiters = liters ? parseFloat(liters) : null;
+  const recentDuplicate = await prisma.transaction.findFirst({
+    where: {
+      customerId: customer.id, establishmentId, status: 'CONFIRMED',
+      amount: parsedAmount, fuelType: fuelType || null, liters: parsedLiters,
+      createdAt: { gte: new Date(Date.now() - EARN_DUPLICATE_WINDOW_MS) },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (recentDuplicate) return buildEarnReplayResult(recentDuplicate, customer);
 
   const { cashbackValue, effectivePercent } = await computeCashback(
     parsedAmount, fuelType, liters, establishmentId
@@ -166,7 +229,7 @@ async function earn({ cpf, amount, fuelType, liters }, operator) {
         cashbackValue,
         receiptCode:     generateReceiptCode('TXN'),
         fuelType:        fuelType || null,
-        liters:          liters ? parseFloat(liters) : null,
+        liters:          parsedLiters,
         status:          'CONFIRMED',
       },
     }),
@@ -176,33 +239,64 @@ async function earn({ cpf, amount, fuelType, liters }, operator) {
     }),
   ]);
 
-  const updated = await prisma.customer.findUnique({ where: { id: customer.id } });
+  // The $transaction above already committed (Transaction created, balance
+  // credited) — everything below is best-effort. A transient failure here
+  // must NOT throw out of earn(), or the caller (operator console retry, or
+  // a mobile client auto-retry) would see an error for an operation that
+  // already succeeded and might resubmit — though the duplicate guard above
+  // would catch that specific resubmission, it's still a false "it failed"
+  // signal for an operation that didn't.
+  let newBalance;
+  let balanceVerified = false;
+  for (let attempt = 1; attempt <= 3 && !balanceVerified; attempt++) {
+    try {
+      const updated = await prisma.customer.findUnique({ where: { id: customer.id } });
+      newBalance = parseFloat(updated.balance);
+      balanceVerified = true;
+    } catch (err) {
+      console.error(`[transactionService] Falha ao reler saldo após acúmulo (tentativa ${attempt}/3, transação ${transaction.id} já confirmada):`, err.message);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+  if (!balanceVerified) {
+    newBalance = Math.round((parseFloat(customer.balance) + cashbackValue) * 100) / 100;
+  }
 
-  await audit.log({
-    action:   'CASHBACK_EARNED',
-    entity:   'Transaction',
-    entityId: transaction.id,
-    operatorId,
-    metadata: {
-      cpf: stripCpf(cpf),
-      amount: parsedAmount,
+  try {
+    await audit.log({
+      action:   'CASHBACK_EARNED',
+      entity:   'Transaction',
+      entityId: transaction.id,
+      operatorId,
+      metadata: {
+        cpf: stripCpf(cpf),
+        amount: parsedAmount,
+        cashbackPercent: effectivePercent,
+        cashbackValue,
+        fuelType: fuelType || null,
+        establishmentId,
+      },
+    });
+  } catch (err) {
+    console.error(`[transactionService] Falha ao registrar auditoria do acúmulo (transação ${transaction.id} já confirmada):`, err.message);
+  }
+
+  let receipt;
+  try {
+    receipt = receiptService.generateEarnReceipt({
+      customerName:   customer.name,
+      cpf:            customer.cpf,
+      amount:         parsedAmount,
       cashbackPercent: effectivePercent,
       cashbackValue,
-      fuelType: fuelType || null,
-      establishmentId,
-    },
-  });
-
-  const receipt = receiptService.generateEarnReceipt({
-    customerName:   customer.name,
-    cpf:            customer.cpf,
-    amount:         parsedAmount,
-    cashbackPercent: effectivePercent,
-    cashbackValue,
-    newBalance:     parseFloat(updated.balance),
-    receiptCode:    transaction.receiptCode,
-    date:           transaction.createdAt,
-  });
+      newBalance,
+      receiptCode:    transaction.receiptCode,
+      date:           transaction.createdAt,
+    });
+  } catch (err) {
+    console.error(`[transactionService] Falha ao gerar comprovante do acúmulo (transação ${transaction.id} já confirmada):`, err.message);
+    receipt = null;
+  }
 
   return {
     mensagem: 'Cashback gerado com sucesso.',
@@ -212,7 +306,7 @@ async function earn({ cpf, amount, fuelType, liters }, operator) {
       valorAbastecimento:  formatBRL(parsedAmount),
       percentualCashback:  `${effectivePercent.toFixed(2)}%`,
       cashbackGerado:      formatBRL(cashbackValue),
-      novoSaldo:           formatBRL(updated.balance),
+      novoSaldo:           formatBRL(newBalance),
       data:                formatDateBR(transaction.createdAt),
     },
     cupom: receipt,

@@ -45,11 +45,18 @@ function validate({ port, readMode, pollIntervalMs, retryIntervalMs, socketTimeo
 }
 
 async function getConfig(establishmentId) {
-  const config = await prisma.concentradorConfig.upsert({
-    where:  { establishmentId },
-    create: { establishmentId, ...DEFAULTS },
-    update: {},
-  });
+  // findUnique-first so a pure read (polled by the admin UI every 15s) doesn't
+  // write to the row every time — upsert's `update: {}` still bumps @updatedAt
+  // on Postgres even with an empty payload.
+  let config = await prisma.concentradorConfig.findUnique({ where: { establishmentId } });
+  if (!config) {
+    try {
+      config = await prisma.concentradorConfig.create({ data: { establishmentId, ...DEFAULTS } });
+    } catch (err) {
+      if (err.code !== 'P2002') throw err;
+      config = await prisma.concentradorConfig.findUnique({ where: { establishmentId } });
+    }
+  }
   return { configuracao: serialize(config) };
 }
 
@@ -80,7 +87,7 @@ async function updateConfig(data, establishmentId) {
     },
   });
 
-  return { mensagem: 'Configuração do concentrador salva com sucesso! Reinicie o agente da pista para aplicar.', configuracao: serialize(config) };
+  return { mensagem: 'Configuração do concentrador salva com sucesso! O agente aplica em até ~60s (ou reinicie-o para aplicar na hora).', configuracao: serialize(config) };
 }
 
 // Agent-facing lookup: the agent authenticates with the shared AGENT_TOKEN (no
