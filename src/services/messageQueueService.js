@@ -76,11 +76,20 @@ async function processNextMessage() {
 
   if (!msg) return { empty: true };
 
-  // Mark as PROCESSING to prevent double-pick in concurrent scenarios
-  await prisma.messageQueue.update({
-    where: { id: msg.id },
+  // findFirst + update is NOT atomic on its own — the comment below used to
+  // claim this "prevents double-pick," but two workers (this codebase runs
+  // one per backend process, and today there's more than one process live
+  // against the same shared Supabase queue table — old/new Render duplicate
+  // services, plus per-posto local installs) can both read the same PENDING
+  // row before either commits its own update. Re-asserting `status:
+  // 'PENDING'` in the where clause turns this into a real compare-and-swap:
+  // if another worker already claimed it, count is 0 and we bail instead of
+  // sending the same message twice.
+  const claimed = await prisma.messageQueue.updateMany({
+    where: { id: msg.id, status: 'PENDING' },
     data:  { status: 'PROCESSING' },
   });
+  if (claimed.count === 0) return { empty: true };
 
   const maskedPhone = msg.customerPhone
     ? `${msg.customerPhone.slice(0, 4)}****${msg.customerPhone.slice(-2)}`

@@ -68,6 +68,18 @@ const registerLimiter = rateLimit({
   },
 });
 
+// Keyed by the target phone/CPF (not the caller's IP): the whole point of
+// this limiter is bounding how many guesses a given phone number's OTP can
+// take. A pure per-IP key (express-rate-limit's default) lets an attacker
+// reset their budget for free by rotating IPs while still hammering the same
+// victim — the global apiLimiter (200/15min per IP, applied to every route in
+// app.js) still bounds each IP's overall volume as a second layer; this key
+// closes the specific "rotate IP, keep the target fixed" bypass.
+function otpKeyGenerator(req) {
+  const target = String(req.body?.phone || req.body?.cpf || '').replace(/\D/g, '');
+  return target ? `otp:${target}` : req.ip;
+}
+
 /**
  * OTP send/verify limiter — same budget as password login (10/15min).
  * Previously these endpoints only had the generic apiLimiter (200/15min,
@@ -79,6 +91,7 @@ const otpLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: otpKeyGenerator,
   message: {
     erro: 'Muitas tentativas. Tente novamente em 15 minutos.',
   },

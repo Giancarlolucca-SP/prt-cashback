@@ -3,8 +3,6 @@ const { createError }  = require('../middlewares/errorMiddleware');
 
 const prisma = new PrismaClient();
 
-const AVG_FUEL_PRICE_PER_LITER = 5.50;
-
 const PERIOD_DAYS = { '7d': 7, '15d': 15, '30d': 30, '60d': 60, '90d': 90 };
 
 function periodStart(period) {
@@ -22,7 +20,13 @@ function safeFloat(v) { return round2(parseFloat(v) || 0); }
 // ── Establishment resolver ────────────────────────────────────────────────────
 
 function resolveEstablishmentId(operator, query) {
-  if (operator.role === 'ADMIN' && query.establishmentId) {
+  // SUPERADMIN accounts have establishmentId: null by design (not scoped to
+  // any single station) — without this, `operator.establishmentId` (null)
+  // was passed straight into the query's `where`, which Prisma treats as a
+  // literal IS NULL filter (unlike `undefined`, which is dropped), so every
+  // dashboard/ranking call for a SUPERADMIN matched zero rows regardless of
+  // the requested establishmentId.
+  if ((operator.role === 'ADMIN' || operator.role === 'SUPERADMIN') && query.establishmentId) {
     return query.establishmentId;
   }
   return operator.establishmentId;
@@ -94,7 +98,7 @@ async function getAnalytics(operator, query = {}) {
     [agg, uniqueRows, allTxns] = await Promise.all([
       prisma.transaction.aggregate({
         where,
-        _sum:   { amount: true, cashbackValue: true },
+        _sum:   { amount: true, cashbackValue: true, liters: true },
         _count: { id: true },
       }),
       prisma.transaction.findMany({
@@ -118,7 +122,11 @@ async function getAnalytics(operator, query = {}) {
   const totalFuelings        = agg._count.id || 0;
   const uniqueCustomersCount = uniqueRows.length;
 
-  const totalVolumeLiters        = round2(totalSales / AVG_FUEL_PRICE_PER_LITER);
+  // Real summed liters (Transaction.liters), not a price-based estimate —
+  // AVG_FUEL_PRICE_PER_LITER was a single hardcoded R$5.50 applied to every
+  // fuel type, which is systematically wrong for any station whose mix
+  // isn't ~100% mid-grade gasoline (etanol runs ~R$3.5-4/L, diesel R$6+/L).
+  const totalVolumeLiters        = safeFloat(agg._sum.liters);
   const avgVolumePerFueling      = safeDivide(totalVolumeLiters, totalFuelings);
   const avgInvestmentPerFueling  = safeDivide(totalInvestment, totalFuelings);
   const avgInvestmentPerLiter    = safeDivide(totalInvestment, totalVolumeLiters);

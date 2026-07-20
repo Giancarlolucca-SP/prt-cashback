@@ -48,18 +48,23 @@ async function resolveFuel(establishmentId, nozzleCode) {
 }
 
 // Backfill fuelName/isAditivada on existing Abastecimento rows from the current map.
+// One updateMany per distinct nozzle (typically a couple dozen) instead of
+// one update per fueling row (which grows unbounded with history — an
+// established station's abastecimentos can run into the thousands, each
+// previously issuing its own sequential round-trip to the DB).
 async function backfillFuel(operator) {
   const establishmentId = operator.establishmentId;
   const maps = await prisma.pistaFuelMap.findMany({ where: { establishmentId } });
-  const byNozzle = new Map(maps.map((m) => [m.nozzleCode, m]));
-  let updated = 0;
-  const rows = await prisma.abastecimento.findMany({ where: { establishmentId }, select: { id: true, nozzleCode: true } });
-  for (const r of rows) {
-    const m = byNozzle.get(r.nozzleCode);
-    if (!m) continue;
-    await prisma.abastecimento.update({ where: { id: r.id }, data: { fuelName: m.fuelName, isAditivada: m.isAditivada } });
-    updated += 1;
-  }
+  // Each nozzle's updateMany touches a disjoint set of rows (filtered by its
+  // own nozzleCode) — safe to run concurrently instead of paying one
+  // sequential network round-trip per nozzle.
+  const results = await Promise.all(maps.map((m) =>
+    prisma.abastecimento.updateMany({
+      where: { establishmentId, nozzleCode: m.nozzleCode },
+      data:  { fuelName: m.fuelName, isAditivada: m.isAditivada },
+    })
+  ));
+  const updated = results.reduce((sum, r) => sum + r.count, 0);
   return { mensagem: `${updated} abastecimento(s) atualizado(s) pelo mapa de combustível.`, updated };
 }
 
@@ -106,9 +111,9 @@ async function resolveAttendant(establishmentId, identfidCode) {
   if (!identfidCode) return null;
   const m = await prisma.pistaCardMap.findUnique({
     where: { establishmentId_identfidCode: { establishmentId, identfidCode: String(identfidCode).trim() } },
-    include: { attendant: { select: { id: true, name: true, photoUrl: true } } },
+    include: { attendant: { select: { id: true, name: true, photoUrl: true, active: true } } },
   });
-  return m?.attendant || null;
+  return m?.attendant?.active ? m.attendant : null;
 }
 
 module.exports = {

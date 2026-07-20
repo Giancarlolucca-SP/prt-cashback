@@ -20,6 +20,7 @@ async function approvePhoto(req, res, next) {
       fuelType,
       liters,
       operatorId: req.operator.id,
+      establishmentId: req.operator.establishmentId,
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -34,6 +35,7 @@ async function rejectPhoto(req, res, next) {
       transactionId: id,
       motivo:        motivo || 'Cupom inválido.',
       operatorId:    req.operator.id,
+      establishmentId: req.operator.establishmentId,
     });
     res.json(result);
   } catch (err) { next(err); }

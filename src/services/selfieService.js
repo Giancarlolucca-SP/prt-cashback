@@ -33,6 +33,7 @@ const FULL_QUALITY      = 75;    // JPEG quality for full image
 const COMPARE_SIZE      = 50;    // px — downscale for pixel comparison (faster)
 const MATCH_THRESHOLD   = 70;    // minimum confidence % to consider a match
 const BUCKET            = process.env.SUPABASE_STORAGE_BUCKET || 'selfies';
+const GRACE_PERIOD_MS   = 2 * 60 * 60 * 1000; // cleanupOldSelfies: skip folders touched this recently
 
 // ── Supabase client (lazy, optional) ─────────────────────────────────────────
 
@@ -345,9 +346,26 @@ async function cleanupOldSelfies() {
         if (!validPaths.has(basePath)) {
           const { data: files } = await supabase.storage.from(BUCKET).list(basePath);
           if (files?.length) {
+            // uploadSelfie() writes files to Storage BEFORE the Customer row
+            // is created/updated with the matching selfieStoragePath — a
+            // folder that's genuinely mid-registration (not yet in
+            // validPaths) would otherwise look orphaned and get deleted in
+            // that narrow window. Skip anything touched in the last couple
+            // hours; a still-orphaned folder gets caught on tomorrow's run.
+            const now = Date.now();
+            const hasRecentFile = files.some((f) => {
+              const createdAt = f.created_at ? new Date(f.created_at).getTime() : 0;
+              return now - createdAt < GRACE_PERIOD_MS;
+            });
+            if (hasRecentFile) continue;
+
             const toDelete = files.map((f) => `${basePath}/${f.name}`);
-            await supabase.storage.from(BUCKET).remove(toDelete);
-            deletedCount += toDelete.length;
+            const { error: removeError } = await supabase.storage.from(BUCKET).remove(toDelete);
+            if (removeError) {
+              console.error(`[selfieService] cleanup: falha ao remover ${basePath}:`, removeError.message);
+            } else {
+              deletedCount += toDelete.length;
+            }
           }
         }
       }

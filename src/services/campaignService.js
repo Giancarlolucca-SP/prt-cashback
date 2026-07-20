@@ -163,6 +163,27 @@ async function createInternal({ name, filterType, filterPeriod, rewardType, rewa
     orderBy: { createdAt: 'desc' },
   });
   if (recentDuplicate) {
+    // A first attempt can commit the campaign row + credit every matched
+    // customer's balance, then fail on the WhatsApp enqueue step (the catch
+    // around addToQueue below only logs, it never retries). Blindly
+    // returning the cached result here would permanently lose the
+    // notification for money that was already credited — check whether
+    // anything actually got queued for this campaign, and retry the enqueue
+    // now if not.
+    const queueStatus = await messageQueueService.getCampaignQueueStatus(recentDuplicate.id);
+    if (queueStatus.total === 0 && recentDuplicate.customerCount > 0) {
+      try {
+        const retryCustomers = await getFilteredCustomers(filterType, filterPeriod, establishmentId);
+        await messageQueueService.addToQueue(retryCustomers.map((c) => ({
+          establishmentId, campaignId: recentDuplicate.id, customerId: c.id,
+          phone: c.phone, name: c.name, message: message.trim(), priority: 0,
+        })));
+        console.log(`[CAMPANHA] Reenfileiramento de mensagens para campanha ${recentDuplicate.id} (tentativa anterior não enfileirou nada).`);
+      } catch (err) {
+        console.error(`[campaignService] Retentativa de enfileiramento falhou para campanha ${recentDuplicate.id}:`, err.message);
+      }
+    }
+
     return {
       mensagem: 'Campanha criada! As mensagens serão enviadas em breve.',
       clientesAtingidos: recentDuplicate.customerCount,

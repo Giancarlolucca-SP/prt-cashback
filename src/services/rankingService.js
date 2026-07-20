@@ -50,7 +50,11 @@ function resolveRange(query = {}) {
 }
 
 function resolveEstablishmentId(operator, query) {
-  if (operator.role === 'ADMIN' && query.establishmentId) return query.establishmentId;
+  // Same fix as dashboardService.js: SUPERADMIN has establishmentId: null by
+  // design, and passing that straight into `where` matches literal IS NULL
+  // (Prisma drops `undefined` filters but not `null` ones), so every ranking
+  // call for a SUPERADMIN silently matched zero rows.
+  if ((operator.role === 'ADMIN' || operator.role === 'SUPERADMIN') && query.establishmentId) return query.establishmentId;
   return operator.establishmentId;
 }
 

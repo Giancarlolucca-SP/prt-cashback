@@ -145,24 +145,37 @@ async function getData(type, rawStart, rawEnd, establishmentId) {
     case 'CUSTOMERS': {
       // Busca todos os clientes do estabelecimento — o filtro de data se aplica às
       // transações (período de atividade), não ao cadastro do cliente.
-      const customers = await prisma.customer.findMany({
+      const allCustomers = await prisma.customer.findMany({
         where: { establishmentId },
-        include: {
-          transactions: {
-            where: hasDateFilter ? { createdAt: dateFilter } : undefined,
-            select: { amount: true, createdAt: true, status: true },
-            orderBy: { createdAt: 'desc' },
-          },
-        },
         orderBy: { name: 'asc' },
       });
 
-      console.log('[REPORT] Customers found:', customers.length);
+      // DB-level aggregates instead of pulling every transaction row per
+      // customer into Node — cost no longer grows with how much fueling
+      // history each customer has (same fix applied to customerService.list
+      // earlier this session for the identical pattern).
+      const ids = allCustomers.map((c) => c.id);
+      // `_max(createdAt)` here intentionally shares the same (optionally
+      // date-filtered) `where` as `_sum`/`_count` — the original per-row
+      // fetch's `lastFuelDate` reflected the most recent fueling WITHIN the
+      // filtered period, not the true all-time last fueling, and a report
+      // scoped to e.g. "January" should show a January last-fuel date, not
+      // one from after the period.
+      const periodWhere = { customerId: { in: ids }, ...(hasDateFilter ? { createdAt: dateFilter } : {}) };
+      const periodAgg = ids.length === 0 ? [] : await prisma.transaction.groupBy({
+        by: ['customerId'],
+        where: periodWhere,
+        _sum: { amount: true },
+        _count: { _all: true },
+        _max: { createdAt: true },
+      });
+
+      const periodById = new Map(periodAgg.map((r) => [r.customerId, r]));
 
       // Quando há filtro de data, exibe apenas quem teve transação no período.
       const active = hasDateFilter
-        ? customers.filter((c) => c.transactions.length > 0)
-        : customers;
+        ? allCustomers.filter((c) => (periodById.get(c.id)?._count._all ?? 0) > 0)
+        : allCustomers;
 
       console.log('[REPORT] Customers active in period:', active.length);
 
@@ -170,7 +183,7 @@ async function getData(type, rawStart, rawEnd, establishmentId) {
 
       const totalBalance = active.reduce((s, c) => s + safeFloat(c.balance), 0);
       const totalSpent   = active.reduce(
-        (s, c) => s + c.transactions.reduce((ts, t) => ts + safeFloat(t.amount), 0), 0,
+        (s, c) => s + safeFloat(periodById.get(c.id)?._sum.amount), 0,
       );
 
       return {
@@ -182,9 +195,9 @@ async function getData(type, rawStart, rawEnd, establishmentId) {
           cpf:              maskCpf(c.cpf),
           phone:            maskPhone(c.phone),
           balance:          safeFloat(c.balance),
-          totalSpent:       c.transactions.reduce((s, t) => s + safeFloat(t.amount), 0),
-          lastFuelDate:     c.transactions.length > 0 ? c.transactions[0].createdAt : null,
-          transactionCount: c.transactions.length,
+          totalSpent:       safeFloat(periodById.get(c.id)?._sum.amount),
+          lastFuelDate:     periodById.get(c.id)?._max.createdAt ?? null,
+          transactionCount: periodById.get(c.id)?._count._all ?? 0,
         })),
         totals: { count: active.length, totalBalance, totalSpent },
       };

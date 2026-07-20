@@ -5,6 +5,19 @@ function errorHandler(err, req, res, next) {
   console.error(`[${new Date().toISOString()}] ${err.message}`);
   if (isDev) console.error(err.stack);
 
+  // Multer upload errors (file too large, unexpected field, etc.) — thrown
+  // by the upload middleware itself, before any route handler runs, so they
+  // never pass through a service's own createError() calls.
+  if (err.name === 'MulterError') {
+    const messages = {
+      LIMIT_FILE_SIZE:      'Arquivo muito grande. O tamanho máximo permitido é 2MB.',
+      LIMIT_UNEXPECTED_FILE: 'Campo de arquivo inesperado.',
+    };
+    return res.status(400).json({
+      erro: messages[err.code] || 'Erro ao processar o arquivo enviado.',
+    });
+  }
+
   // Prisma unique constraint violation
   if (err.code === 'P2002') {
     return res.status(409).json({

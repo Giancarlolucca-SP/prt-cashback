@@ -51,6 +51,26 @@ async function getSettings(establishmentId) {
 
 // ── 2. updateSettings ─────────────────────────────────────────────────────────
 
+// All of these gate whether a customer can fuel/redeem at all — a value of 0
+// or less doesn't mean "unlimited", it means every transaction is blocked
+// (checkTransaction/checkRedemption compare with >=), so a mistyped 0 would
+// silently lock every customer out of the station.
+function assertPositiveInt(value, label) {
+  if (value == null) return;
+  const n = parseInt(value, 10);
+  if (isNaN(n) || n < 1) {
+    throw createError(`${label} deve ser um número inteiro maior que zero.`, 400);
+  }
+}
+
+function assertPositiveAmount(value, label) {
+  if (value == null) return;
+  const n = parseFloat(value);
+  if (isNaN(n) || n <= 0) {
+    throw createError(`${label} deve ser maior que zero.`, 400);
+  }
+}
+
 async function updateSettings(establishmentId, data) {
   const allowed = [
     'maxFuelsPerDay',
@@ -70,6 +90,12 @@ async function updateSettings(establishmentId, data) {
   if (Object.keys(updates).length === 0) {
     throw createError('Nenhum campo válido para atualizar.', 400);
   }
+
+  assertPositiveInt(updates.maxFuelsPerDay, 'Máximo de abastecimentos por dia');
+  assertPositiveInt(updates.maxFuelsPerWeek, 'Máximo de abastecimentos por semana');
+  assertPositiveInt(updates.maxRedeemsPerWeek, 'Máximo de resgates por semana');
+  assertPositiveAmount(updates.maxCashbackPerDay, 'Máximo de cashback por dia');
+  assertPositiveAmount(updates.maxFuelAmount, 'Valor máximo de abastecimento');
 
   // Ensure the row exists before updating
   await getSettings(establishmentId);

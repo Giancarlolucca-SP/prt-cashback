@@ -19,7 +19,14 @@ const ZAPI_BASE_URL    = process.env.ZAPI_BASE_URL;
 // ── Phone normaliser ──────────────────────────────────────────────────────────
 function normalisePhone(phone) {
   const digits = phone.replace(/\D/g, '');
-  return digits.startsWith('55') ? digits : `55${digits}`;
+  // Checking startsWith('55') is ambiguous: DDD 55 (Rio Grande do Sul —
+  // Santa Maria and region) is a real Brazilian area code, so a local
+  // 11-digit number from that DDD already starts with "55" and would be
+  // mistaken for "country code already present," leaving the number 2
+  // digits short. Brazilian numbers without country code are 10-11 digits
+  // (DDD + phone); with it (55 + DDD + phone) they're 12-13 — use length,
+  // not a coincidental prefix match.
+  return digits.length <= 11 ? `55${digits}` : digits;
 }
 
 // ── Evolution API sender ──────────────────────────────────────────────────────

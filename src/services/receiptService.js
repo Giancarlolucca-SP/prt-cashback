@@ -1,5 +1,5 @@
 const { formatBRL } = require('../utils/currencyFormatter');
-const { maskCpf, maskName, formatCpf } = require('../utils/cpfValidator');
+const { maskCpf, maskName } = require('../utils/cpfValidator');
 const { formatDateBR } = require('../utils/dateFormatter');
 
 function formatDateTimeBR(date) {
@@ -88,7 +88,7 @@ function generateComprovante({ type, controlNumber, date, frentista, customerNam
     `Frentista: ${frentista || '-'}`,
     DASH,
     `Cliente: ${customerName || '-'}`,
-    `CPF: ${formatCpf(cpf)}`,
+    `CPF: ${maskCpf(cpf)}`,
     `Tipo: ${tipo}`,
     `Valor: ${formatBRL(value)}`,
     `Saldo restante: ${formatBRL(balance)}`,

@@ -1,9 +1,9 @@
 const { Router } = require('express');
 const rankingController = require('../controllers/rankingController');
-const { authenticate }  = require('../middlewares/authMiddleware');
+const { authenticate, requireAdmin }  = require('../middlewares/authMiddleware');
 
 const router = Router();
 
-router.get('/', authenticate, rankingController.getRanking);
+router.get('/', authenticate, requireAdmin, rankingController.getRanking);
 
 module.exports = router;

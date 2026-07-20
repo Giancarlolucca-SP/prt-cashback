@@ -69,13 +69,17 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
 
     attendantKey = attendantService.norm(rawAttendantRef);
   } else {
-    // No transaction reference: only allow rating an attendant that genuinely
-    // exists for this establishment (registered, or seen on a real transaction).
+    // No transaction reference: the mobile app never actually takes this path
+    // (transactionId is a required prop there — see AttendantRating.tsx), but
+    // this is a public API, not just the app, so it's still reachable by
+    // anyone with a valid customer JWT. Without a transaction tying the
+    // rating to a real fueling, nothing stops one customer from spamming
+    // unlimited ratings for the same attendant to manipulate their average.
     const rawKey = String(attendantName || attendantCode || '').trim();
     if (!rawKey) throw createError('Selecione o atendente que você deseja avaliar.', 400);
     const key = attendantService.norm(rawKey);
 
-    const [registered, seen] = await Promise.all([
+    const [registered, seen, hasHistory] = await Promise.all([
       prisma.attendant.findUnique({
         where: { establishmentId_attendantKey: { establishmentId, attendantKey: key } },
       }),
@@ -83,8 +87,26 @@ async function createRating({ transactionId, attendantCode, attendantName, stars
         where:  { establishmentId, attendantName: { equals: key, mode: 'insensitive' }, status: 'CONFIRMED' },
         select: { id: true },
       }),
+      // Require a genuine relationship with this establishment — otherwise a
+      // freshly-registered account could rate attendants it never interacted
+      // with, at any volume.
+      prisma.transaction.findFirst({
+        where:  { establishmentId, customerId, status: 'CONFIRMED' },
+        select: { id: true },
+      }),
     ]);
     if (!registered && !seen) throw createError('Atendente não encontrado.', 404);
+    if (!hasHistory) throw createError('Avalie um atendente a partir de um abastecimento confirmado.', 403);
+
+    const RATING_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    const recent = await prisma.attendantRating.findFirst({
+      where: {
+        customerId, establishmentId, attendantName: key,
+        createdAt: { gte: new Date(Date.now() - RATING_COOLDOWN_MS) },
+      },
+      select: { id: true },
+    });
+    if (recent) throw createError('Você já avaliou este atendente recentemente. Tente novamente mais tarde.', 429);
 
     attendantKey = key;
   }

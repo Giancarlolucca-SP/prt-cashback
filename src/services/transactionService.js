@@ -7,7 +7,7 @@ const { createError } = require('../middlewares/errorMiddleware');
 const audit = require('./auditService');
 const receiptService = require('./receiptService');
 const fraudService = require('./fraudService');
-const { DEFAULT_FUEL_TYPES } = require('./cashbackSettingsService');
+const { DEFAULT_FUEL_TYPES, getOrCreateSettings } = require('./cashbackSettingsService');
 
 const prisma = new PrismaClient();
 
@@ -28,12 +28,10 @@ const FUEL_TYPE_ALIASES = {
 async function computeCashback(amount, fuelType, liters, establishmentId) {
   fuelType = fuelType ? (FUEL_TYPE_ALIASES[fuelType] || fuelType) : fuelType;
 
-  // Load (or create default) settings
-  const settings = await prisma.cashbackSettings.upsert({
-    where:  { establishmentId },
-    create: { establishmentId, fuelTypes: DEFAULT_FUEL_TYPES },
-    update: {},
-  });
+  // Load (or create default) settings — shared helper avoids bumping
+  // CashbackSettings.updatedAt on every fueling (see cashbackSettingsService
+  // for why upsert-as-read was wrong here).
+  const settings = await getOrCreateSettings(establishmentId);
 
   // Minimum purchase check
   const minAmount = parseFloat(settings.minFuelAmount);

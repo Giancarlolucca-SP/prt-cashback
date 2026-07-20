@@ -110,15 +110,25 @@ async function createAttendant(operator, { name, code, operatorId }) {
 
   await assertOperatorInEstablishment(operatorId, establishmentId);
 
-  const attendant = await prisma.attendant.create({
-    data: {
-      establishmentId,
-      name:         name.trim(),
-      code:         code ? String(code).trim() : null,
-      attendantKey,
-      operatorId:   operatorId || null,
-    },
-  });
+  // The findUnique above is check-then-act, not atomic — two concurrent
+  // submissions for the same name/code (double-click) can both pass it
+  // before either commits. Catch the resulting P2002 instead of letting it
+  // surface as an unhandled 500.
+  let attendant;
+  try {
+    attendant = await prisma.attendant.create({
+      data: {
+        establishmentId,
+        name:         name.trim(),
+        code:         code ? String(code).trim() : null,
+        attendantKey,
+        operatorId:   operatorId || null,
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') throw createError('Já existe um atendente com este nome/código.', 409);
+    throw err;
+  }
   return { mensagem: 'Atendente cadastrado.', attendant: serialize(attendant) };
 }
 
@@ -148,16 +158,25 @@ async function updateAttendant(operator, id, { name, code, active, operatorId })
 
   if (operatorId !== undefined) await assertOperatorInEstablishment(operatorId, attendant.establishmentId);
 
-  const updated = await prisma.attendant.update({
-    where: { id },
-    data: {
-      name:         newName,
-      code:         newCode,
-      attendantKey,
-      ...(active !== undefined ? { active: !!active } : {}),
-      ...(operatorId !== undefined ? { operatorId: operatorId || null } : {}),
-    },
-  });
+  // Same check-then-act gap as createAttendant: two concurrent edits that
+  // land on the same new attendantKey (e.g. both renaming to the same code)
+  // can both pass the clash check above before either commits.
+  let updated;
+  try {
+    updated = await prisma.attendant.update({
+      where: { id },
+      data: {
+        name:         newName,
+        code:         newCode,
+        attendantKey,
+        ...(active !== undefined ? { active: !!active } : {}),
+        ...(operatorId !== undefined ? { operatorId: operatorId || null } : {}),
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') throw createError('Já existe um atendente com este nome/código.', 409);
+    throw err;
+  }
   return { mensagem: 'Atendente atualizado.', attendant: serialize(updated) };
 }
 

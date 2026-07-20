@@ -23,9 +23,15 @@ async function createOperador(admin, { name, email, password }) {
   if (existing) throw createError('E-mail já cadastrado.', 409);
 
   const hash = await bcrypt.hash(String(password), 10);
-  const op = await prisma.operator.create({
-    data: { name: name.trim(), email: cleanEmail, password: hash, role: 'OPERATOR', establishmentId },
-  });
+  let op;
+  try {
+    op = await prisma.operator.create({
+      data: { name: name.trim(), email: cleanEmail, password: hash, role: 'OPERATOR', establishmentId },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') throw createError('E-mail já cadastrado.', 409);
+    throw err;
+  }
   return { mensagem: 'Login de operador criado.', operador: { id: op.id, name: op.name, email: op.email, role: op.role } };
 }
 

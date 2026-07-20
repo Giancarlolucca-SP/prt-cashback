@@ -7,8 +7,28 @@ const audit               = require('./auditService');
 const prisma = new PrismaClient();
 
 const MAX_RETRIES = 10;
+const BATCH_LIMIT = 50; // bound a single run's duration/memory during a long SEFAZ outage
+
+// node-cron does not prevent overlapping runs — if a batch takes longer than
+// the 30-minute schedule (SEFAZ slow/down with many pending transactions),
+// the next invocation would otherwise start while this one is still mid-loop
+// and could fetch + credit the same PENDING_VALIDATION transaction twice.
+let retryInFlight = false;
 
 async function retryPendingValidations() {
+  if (retryInFlight) {
+    console.log('[revalidacao] Execução anterior ainda em andamento — pulando este ciclo.');
+    return;
+  }
+  retryInFlight = true;
+  try {
+    await runRetryPendingValidations();
+  } finally {
+    retryInFlight = false;
+  }
+}
+
+async function runRetryPendingValidations() {
   console.log('[revalidacao] Iniciando reprocessamento de validações pendentes...');
 
   let pendentes;
@@ -24,6 +44,8 @@ async function retryPendingValidations() {
         customer:      { select: { id: true, cpf: true, pushToken: true } },
         establishment: { select: { id: true, cnpj: true } },
       },
+      orderBy: { createdAt: 'asc' }, // oldest-waiting first
+      take:    BATCH_LIMIT,
     });
   } catch (err) {
     console.error('[revalidacao] Erro ao buscar transações pendentes:', err.message);
@@ -120,12 +142,26 @@ async function retryPendingValidations() {
       });
 
     } catch (err) {
+      // The findFirst duplicate-nfceKey check earlier is a TOCTOU race
+      // between overlapping/concurrent runs — it's the DB's own @unique
+      // constraint on Transaction.nfceKey that actually prevents a double
+      // credit here, not that check. Recognize it specifically instead of
+      // letting it fall into the generic "erro não recuperável" bucket, so
+      // the real cause (duplicate invoice, not a SEFAZ/parsing failure)
+      // is visible in the logs.
+      const isDuplicateNfceKey = err.code === 'P2002' && (
+        Array.isArray(err.meta?.target)
+          ? err.meta.target.includes('nfceKey')
+          : String(err.meta?.target || '').includes('nfceKey')
+      );
       const isSefazDown = err.statusCode === 502 || err.statusCode === 504;
-      const novoStatus  = (!isSefazDown || tentativa >= MAX_RETRIES)
+      const novoStatus  = (isDuplicateNfceKey || !isSefazDown || tentativa >= MAX_RETRIES)
         ? 'MANUAL_REVIEW'
         : 'PENDING_VALIDATION';
 
-      if (novoStatus === 'MANUAL_REVIEW') {
+      if (isDuplicateNfceKey) {
+        console.log(`[revalidacao] Transação ${tx.id}: chave de acesso já usada por outra transação — revisão manual.`);
+      } else if (novoStatus === 'MANUAL_REVIEW') {
         if (tentativa >= MAX_RETRIES) {
           console.log(`[revalidacao] Transação ${tx.id}: limite de ${MAX_RETRIES} tentativas atingido — encaminhada para revisão manual.`);
         } else {
@@ -135,16 +171,24 @@ async function retryPendingValidations() {
         console.log(`[revalidacao] Transação ${tx.id}: SEFAZ ainda indisponível (tentativa ${tentativa}/${MAX_RETRIES}). Aguardando próxima execução.`);
       }
 
-      await prisma.transaction.update({
-        where: { id: tx.id },
-        data:  { status: novoStatus, retryCount: tentativa },
-      });
+      // Guarded on its own: if recording the failure status itself hits a
+      // transient DB error, it must not escape and abort the rest of this
+      // batch — every remaining pending transaction would otherwise sit
+      // untouched until the next 30-minute tick with no indication why.
+      try {
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data:  { status: novoStatus, retryCount: tentativa },
+        });
+      } catch (updateErr) {
+        console.error(`[revalidacao] Transação ${tx.id}: falha ao registrar status de erro:`, updateErr.message);
+      }
 
       await audit.log({
         action:   'NFCE_RETRY_FAILED',
         entity:   'Transaction',
         entityId: tx.id,
-        metadata: { tentativa, erro: err.message, novoStatus },
+        metadata: { tentativa, erro: err.message, novoStatus, duplicateNfceKey: isDuplicateNfceKey },
       });
     }
   }

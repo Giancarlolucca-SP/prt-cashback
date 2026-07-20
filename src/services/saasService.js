@@ -14,13 +14,18 @@ async function getSaasMetrics() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // ── Stripe: all subscriptions ──────────────────────────────────────────────
-  const [allSubsResp, cancelledSubsResp] = await Promise.all([
-    stripe.subscriptions.list({ limit: 100, status: 'all', expand: ['data.items.data.price'] }),
-    stripe.subscriptions.list({ limit: 100, status: 'canceled' }),
+  // `.list({ limit: 100 })` alone only returns Stripe's first page — with no
+  // pagination this silently undercounts every metric below (MRR, churn,
+  // new/cancelled counts) the moment the platform passes 100 total
+  // subscriptions or 100 ever-cancelled subscriptions. autoPagingToArray
+  // walks every page up to the given cap.
+  const PAGINATION_CAP = 10000;
+  const [allSubs, cancelledSubs] = await Promise.all([
+    stripe.subscriptions.list({ limit: 100, status: 'all', expand: ['data.items.data.price'] })
+      .autoPagingToArray({ limit: PAGINATION_CAP }),
+    stripe.subscriptions.list({ limit: 100, status: 'canceled' })
+      .autoPagingToArray({ limit: PAGINATION_CAP }),
   ]);
-
-  const allSubs       = allSubsResp.data;
-  const cancelledSubs = cancelledSubsResp.data;
   const activeSubs    = allSubs.filter(s => s.status === 'active' || s.status === 'trialing');
 
   // MRR in cents → normalized to monthly
@@ -51,11 +56,11 @@ async function getSaasMetrics() {
     new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime() / 1000
   );
 
-  const invoicesResp = await stripe.invoices.list({
+  const invoices = await stripe.invoices.list({
     limit: 100,
     created: { gte: twelveMonthsAgoTs },
     status: 'paid',
-  });
+  }).autoPagingToArray({ limit: PAGINATION_CAP });
 
   const revenueMap = {};
   for (let i = 11; i >= 0; i--) {
@@ -67,7 +72,7 @@ async function getSaasMetrics() {
     };
   }
 
-  invoicesResp.data.forEach(inv => {
+  invoices.forEach(inv => {
     const d   = new Date(inv.created * 1000);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     if (revenueMap[key]) revenueMap[key].revenue += (inv.amount_paid || 0) / 100;

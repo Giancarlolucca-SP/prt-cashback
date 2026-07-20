@@ -450,9 +450,29 @@ async function confirmarTransacao({ customer, operator, establishmentId, extract
 
 // ── validatePhoto ─────────────────────────────────────────────────────────────
 
+// Duplicate-receipt detection below is check-then-act (findFirst, no unique
+// constraint backing the value/liters paths — only nfceKey has one). A
+// network retry or double-tap "enviar" from the same customer within the
+// race window would otherwise pass all checks twice and double-credit one
+// paper receipt. A per-customer mutex closes the concurrent-request gap the
+// checks alone can't.
+const validationInFlight = new Set();
+
 async function validatePhoto({ base64Photo, customerId, establishmentId }) {
   if (!base64Photo) throw createError('Foto é obrigatória.', 400);
 
+  if (validationInFlight.has(customerId)) {
+    throw createError('Já existe uma validação de foto em andamento para este cliente. Aguarde alguns segundos e tente novamente.', 409);
+  }
+  validationInFlight.add(customerId);
+  try {
+    return await validatePhotoInternal({ base64Photo, customerId, establishmentId });
+  } finally {
+    validationInFlight.delete(customerId);
+  }
+}
+
+async function validatePhotoInternal({ base64Photo, customerId, establishmentId }) {
   const buffer = Buffer.from(base64Photo, 'base64');
 
   const [establishment, customer] = await Promise.all([
@@ -608,13 +628,14 @@ async function criarTransacaoPendente({ buffer, customer, operator, establishmen
 
 // ── approvePhotoValidation ────────────────────────────────────────────────────
 
-async function approvePhotoValidation({ transactionId, amount, fuelType, liters, operatorId }) {
+async function approvePhotoValidation({ transactionId, amount, fuelType, liters, operatorId, establishmentId }) {
   const tx = await prisma.transaction.findUnique({
     where:   { id: transactionId },
     include: { customer: true },
   });
 
   if (!tx) throw createError('Transação não encontrada.', 404);
+  if (tx.establishmentId !== establishmentId) throw createError('Transação não encontrada.', 404);
   if (tx.source !== 'PHOTO_VALIDATION') throw createError('Transação não é uma validação por foto.', 400);
   if (tx.status !== 'PENDING_VALIDATION') throw createError('Transação não está pendente de validação.', 400);
 
@@ -625,9 +646,16 @@ async function approvePhotoValidation({ transactionId, amount, fuelType, liters,
     parsedAmount, fuelType || null, liters || null, tx.establishmentId,
   );
 
-  await prisma.$transaction([
-    prisma.transaction.update({
-      where: { id: transactionId },
+  // `status: 'PENDING_VALIDATION'` in the where clause makes this a
+  // compare-and-swap: the findUnique read above happens before this write,
+  // so without re-asserting the status here, two concurrent approve calls
+  // (or an approve racing a reject) could both pass the check above and
+  // both credit cashback. If another request already moved this row off
+  // PENDING_VALIDATION, updateMany matches zero rows and we abort before
+  // ever touching the customer's balance.
+  await prisma.$transaction(async (txClient) => {
+    const updated = await txClient.transaction.updateMany({
+      where: { id: transactionId, status: 'PENDING_VALIDATION' },
       data: {
         amount:          parsedAmount,
         cashbackPercent: effectivePercent,
@@ -637,12 +665,17 @@ async function approvePhotoValidation({ transactionId, amount, fuelType, liters,
         status:          'CONFIRMED',
         validatedAt:     new Date(),
       },
-    }),
-    prisma.customer.update({
+    });
+
+    if (updated.count === 0) {
+      throw createError('Esta transação já foi processada por outra requisição.', 409);
+    }
+
+    await txClient.customer.update({
       where: { id: tx.customerId },
       data:  { balance: { increment: cashbackValue } },
-    }),
-  ]);
+    });
+  });
 
   await audit.log({
     action:     'PHOTO_APPROVED',
@@ -660,17 +693,26 @@ async function approvePhotoValidation({ transactionId, amount, fuelType, liters,
 
 // ── rejectPhotoValidation ─────────────────────────────────────────────────────
 
-async function rejectPhotoValidation({ transactionId, motivo, operatorId }) {
+async function rejectPhotoValidation({ transactionId, motivo, operatorId, establishmentId }) {
   const tx = await prisma.transaction.findUnique({ where: { id: transactionId } });
 
   if (!tx) throw createError('Transação não encontrada.', 404);
+  if (tx.establishmentId !== establishmentId) throw createError('Transação não encontrada.', 404);
   if (tx.source !== 'PHOTO_VALIDATION') throw createError('Transação não é uma validação por foto.', 400);
   if (tx.status !== 'PENDING_VALIDATION') throw createError('Transação não está pendente de validação.', 400);
 
-  await prisma.transaction.update({
-    where: { id: transactionId },
+  // Same compare-and-swap concern as approvePhotoValidation: re-assert the
+  // status in the write so a reject racing an approve for the same
+  // transaction can't silently overwrite a status the other request already
+  // committed.
+  const updated = await prisma.transaction.updateMany({
+    where: { id: transactionId, status: 'PENDING_VALIDATION' },
     data:  { status: 'CANCELLED', metadata: { ...(tx.metadata ?? {}), motivoRejeicao: motivo } },
   });
+
+  if (updated.count === 0) {
+    throw createError('Esta transação já foi processada por outra requisição.', 409);
+  }
 
   await audit.log({
     action:     'PHOTO_REJECTED',

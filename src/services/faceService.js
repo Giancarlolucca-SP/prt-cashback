@@ -21,6 +21,7 @@ const { RekognitionClient, CompareFacesCommand } = require('@aws-sdk/client-reko
 
 const SIMILARITY_THRESHOLD  = 80;   // Rekognition similarity % required for a match
 const SEARCH_MAX_CUSTOMERS  = 200;  // cap for 1:N face-only search
+const SEARCH_CONCURRENCY    = 10;   // bounded parallelism for 1:N search — full serial is too slow/costly for 200 candidates; full parallel risks Rekognition throttling
 const FALLBACK_RATIO_THRESH = 0.40; // size-ratio threshold when Rekognition is unavailable
 
 // ── Client (lazy-init so missing credentials don't crash startup) ─────────────
@@ -65,7 +66,13 @@ async function compareFaces(sourceBase64, targetBase64) {
 
   const client = getClient();
   if (!client) {
-    // Rekognition not configured — use size-ratio fallback
+    // Rekognition not configured — falls back to comparing base64 byte
+    // length, which is NOT a real biometric check. This silently downgrades
+    // identity verification (used for account-recovery/device-rebind) to
+    // "roughly the same file size" with no operator-visible signal — worth
+    // a loud warning since a misconfigured/expired AWS credential in
+    // production would otherwise degrade silently.
+    console.warn('[faceService] AWS Rekognition não configurado — usando fallback de tamanho de arquivo (NÃO é verificação biométrica real).');
     return sizeRatioMatch(sourceBase64, targetBase64);
   }
 
@@ -127,21 +134,28 @@ async function searchFaces(queryBase64, customers) {
     return { customer: best, confidence: bestConfidence };
   }
 
-  // Rekognition: sequential CompareFaces — exit early on high-confidence match
-  let best       = null;
-  let bestConf   = 0;
+  // Rekognition: bounded-concurrency CompareFaces, batches of
+  // SEARCH_CONCURRENCY — exits early between batches on a high-confidence
+  // match. Full serial (one await per candidate) made a 200-candidate search
+  // take tens of seconds and cost up to $0.20 in sequential Rekognition
+  // calls; full parallel risks throttling.
+  let best     = null;
+  let bestConf = 0;
 
-  for (const c of candidates) {
-    try {
-      const { match, confidence } = await compareFaces(c.selfieData, queryBase64);
-      if (match && confidence > bestConf) {
-        bestConf = confidence;
-        best     = c;
-        if (confidence >= 95) break; // good enough — skip remaining
+  for (let i = 0; i < candidates.length; i += SEARCH_CONCURRENCY) {
+    const batch = candidates.slice(i, i + SEARCH_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map((c) => compareFaces(c.selfieData, queryBase64).catch(() => ({ match: false, confidence: 0 })))
+    );
+
+    results.forEach((result, idx) => {
+      if (result.match && result.confidence > bestConf) {
+        bestConf = result.confidence;
+        best     = batch[idx];
       }
-    } catch {
-      continue;
-    }
+    });
+
+    if (bestConf >= 95) break; // good enough — skip remaining batches
   }
 
   return { customer: best, confidence: bestConf };

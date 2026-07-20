@@ -103,7 +103,7 @@ async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId, 
   let resolvedAttendantId = null;
   if (attendantId) {
     const att = await prisma.attendant.findUnique({ where: { id: attendantId } });
-    if (att && att.establishmentId === establishmentId) {
+    if (att && att.establishmentId === establishmentId && att.active) {
       frentista = att.name;
       resolvedAttendantId = att.id;
     }
@@ -335,7 +335,7 @@ async function confirmRequest(operator, requestId, { amount, note, attendantId }
   let resolvedAttendantId = null;
   if (attendantId) {
     const att = await prisma.attendant.findUnique({ where: { id: attendantId } });
-    if (att && att.establishmentId === establishmentId) {
+    if (att && att.establishmentId === establishmentId && att.active) {
       frentista = att.name;
       resolvedAttendantId = att.id;
     }

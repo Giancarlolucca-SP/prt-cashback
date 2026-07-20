@@ -65,11 +65,25 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
+// Per-posto local installs serve the panel from the station's own machine —
+// staff on other devices on the same LAN reach it via that machine's local
+// IP (e.g. http://192.168.0.20:5173), not localhost. Without this, that
+// documented access path is silently rejected by CORS since the fixed
+// allowlist above only ever covers localhost/the public domains.
+function isPrivateLanOrigin(origin) {
+  try {
+    const { hostname } = new URL(origin);
+    return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes(origin) || isPrivateLanOrigin(origin)) return callback(null, true);
     callback(new Error(`CORS: origem não permitida — ${origin}`));
   },
   credentials: true,

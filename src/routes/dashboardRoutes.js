@@ -1,12 +1,12 @@
 const { Router } = require('express');
 const dashboardController = require('../controllers/dashboardController');
-const { authenticate } = require('../middlewares/authMiddleware');
+const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 
 const router = Router();
 
-router.get('/',                 authenticate, dashboardController.getSummary);
-router.get('/campaign-results', authenticate, dashboardController.getCampaignResults);
-router.get('/fuel-types',       authenticate, dashboardController.getFuelTypes);
-router.get('/attendants',       authenticate, dashboardController.getAttendantRanking);
+router.get('/',                 authenticate, requireAdmin, dashboardController.getSummary);
+router.get('/campaign-results', authenticate, requireAdmin, dashboardController.getCampaignResults);
+router.get('/fuel-types',       authenticate, requireAdmin, dashboardController.getFuelTypes);
+router.get('/attendants',       authenticate, requireAdmin, dashboardController.getAttendantRanking);
 
 module.exports = router;

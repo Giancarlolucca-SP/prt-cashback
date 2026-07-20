@@ -1,7 +1,6 @@
-const path  = require('path');
-const fs    = require('fs');
 const sharp = require('sharp');
 const QRCode = require('qrcode');
+const { createClient } = require('@supabase/supabase-js');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt   = require('jsonwebtoken');
@@ -10,6 +9,37 @@ const { formatDateBR } = require('../utils/dateFormatter');
 const audit = require('./auditService');
 
 const prisma = new PrismaClient();
+
+// ── Supabase (lazy) — logos must survive redeploys, unlike local disk ────────
+// (this backend runs as an ephemeral-filesystem web service on Render, and
+// writing to a local uploads/ folder means the file vanishes on the next
+// deploy/restart; every other uploaded image in this codebase — selfies,
+// receipt photos, attendant photos — already goes through Supabase Storage
+// for the same reason).
+
+const LOGO_BUCKET = 'logos';
+
+let _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
+
+let _bucketEnsured = false;
+async function ensureLogoBucket(supabase) {
+  if (_bucketEnsured) return;
+  try {
+    const { data } = await supabase.storage.getBucket(LOGO_BUCKET);
+    if (!data) await supabase.storage.createBucket(LOGO_BUCKET, { public: true });
+  } catch {
+    try { await supabase.storage.createBucket(LOGO_BUCKET, { public: true }); } catch {}
+  }
+  _bucketEnsured = true;
+}
 
 function formatCnpj(digits) {
   return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
@@ -46,34 +76,47 @@ async function create(
   const parsedCashback   = Math.min(100, Math.max(0, parseFloat(cashbackPercent) || 5));
   const parsedMinRedeem  = minRedemption ? parseFloat(minRedemption) : null;
 
-  const { est, op } = await prisma.$transaction(async (tx) => {
-    const est = await tx.establishment.create({
-      data: {
-        name:           nome.trim(),
-        cnpj:           cleanCnpj,
-        cashbackPercent: parsedCashback,
-        phone:          telefone?.trim()  || null,
-        address:        endereco?.trim()  || null,
-        city:           cidade?.trim()    || null,
-        state:          estado            || null,
-        ...(parsedMinRedeem !== null && { minRedemption: parsedMinRedeem }),
-      },
-    });
+  // existingEst/existingOp above is check-then-act, not atomic — a
+  // double-submit (double-click on this admin form) can race past it before
+  // either commits. Catch the resulting P2002 instead of an unhandled 500.
+  let est, op;
+  try {
+    ({ est, op } = await prisma.$transaction(async (tx) => {
+      const est = await tx.establishment.create({
+        data: {
+          name:           nome.trim(),
+          cnpj:           cleanCnpj,
+          cashbackPercent: parsedCashback,
+          phone:          telefone?.trim()  || null,
+          address:        endereco?.trim()  || null,
+          city:           cidade?.trim()    || null,
+          state:          estado            || null,
+          ...(parsedMinRedeem !== null && { minRedemption: parsedMinRedeem }),
+        },
+      });
 
-    const op = await tx.operator.create({
-      data: {
-        name:            operatorName.trim(),
-        email:           cleanEmail,
-        password:        hashedPassword,
-        role:            'ADMIN',
-        establishmentId: est.id,
-      },
-    });
+      const op = await tx.operator.create({
+        data: {
+          name:            operatorName.trim(),
+          email:           cleanEmail,
+          password:        hashedPassword,
+          role:            'ADMIN',
+          establishmentId: est.id,
+        },
+      });
 
-    await tx.fraudSettings.create({ data: { establishmentId: est.id } });
+      await tx.fraudSettings.create({ data: { establishmentId: est.id } });
 
-    return { est, op };
-  });
+      return { est, op };
+    }));
+  } catch (err) {
+    if (err.code === 'P2002') {
+      const target = Array.isArray(err.meta?.target) ? err.meta.target.join(',') : String(err.meta?.target || '');
+      if (target.includes('cnpj')) throw createError('CNPJ já cadastrado.', 409);
+      if (target.includes('email')) throw createError('E-mail do operador já cadastrado.', 409);
+    }
+    throw err;
+  }
 
   await audit.log({
     action:     'ESTABLISHMENT_CREATED',
@@ -134,17 +177,24 @@ async function uploadLogo(establishmentId, fileBuffer) {
   const est = await prisma.establishment.findUnique({ where: { id: establishmentId } });
   if (!est) throw createError('Estabelecimento não encontrado.', 404);
 
-  const logosDir = path.join(__dirname, '../uploads/logos');
-  if (!fs.existsSync(logosDir)) fs.mkdirSync(logosDir, { recursive: true });
+  const supabase = getSupabase();
+  if (!supabase) throw createError('Armazenamento de imagens não configurado.', 503);
+  await ensureLogoBucket(supabase);
 
-  const outputPath = path.join(logosDir, `${establishmentId}.webp`);
-
-  await sharp(fileBuffer)
+  const buf = await sharp(fileBuffer)
     .resize(400, 400, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
     .webp({ quality: 85 })
-    .toFile(outputPath);
+    .toBuffer();
 
-  const logoUrl = `/uploads/logos/${establishmentId}.webp`;
+  const path = `${establishmentId}.webp`;
+  const { error } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, buf, { contentType: 'image/webp', upsert: true });
+  if (error) throw createError(`Falha ao enviar a logo: ${error.message}`, 502);
+
+  const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+  // Cache-bust so the admin sees the new logo immediately on re-upload
+  const logoUrl = data?.publicUrl ? `${data.publicUrl}?v=${Date.now()}` : null;
 
   await prisma.establishment.update({
     where: { id: establishmentId },
@@ -314,15 +364,24 @@ async function completarCadastroOAuth({ nome, cnpj, telefone, cidade, estado }, 
   if (existingEst)     throw createError('CNPJ já cadastrado no sistema.', 409);
   if (operator.establishmentId) throw createError('Estabelecimento já cadastrado para este operador.', 409);
 
-  const establishment = await prisma.establishment.create({
-    data: {
-      name:  nome.trim(),
-      cnpj:  cleanCnpj,
-      phone: telefone || null,
-      city:  cidade   || null,
-      state: estado   || null,
-    },
-  });
+  // existingEst above is check-then-act — a double-submit of the "finalizar
+  // cadastro" button (a real, plausible UI double-click, not just a
+  // theoretical race) can pass it twice before either commits.
+  let establishment;
+  try {
+    establishment = await prisma.establishment.create({
+      data: {
+        name:  nome.trim(),
+        cnpj:  cleanCnpj,
+        phone: telefone || null,
+        city:  cidade   || null,
+        state: estado   || null,
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') throw createError('CNPJ já cadastrado no sistema.', 409);
+    throw err;
+  }
 
   const updated = await prisma.operator.update({
     where: { id: operatorId },

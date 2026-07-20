@@ -1,10 +1,16 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/pistaController');
-const { authenticate } = require('../middlewares/authMiddleware');
+const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 
 const router = Router();
 
-// All pista routes are operator/frentista only (establishment-scoped via JWT).
+// All pista routes require login; the day-to-day frentista actions below
+// (accrual, fuelings, redemption queue, comprovante, caixa, dashboard) are
+// also reachable by OPERATOR role (whitelisted in operatorLockdown). The
+// config screens further down (fuel-map, card-map, concentrador-config)
+// are admin-only — that was previously enforced only by operatorLockdown's
+// external whitelist rejecting OPERATOR tokens before reaching these, not
+// self-documented on the routes themselves.
 router.use(authenticate);
 
 // Cashback (manual fallback + from selected fueling)
@@ -25,18 +31,18 @@ router.get ('/caixa',                            ctrl.caixa);
 router.get ('/dashboard',                        ctrl.dashboard);
 
 // Config — fuel map (bico -> combustível)
-router.get   ('/fuel-map',                       ctrl.listFuelMap);
-router.post  ('/fuel-map',                       ctrl.upsertFuelMap);
-router.delete('/fuel-map/:id',                   ctrl.deleteFuelMap);
-router.post  ('/fuel-map/backfill',              ctrl.backfillFuel);
+router.get   ('/fuel-map',                       requireAdmin, ctrl.listFuelMap);
+router.post  ('/fuel-map',                       requireAdmin, ctrl.upsertFuelMap);
+router.delete('/fuel-map/:id',                   requireAdmin, ctrl.deleteFuelMap);
+router.post  ('/fuel-map/backfill',              requireAdmin, ctrl.backfillFuel);
 
 // Config — card map (Identfid -> frentista/Attendant)
-router.get   ('/card-map',                       ctrl.listCardMap);
-router.post  ('/card-map',                       ctrl.upsertCardMap);
-router.delete('/card-map/:id',                   ctrl.deleteCardMap);
+router.get   ('/card-map',                       requireAdmin, ctrl.listCardMap);
+router.post  ('/card-map',                       requireAdmin, ctrl.upsertCardMap);
+router.delete('/card-map/:id',                   requireAdmin, ctrl.deleteCardMap);
 
 // Config — concentrador (Companytec TCP connection settings for the local agent)
-router.get('/concentrador-config',               ctrl.getConcentradorConfig);
-router.put('/concentrador-config',               ctrl.updateConcentradorConfig);
+router.get('/concentrador-config',               requireAdmin, ctrl.getConcentradorConfig);
+router.put('/concentrador-config',               requireAdmin, ctrl.updateConcentradorConfig);
 
 module.exports = router;

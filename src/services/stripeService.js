@@ -28,18 +28,37 @@ function idempotencyKeyFor(...parts) {
   return crypto.createHash('sha256').update(parts.join(':')).digest('hex');
 }
 
+const PRODUCT_NAME = 'PostoCash — Sistema de Fidelidade';
+
 async function ensurePrice() {
   const s = getStripe();
 
-  const product = await s.products.create({
-    name: 'PostoCash — Sistema de Fidelidade',
-    description: 'Assinatura mensal — acesso completo ao sistema PostoCash para postos de combustível',
+  // Idempotent: with several server instances/installs sharing the same
+  // Stripe account (Render's old/new duplicate services, plus per-posto
+  // local installs), any boot that doesn't have STRIPE_PRICE_ID persisted
+  // (a fresh install, or a redeploy on a platform with an ephemeral
+  // filesystem where server.js's .env write-back doesn't survive a
+  // restart) used to unconditionally mint a brand new Stripe Product +
+  // Price — one more duplicate every time. Look for an existing one first.
+  const existingProducts = await s.products.search({
+    query: `name:'${PRODUCT_NAME}' AND active:'true'`,
   });
+  let product = existingProducts.data[0];
+
+  if (!product) {
+    product = await s.products.create({
+      name: PRODUCT_NAME,
+      description: 'Assinatura mensal — acesso completo ao sistema PostoCash para postos de combustível',
+    });
+  }
+
+  const existingPrices = await s.prices.list({ product: product.id, active: true, limit: 1 });
+  if (existingPrices.data[0]) return existingPrices.data[0].id;
 
   const price = await s.prices.create({
     product: product.id,
     unit_amount: 20000, // R$ 200,00 em centavos
-    currency: 'usd',
+    currency: 'brl',
     recurring: { interval: 'month' },
   });
 

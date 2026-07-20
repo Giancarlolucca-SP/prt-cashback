@@ -8,8 +8,8 @@ const EVOLUTION_URL      = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY  = process.env.EVOLUTION_API_KEY;
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'postocash';
 
-// GET /admin/whatsapp-status — authenticated
-router.get('/whatsapp-status', authenticate, async (req, res) => {
+// GET /admin/whatsapp-status — admin only
+router.get('/whatsapp-status', authenticate, requireSuperAdmin, async (req, res) => {
   try {
     if (!EVOLUTION_URL || !EVOLUTION_API_KEY) {
       return res.status(503).json({

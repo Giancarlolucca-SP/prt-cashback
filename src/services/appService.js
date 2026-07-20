@@ -137,9 +137,10 @@ async function register({ cpf, name, phone, establishmentCnpj, deviceId, selfieB
 
 // ── login ─────────────────────────────────────────────────────────────────────
 
-async function login({ cpf, establishmentCnpj }) {
+async function login({ cpf, establishmentCnpj, recoveryToken }) {
   if (!cpf || !isValidCpf(cpf)) throw createError('CPF inválido.', 400);
   if (!establishmentCnpj)       throw createError('CNPJ do estabelecimento é obrigatório.', 400);
+  if (!recoveryToken)           throw createError('Verificação por SMS obrigatória.', 401);
 
   const strippedCpf = stripCpf(cpf);
   const establishment = await findEstablishment(establishmentCnpj);
@@ -148,6 +149,25 @@ async function login({ cpf, establishmentCnpj }) {
     where: { cpf_establishmentId: { cpf: strippedCpf, establishmentId: establishment.id } },
   });
   if (!customer) throw createError('Cliente não encontrado. Realize o cadastro primeiro.', 404);
+
+  // Require proof (minted by verifyOtp) that the caller just demonstrated
+  // control of THIS customer's phone — CPF and the establishment's CNPJ are
+  // both non-secret (CPF printed on receipts, CNPJ public business registry
+  // data), so without this check anyone who knew both could mint a session
+  // for any customer with no OTP/password/device check at all.
+  let proof;
+  try {
+    proof = jwt.verify(recoveryToken, process.env.JWT_SECRET);
+  } catch {
+    throw createError('Verificação por SMS expirada. Solicite um novo código.', 401);
+  }
+  if (
+    proof.purpose !== 'recovery' ||
+    proof.establishmentId !== establishment.id ||
+    proof.phone !== customer.phone
+  ) {
+    throw createError('Verificação por SMS inválida para esta conta.', 403);
+  }
 
   const token = signCustomerToken({
     customerId:      customer.id,
@@ -564,11 +584,17 @@ async function sendOtp({ phone, establishmentCnpj }) {
 
   const code = otpService.send(rawPhone, establishment.id);
 
-  const isDev = process.env.NODE_ENV !== 'production';
+  // Inverted on purpose: this must default CLOSED. `NODE_ENV !== 'production'`
+  // means a forgotten/misconfigured/blank NODE_ENV — the actual failure mode
+  // for a fresh install — leaks every OTP straight into the API response,
+  // silently defeating the whole phone-possession check recovery/login rely
+  // on. Requiring an explicit opt-in means an unset env var fails safe.
+  const debugMode = process.env.OTP_DEBUG_MODE === 'true';
   return {
     mensagem: 'Código enviado com sucesso.',
-    // Return code only in dev so the mobile app can auto-fill during testing
-    ...(isDev ? { codigo: code } : {}),
+    // Return code only when explicitly enabled, so the mobile app can
+    // auto-fill during local testing.
+    ...(debugMode ? { codigo: code } : {}),
   };
 }
 
@@ -750,9 +776,18 @@ async function recoveryComplete({ cpf, establishmentCnpj, deviceId, selfieBase64
   }
 
   const incomingSelfie = selfieThumb || selfieBase64;
+  const hasSelfieOnFile = customer.selfieData || customer.selfieThumbnailUrl;
+
+  // A customer with a selfie on file MUST prove identity with a new one — a
+  // caller hitting this endpoint directly (not through the vetted mobile
+  // client) could otherwise just omit the selfie fields entirely and skip
+  // biometric verification, rebinding the device with only the OTP proof.
+  if (hasSelfieOnFile && !incomingSelfie) {
+    throw createError('Verificação por selfie é obrigatória para esta conta.', 400);
+  }
 
   // Selfie similarity check using pixel comparison (thumbnail is preferred)
-  if (incomingSelfie && (customer.selfieData || customer.selfieThumbnailUrl)) {
+  if (incomingSelfie && hasSelfieOnFile) {
     const result = await selfieService.compareFaces(incomingSelfie, customer.id);
 
     if (!result.match) {

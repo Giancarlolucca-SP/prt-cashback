@@ -31,10 +31,29 @@ async function validateDeviceId(req, res, next) {
     // an omitted header shouldn't erase the requirement for future requests.
     if (!customer.deviceId) {
       if (headerDeviceId) {
-        await prisma.customer.update({
-          where: { id: customerId },
+        // CAS: two concurrent requests (e.g. a stolen-but-not-yet-bound JWT
+        // racing the legitimate first login) could both read deviceId:null —
+        // updateMany + count check ensures only the first actually claims it.
+        const claim = await prisma.customer.updateMany({
+          where: { id: customerId, deviceId: null },
           data:  { deviceId: headerDeviceId },
         });
+        if (claim.count === 0) {
+          // Lost the race — re-check against whichever device actually won.
+          const fresh = await prisma.customer.findUnique({ where: { id: customerId }, select: { deviceId: true } });
+          if (fresh?.deviceId && fresh.deviceId !== headerDeviceId) {
+            await fraudAlertService.logAlert(
+              'WRONG_DEVICE',
+              customerId,
+              customer.establishmentId,
+              { storedDevice: fresh.deviceId, requestDevice: headerDeviceId },
+            );
+            return res.status(403).json({
+              erro: 'Dispositivo não autorizado. Realize o processo de recuperação de conta.',
+              codigo: 'WRONG_DEVICE',
+            });
+          }
+        }
       }
       return next();
     }
@@ -60,8 +79,13 @@ async function validateDeviceId(req, res, next) {
       codigo: 'WRONG_DEVICE',
     });
   } catch (err) {
+    // Fail CLOSED: this check exists specifically to block a stolen JWT used
+    // from a different device, so swallowing errors and letting the request
+    // through would silently reopen exactly that bypass on any transient
+    // Prisma error — the same class of "quiet failure defeats the guard" bug
+    // this middleware itself was written to close.
     console.error('[DeviceMiddleware] Erro:', err.message);
-    next(); // Fail open — don't break the app over a device check error
+    return res.status(503).json({ erro: 'Não foi possível validar o dispositivo. Tente novamente.' });
   }
 }
 
