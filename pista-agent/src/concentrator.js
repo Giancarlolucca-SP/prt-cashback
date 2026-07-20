@@ -21,9 +21,34 @@ class Concentrator {
       this.sock = s;
       s.setEncoding('latin1'); // 1 byte = 1 char (ASCII protocol)
       let settled = false;
-      s.once('connect', () => { settled = true; resolve(); });
+
+      // Guards the TCP handshake itself: on a host that silently drops SYN
+      // (firewall, dead IP on a live subnet) neither 'connect' nor 'error'
+      // ever fires, and this promise would otherwise hang forever — freezing
+      // the whole read loop, which awaits connect(), with no reconnect ever
+      // attempted again.
+      s.setTimeout(this.timeoutMs);
+
+      s.once('connect', () => {
+        settled = true;
+        s.setTimeout(0); // done with the connect-phase timeout; don't fire on ordinary idle polling
+        resolve();
+      });
       s.on('data', (d) => { this.buffer += d; });
-      s.once('error', (err) => { if (!settled) { settled = true; reject(err); } });
+
+      // Always-on, not .once(): a .once() listener self-detaches after firing,
+      // so a SECOND 'error' on this same socket later (e.g. two ECONNRESETs
+      // back to back) would have no listener left — Node throws an unhandled
+      // 'error' event in that case, crashing this long-running, unattended
+      // process outright. Post-connect errors are otherwise surfaced to
+      // callers via sendCommand()'s own timeout; this handler's only job is
+      // to make sure 'error' never goes unhandled.
+      s.on('error', (err) => {
+        if (!settled) { settled = true; reject(err); }
+      });
+      s.once('timeout', () => {
+        if (!settled) { settled = true; s.destroy(); reject(new Error('timeout ao conectar ao concentrador')); }
+      });
       s.once('close', () => { /* surfaced via sendCommand failures */ });
     });
   }

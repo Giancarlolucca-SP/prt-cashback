@@ -252,10 +252,16 @@ async function runLoop() {
           log.step('Avançando ponteiro de leitura (&I).');
           try {
             await conc.sendCommand(proto.CMD.INCREMENT, { withChecksum: useChecksum, expectResponse: false });
+            // Only confirm (remove from the local durable queue) once the pointer
+            // has actually advanced — the backend's unique constraint on
+            // (establishmentId, registro, encerranteFinal, fuelingDateTime) makes
+            // a re-send safe either way, but confirming here would leave the
+            // local queue silently out of sync with what the device pointer
+            // says is still unread.
+            queue.confirm(fueling);
           } catch (e) {
-            log.warn('Incremento (&I) falhou:', e.message);
+            log.warn('Incremento (&I) falhou; mantendo na fila local — será reenviado (idempotente) até o ponteiro avançar:', e.message);
           }
-          queue.confirm(fueling);
         } else {
           const why = result.err ? result.err.message : `HTTP ${result.status} ${result.body || ''}`;
           log.error(`Falha ao enviar para a nuvem: ${why}. Mantendo o ponteiro; nova tentativa em ${config.retryIntervalMs}ms.`);
