@@ -8,6 +8,16 @@ import {
   ChartPie, Drop, IdentificationCard, Plus, Trash, UserCircle, Plugs,
 } from '@phosphor-icons/react';
 
+// Not crypto.randomUUID(): the panel is also accessed over plain HTTP on the
+// posto's LAN (see manual), where that API is unavailable (secure-context only).
+function genIdempotencyKey() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Fuel keys (match each establishment's cashback config)
 const FUEL_OPTIONS = [
   { value: '',                   label: 'Sem combustível específico' },
@@ -233,6 +243,10 @@ function ManualAccrualForm({ onResult, attendantId }) {
   const [bomba, setBomba]   = useState('');
   const [busy, setBusy]     = useState(false);
   const [error, setError]   = useState('');
+  // Stable across retries of the SAME submission (e.g. a timed-out request the
+  // frentista resubmits without knowing the first one already landed) so the
+  // backend can dedupe instead of double-crediting; rotated after each success.
+  const idempotencyKeyRef = useRef(genIdempotencyKey());
 
   async function submit(e) {
     e.preventDefault();
@@ -242,7 +256,11 @@ function ManualAccrualForm({ onResult, attendantId }) {
     if (!value || value <= 0) { setError('Informe o valor do abastecimento.'); return; }
     setBusy(true);
     try {
-      const { data } = await pistaAPI.accrue({ cpf: stripCpf(cpf), amount: value, fuelType: fuelType || undefined, bomba: bomba || undefined, attendantId: attendantId || undefined });
+      const { data } = await pistaAPI.accrue({
+        cpf: stripCpf(cpf), amount: value, fuelType: fuelType || undefined, bomba: bomba || undefined,
+        attendantId: attendantId || undefined, idempotencyKey: idempotencyKeyRef.current,
+      });
+      idempotencyKeyRef.current = genIdempotencyKey();
       onResult(data); setAmount(''); setBomba('');
     } catch (e2) {
       setError(e2.response?.data?.erro ?? 'Não foi possível acumular o cashback.');
@@ -400,9 +418,10 @@ function ConfirmRedemptionModal({ request, attendantId, onClose, onDone }) {
   const [error, setError]   = useState('');
 
   async function confirm() {
+    const value = parseFloat(String(amount).replace(',', '.'));
+    if (!value || isNaN(value) || value <= 0) { setError('Informe um valor válido.'); return; }
     setBusy(true); setError('');
     try {
-      const value = parseFloat(String(amount).replace(',', '.'));
       const { data } = await pistaAPI.confirmRequest(request.id, { amount: value, note: note || undefined, attendantId: attendantId || undefined });
       onDone(data.comprovante);
     } catch (e) {
@@ -874,14 +893,23 @@ function ConcentradorTab() {
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
 
   async function save(e) {
-    e.preventDefault(); setError(''); setNotice(''); setSaving(true);
+    e.preventDefault(); setError(''); setNotice('');
+    const port = parseInt(form.port, 10);
+    const pollIntervalMs = parseInt(form.pollIntervalMs, 10);
+    const retryIntervalMs = parseInt(form.retryIntervalMs, 10);
+    const socketTimeoutMs = parseInt(form.socketTimeoutMs, 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) { setError('Porta inválida (1–65535).'); return; }
+    for (const [label, v] of [['Intervalo de leitura', pollIntervalMs], ['Nova tentativa', retryIntervalMs], ['Timeout do socket', socketTimeoutMs]]) {
+      if (!Number.isInteger(v) || v < 100) { setError(`${label}: informe um número inteiro de pelo menos 100ms.`); return; }
+    }
+    setSaving(true);
     try {
       const { data } = await pistaAPI.updateConcentradorConfig({
         host: form.host,
-        port: parseInt(form.port, 10),
-        pollIntervalMs: parseInt(form.pollIntervalMs, 10),
-        retryIntervalMs: parseInt(form.retryIntervalMs, 10),
-        socketTimeoutMs: parseInt(form.socketTimeoutMs, 10),
+        port,
+        pollIntervalMs,
+        retryIntervalMs,
+        socketTimeoutMs,
         useChecksum: form.useChecksum,
         readMode: form.readMode,
       });
@@ -985,6 +1013,17 @@ export default function PainelPista() {
   useEffect(() => {
     attendantsAPI.list().then((res) => setAttendants((res.data.attendants || []).filter((a) => a.active))).catch(() => {});
   }, []);
+
+  // A frentista deactivated (or removed) between sessions shouldn't keep being
+  // silently attributed via a stale sessionStorage id — clear it so the bar
+  // prompts for a fresh selection instead.
+  useEffect(() => {
+    if (!attendantId || !attendants.length) return;
+    if (!attendants.some((a) => a.id === attendantId)) {
+      setAttendantId('');
+      sessionStorage.removeItem(FRENTISTA_SESSION_KEY);
+    }
+  }, [attendants, attendantId]);
 
   // Auto-select if this operator login maps 1:1 to a single registered attendant.
   useEffect(() => {

@@ -186,7 +186,7 @@ export const authApi = {
     selfieBase64?:    string;
   }) => api.post('/app/register', data),
 
-  login: (data: { cpf: string; establishmentCnpj: string }) =>
+  login: (data: { cpf: string; establishmentCnpj: string; recoveryToken: string }) =>
     api.post('/app/login', data),
 
   sendOtp: (data: { phone: string; establishmentCnpj: string }) =>

@@ -131,6 +131,7 @@ export default function ValidarScreen() {
 
   const photoCameraRef = useRef<CameraView>(null);
   const scanLock       = useRef(false);
+  const sendingPhotoRef = useRef(false);
 
   // Pre-flight: check token
   useEffect(() => {
@@ -240,6 +241,7 @@ export default function ValidarScreen() {
     mutationFn: (base64Photo: string) =>
       customerApi.validatePhoto({ photo: base64Photo }),
     onSuccess: ({ data }) => {
+      sendingPhotoRef.current = false;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['balance'] });
       queryClient.invalidateQueries({ queryKey: ['statement'] });
@@ -250,6 +252,7 @@ export default function ValidarScreen() {
       setResult({ kind: 'nfce', data, via: 'photo' });
     },
     onError: (err: any) => {
+      sendingPhotoRef.current = false;
       const msg = err.response?.data?.erro ?? 'Não foi possível processar a foto do cupom.';
       Alert.alert(
         'Erro ao processar foto',
@@ -309,7 +312,11 @@ export default function ValidarScreen() {
   }
 
 function handleSendPhoto() {
-    if (!photoData) return;
+    // photoStep flipping to 'uploading' is an async re-render, not a synchronous
+    // guard — a fast double-tap before that render can still fire validatePhoto
+    // twice for the same cupom. Mirrors the scanLock pattern used for handleScan.
+    if (!photoData || sendingPhotoRef.current) return;
+    sendingPhotoRef.current = true;
     setPhotoStep('uploading');
     validatePhoto(photoData);
   }
@@ -628,7 +635,14 @@ function handleSendPhoto() {
         {/* Back button + location indicator */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 10 }}>
           <TouchableOpacity
-            onPress={() => setScanning(false)}
+            onPress={() => {
+              // Doesn't cancel an in-flight redeem/validateNfce (no AbortController
+              // wired through react-query here), but resetting the lock means the
+              // scanner works again on re-entry instead of silently no-op'ing in
+              // handleScan until the abandoned request eventually resolves.
+              scanLock.current = false;
+              setScanning(false);
+            }}
             hitSlop={8}
             style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}
           >

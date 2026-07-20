@@ -31,9 +31,6 @@ function FacebookIcon() {
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-// Debug: log the env var so we can confirm it's being picked up
-console.log('GOOGLE_CLIENT_ID:', googleClientId);
-
 function GoogleLoginButton({ onSuccess, onError, disabled }) {
   const googleLogin = useGoogleLogin({ onSuccess, onError });
   return (

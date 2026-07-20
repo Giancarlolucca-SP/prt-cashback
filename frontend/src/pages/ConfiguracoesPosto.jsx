@@ -17,6 +17,9 @@ function formatBytes(bytes) {
 
 function EstablishmentLogo({ src, name, size = 'lg' }) {
   const [failed, setFailed] = useState(false);
+  // Without this, a one-time load failure (stale URL, transient network blip)
+  // sticks forever — a successful re-upload changing `src` wouldn't clear it.
+  useEffect(() => { setFailed(false); }, [src]);
   const dim = size === 'lg' ? 'w-24 h-24' : 'w-12 h-12';
   const txt = size === 'lg' ? 'text-3xl' : 'text-xl';
 
@@ -333,8 +336,8 @@ export default function ConfiguracoesPosto() {
       setPendingPreview(null);
       if (inputRef.current) inputRef.current.value = '';
       showToast('Logo atualizado com sucesso!', 'success');
-    } catch {
-      showToast('Erro ao enviar logo. Tente novamente.', 'error');
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao enviar logo. Tente novamente.', 'error');
     } finally {
       setUploading(false);
       setProgress(0);

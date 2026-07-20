@@ -1,6 +1,5 @@
 ﻿import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { clearDeviceId } from '../utils/deviceId';
 
 export interface CustomerUser {
   id: string;
@@ -55,6 +54,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    // Deliberately does NOT clear the device ID. It did previously ("so the
+    // next login re-binds"), but device binding is meant to be a property of
+    // this physical installation, not the session — clearing it here meant
+    // getOrCreateDeviceId() minted a brand-new random ID on the very next
+    // login, which the backend's deviceMiddleware then saw as a mismatch
+    // against the one still stored on the customer's row (login itself never
+    // updates it), triggering a false WRONG_DEVICE block + fraud alert for
+    // the completely ordinary case of a customer logging out and back into
+    // their own phone. The device ID should only ever change via a real
+    // reinstall (SecureStore is wiped automatically) or the explicit
+    // selfie-verified recovery flow — not a routine logout.
     await Promise.all([
       SecureStore.deleteItemAsync('postocash_token'),
       SecureStore.deleteItemAsync('postocash_user'),
@@ -63,8 +73,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       SecureStore.deleteItemAsync('customer_data'),
       SecureStore.deleteItemAsync('establishment_data'),
     ]);
-    // Clear device binding so the next login re-binds to this device
-    await clearDeviceId();
     set({ token: null, user: null, establishmentName: null });
   },
 

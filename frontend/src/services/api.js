@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// In production VITE_API_URL points to Render backend.
-// In development the Vite proxy rewrites /api → localhost:3000.
-const API_URL = import.meta.env.VITE_API_URL || 'https://postocash-api.onrender.com';
+// In production VITE_API_URL points to Render backend (or, for a per-posto
+// local install, to that machine's own localhost:3000 — see frontend/.env).
+// This fallback is only used if VITE_API_URL isn't set at build time.
+const API_URL = import.meta.env.VITE_API_URL || 'https://postocash-api-udnj.onrender.com';
 
 const api = axios.create({
   baseURL: API_URL,

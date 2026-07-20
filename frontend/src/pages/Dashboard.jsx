@@ -740,6 +740,9 @@ function dotColor(id = '') {
 
 function EstLogo({ logoUrl, name, id, size = 20 }) {
   const [failed, setFailed] = useState(false);
+  // Without this, a one-time load failure (stale URL, transient network blip)
+  // sticks forever even after logoUrl changes to a working one.
+  useEffect(() => { setFailed(false); }, [logoUrl]);
   const style = { width: size, height: size };
   if (logoUrl && !failed) {
     return (

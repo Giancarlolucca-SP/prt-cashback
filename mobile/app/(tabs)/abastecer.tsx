@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, Alert, TouchableOpacity,
   KeyboardAvoidingView, Platform,
@@ -63,27 +63,43 @@ export default function AbastecerScreen() {
     },
   });
 
+  // Guards the whole handleSubmit body, including the biometric prompt await —
+  // isPending alone doesn't cover that window, since it only flips once submit()
+  // (the mutation) is actually called, so a fast double-tap before the biometric
+  // check resolves could otherwise fire two concurrent transactions.
+  const submittingRef = useRef(false);
+
   async function handleSubmit() {
+    if (submittingRef.current) return;
+    if ((amount.match(/,/g) || []).length > 1) {
+      Alert.alert('Valor inválido', 'Use apenas uma vírgula decimal (ex: 123,45).');
+      return;
+    }
     const parsed = parseFloat(amount.replace(',', '.'));
     if (!amount || isNaN(parsed) || parsed <= 0) {
       Alert.alert('Valor inválido', 'Informe o valor do abastecimento.');
       return;
     }
 
-    // Biometric confirmation for transactions
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    if (compatible) {
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (enrolled) {
-        const bio = await LocalAuthentication.authenticateAsync({
-          promptMessage: `Confirmar abastecimento de ${formatBRL(parsed)}`,
-          cancelLabel:   'Cancelar',
-        });
-        if (!bio.success) return;
+    submittingRef.current = true;
+    try {
+      // Biometric confirmation for transactions
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      if (compatible) {
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (enrolled) {
+          const bio = await LocalAuthentication.authenticateAsync({
+            promptMessage: `Confirmar abastecimento de ${formatBRL(parsed)}`,
+            cancelLabel:   'Cancelar',
+          });
+          if (!bio.success) return;
+        }
       }
-    }
 
-    submit();
+      submit();
+    } finally {
+      submittingRef.current = false;
+    }
   }
 
   if (result) {

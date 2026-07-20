@@ -105,8 +105,9 @@ export default function OtpScreen() {
         return;
       }
 
-      // Login mode — complete login after OTP
-      completeLogin();
+      // Login mode — complete login after OTP, passing the proof that this
+      // device just verified the OTP for this phone (backend requires it).
+      completeLogin(verifyData.recoveryToken);
     },
     onError: (err: any) => {
       Alert.alert('Código inválido', err.response?.data?.erro ?? 'Verifique o código e tente novamente.');
@@ -118,10 +119,11 @@ export default function OtpScreen() {
   // ── Complete login (after OTP in login mode) ─────────────────────────────────
 
   const { mutate: completeLogin, isPending: isLoggingIn } = useMutation({
-    mutationFn: () =>
+    mutationFn: (recoveryToken: string) =>
       authApi.login({
         cpf:              (params.cpf ?? '').replace(/\D/g, ''),
         establishmentCnpj: (params.cnpj ?? '').replace(/\D/g, ''),
+        recoveryToken,
       }),
     onSuccess: ({ data }) => {
       setAuth(data.token, data.cliente, data.estabelecimento?.nome ?? '');

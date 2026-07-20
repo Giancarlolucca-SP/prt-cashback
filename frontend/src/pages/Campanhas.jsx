@@ -36,9 +36,14 @@ function formatBRL(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 }
 
+// rewardValue always comes from a native <input type="number">, whose
+// e.target.value is always period-decimal regardless of browser/OS locale —
+// treating it as comma-decimal (like a BRL-formatted text field) silently
+// turned "0.05" into 5 (the comma-strip regex removes the period, leaving
+// "005", which parseFloat reads as 5): a 100x overpayment on every campaign
+// using a sub-R$1 per-liter reward.
 function parseBRLInput(raw) {
-  const clean = raw.replace(/[^\d,]/g, '').replace(',', '.');
-  const num = parseFloat(clean);
+  const num = parseFloat(raw);
   return isNaN(num) ? '' : num;
 }
 
@@ -429,6 +434,10 @@ export default function Campanhas() {
     const val = parseBRLInput(rewardValue);
     if (!message.trim()) {
       showToast('A mensagem não pode estar vazia.', 'error');
+      return;
+    }
+    if (!previewData?.totalClientes) {
+      showToast('Nenhum cliente elegível para esta campanha.', 'error');
       return;
     }
     setSending(true);

@@ -93,10 +93,13 @@ export default function Clientes() {
     setSearch(value);
     clearTimeout(debounceRef.current);
 
-    if (value.length === 0) {
+    if (value.length < 3) {
+      // Below the 3-char search threshold — including backspacing down from a
+      // previously active search — clear it instead of leaving the table
+      // showing stale results for a term the input no longer displays.
       setActiveSearch('');
       setPage(1);
-    } else if (value.length >= 3) {
+    } else {
       debounceRef.current = setTimeout(() => {
         setActiveSearch(value);
         setPage(1);

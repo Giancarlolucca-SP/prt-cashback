@@ -82,7 +82,7 @@ export default function Operadores() {
           </div>
           <div className="w-44">
             <label className="block text-xs text-gray-500 mb-1">Senha</label>
-            <input value={password} onChange={(e) => setPass(e.target.value)} type="text" placeholder="mín. 6 caracteres"
+            <input value={password} onChange={(e) => setPass(e.target.value)} type="password" placeholder="mín. 6 caracteres"
               className="w-full h-10 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" />
           </div>
         </div>

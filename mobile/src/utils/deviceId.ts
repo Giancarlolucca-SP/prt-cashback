@@ -23,8 +23,11 @@ export async function getOrCreateDeviceId(): Promise<string> {
 }
 
 /**
- * Explicitly clear device ID (used on logout to force re-binding on next login).
- * Note: on a full reinstall SecureStore is cleared automatically.
+ * Explicitly clear the stored device ID. Not called from logout — device
+ * binding should survive an ordinary logout/login cycle on the same phone;
+ * see the comment in store/auth.ts's logout(). Exists for a genuine
+ * reset/support scenario, should one come up; a full reinstall already
+ * clears SecureStore automatically.
  */
 export async function clearDeviceId(): Promise<void> {
   await SecureStore.deleteItemAsync(DEVICE_ID_KEY);
