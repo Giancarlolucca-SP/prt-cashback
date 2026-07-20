@@ -34,7 +34,7 @@
         "image": "latest"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://postocash-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://postocash-api-udnj.onrender.com"
       }
     }
   },
