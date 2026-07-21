@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Image,
 } from 'react-native';
@@ -84,6 +84,11 @@ export default function AttendantRating({
   // The attendant currently selected in manual mode (to show its photo in the header)
   const selectedManual = attendants.find((a) => a.key === selectedKey);
 
+  // isPending only flips after this state update is committed — a fast
+  // double-tap before that re-render can still fire submit() twice, same gap
+  // fixed elsewhere this session (e.g. mobile/app/(tabs)/abastecer.tsx).
+  const submittingRef = useRef(false);
+
   const { mutate: submit, isPending } = useMutation({
     mutationFn: () =>
       ratingApi.submit({
@@ -99,9 +104,16 @@ export default function AttendantRating({
       onSubmitted?.();
     },
     onError: (err: any) => {
+      submittingRef.current = false;
       Alert.alert('Erro', err.response?.data?.erro ?? 'Não foi possível enviar a avaliação.');
     },
   });
+
+  function handleSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    submit();
+  }
 
   // ── Thank-you state ──
   if (submitted) {
@@ -231,7 +243,7 @@ export default function AttendantRating({
         fullWidth
         loading={isPending}
         disabled={!canSubmit}
-        onPress={() => submit()}
+        onPress={handleSubmit}
       />
 
       <TouchableOpacity onPress={onDone} className="mt-3 py-2" activeOpacity={0.7}>
