@@ -1,5 +1,18 @@
 const establishmentService = require('../services/establishmentService');
 
+// Neither the service layer nor these routes previously checked that the
+// caller's own establishment matched req.params.id — any ADMIN (of ANY
+// establishment) could upload a logo or change branding colors for a
+// completely different one just by supplying its id in the URL. SUPERADMIN
+// legitimately manages every establishment; a plain ADMIN must be confined
+// to their own.
+function assertOwnEstablishment(req, res) {
+  if (req.operator.role === 'SUPERADMIN') return true;
+  if (req.operator.establishmentId === req.params.id) return true;
+  res.status(403).json({ erro: 'Você só pode gerenciar o seu próprio estabelecimento.' });
+  return false;
+}
+
 async function create(req, res, next) {
   try {
     const result = await establishmentService.create(req.body, req.operator?.id ?? null);
@@ -20,6 +33,7 @@ async function listAll(req, res, next) {
 
 async function uploadLogo(req, res, next) {
   try {
+    if (!assertOwnEstablishment(req, res)) return;
     if (!req.file) {
       return res.status(400).json({ erro: 'Nenhum arquivo enviado.' });
     }
@@ -45,6 +59,7 @@ async function getQRCode(req, res, next) {
 
 async function updateBranding(req, res, next) {
   try {
+    if (!assertOwnEstablishment(req, res)) return;
     const { primaryColor, secondaryColor } = req.body;
     const result = await establishmentService.updateBranding(
       req.params.id,
