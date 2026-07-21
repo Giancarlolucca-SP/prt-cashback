@@ -7,10 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#FF6B00",
-      "resizeMode": "contain"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.postocash.app",
@@ -82,7 +78,16 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FF6B00"
+        }
+      ]
     ],
     "notification": {
       "icon": "./assets/icon.png",
