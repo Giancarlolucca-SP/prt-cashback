@@ -2,7 +2,25 @@ const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// establishmentName/email are attacker-influenced (POST /establishments is
+// public self-registration) and get interpolated straight into this HTML
+// email with no escaping — a name like `<img src=x onerror=...>` would run
+// in whoever opens the welcome email (typically the same person who signed
+// up, but not guaranteed if the address is spoofed/shared).
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendWelcomeEmail({ name, email, password, establishmentName }) {
+  const safeEmail = escapeHtml(email);
+  const safeEstablishmentName = escapeHtml(establishmentName);
+  const safePassword = escapeHtml(password);
+
   const { error } = await resend.emails.send({
     from: 'PostoCash <noreply@sistemapostocash.app>',
     to: email,
@@ -23,15 +41,15 @@ async function sendWelcomeEmail({ name, email, password, establishmentName }) {
           <table style="width:100%;border-collapse:collapse;">
             <tr>
               <td style="padding:8px 0;color:#64748b;font-size:14px;">Estabelecimento</td>
-              <td style="padding:8px 0;color:#1e293b;font-size:14px;font-weight:600;">${establishmentName}</td>
+              <td style="padding:8px 0;color:#1e293b;font-size:14px;font-weight:600;">${safeEstablishmentName}</td>
             </tr>
             <tr>
               <td style="padding:8px 0;color:#64748b;font-size:14px;">E-mail</td>
-              <td style="padding:8px 0;color:#1e293b;font-size:14px;font-weight:600;">${email}</td>
+              <td style="padding:8px 0;color:#1e293b;font-size:14px;font-weight:600;">${safeEmail}</td>
             </tr>
             <tr>
               <td style="padding:8px 0;color:#64748b;font-size:14px;">Senha</td>
-              <td style="padding:8px 0;color:#FF6B00;font-size:20px;font-weight:800;letter-spacing:2px;">${password}</td>
+              <td style="padding:8px 0;color:#FF6B00;font-size:20px;font-weight:800;letter-spacing:2px;">${safePassword}</td>
             </tr>
           </table>
         </div>
