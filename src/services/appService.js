@@ -168,6 +168,7 @@ async function login({ cpf, establishmentCnpj, recoveryToken }) {
   ) {
     throw createError('Verificação por SMS inválida para esta conta.', 403);
   }
+  await assertPhoneUniqueToCustomer(establishment.id, proof.phone);
 
   const token = signCustomerToken({
     customerId:      customer.id,
@@ -615,6 +616,23 @@ function signRecoveryProof({ phone, establishmentId }) {
   );
 }
 
+// The OTP proof above only establishes control of a PHONE NUMBER, not of a
+// specific account — it's minted before we know which customer the caller
+// will submit. If that phone is shared across more than one Customer row at
+// the same establishment (e.g. a family sharing one line), the proof is
+// ambiguous: anyone who verified the OTP could submit ANY of those CPFs and
+// pass the `proof.phone === customer.phone` check. Refuse instead of
+// silently trusting whichever CPF happened to be submitted.
+async function assertPhoneUniqueToCustomer(establishmentId, phone) {
+  const count = await prisma.customer.count({ where: { establishmentId, phone } });
+  if (count > 1) {
+    throw createError(
+      'Este telefone está vinculado a mais de uma conta neste posto. Entre em contato com o suporte.',
+      409,
+    );
+  }
+}
+
 async function verifyOtp({ phone, code, establishmentCnpj }) {
   if (!phone || !code) throw createError('Telefone e código são obrigatórios.', 400);
   if (!establishmentCnpj) throw createError('CNPJ do estabelecimento é obrigatório.', 400);
@@ -774,6 +792,7 @@ async function recoveryComplete({ cpf, establishmentCnpj, deviceId, selfieBase64
   ) {
     throw createError('Verificação por SMS inválida para esta conta.', 403);
   }
+  await assertPhoneUniqueToCustomer(establishment.id, proof.phone);
 
   const incomingSelfie = selfieThumb || selfieBase64;
   const hasSelfieOnFile = customer.selfieData || customer.selfieThumbnailUrl;
