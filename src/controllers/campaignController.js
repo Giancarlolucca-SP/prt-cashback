@@ -65,7 +65,7 @@ async function listReturnees(req, res, next) {
 
 async function getQueueStatus(req, res, next) {
   try {
-    const result = await messageQueueService.getCampaignQueueStatus(req.params.id);
+    const result = await messageQueueService.getCampaignQueueStatus(req.params.id, req.operator.establishmentId);
     res.status(200).json(result);
   } catch (err) {
     next(err);

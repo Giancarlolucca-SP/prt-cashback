@@ -170,7 +170,7 @@ async function createInternal({ name, filterType, filterPeriod, rewardType, rewa
     // notification for money that was already credited — check whether
     // anything actually got queued for this campaign, and retry the enqueue
     // now if not.
-    const queueStatus = await messageQueueService.getCampaignQueueStatus(recentDuplicate.id);
+    const queueStatus = await messageQueueService.getCampaignQueueStatus(recentDuplicate.id, establishmentId);
     if (queueStatus.total === 0 && recentDuplicate.customerCount > 0) {
       try {
         const retryCustomers = await getFilteredCustomers(filterType, filterPeriod, establishmentId);

@@ -54,7 +54,12 @@ function resolveEstablishmentId(operator, query) {
   // design, and passing that straight into `where` matches literal IS NULL
   // (Prisma drops `undefined` filters but not `null` ones), so every ranking
   // call for a SUPERADMIN silently matched zero rows.
-  if ((operator.role === 'ADMIN' || operator.role === 'SUPERADMIN') && query.establishmentId) return query.establishmentId;
+  //
+  // ONLY SUPERADMIN may override via the query param — this also let plain
+  // ADMIN override (real cross-tenant leak: any station's admin could pass
+  // ?establishmentId=<victim> and read another establishment's ranking/
+  // ratings data, since ratingService.listRatings reuses this same helper).
+  if (operator.role === 'SUPERADMIN' && query.establishmentId) return query.establishmentId;
   return operator.establishmentId;
 }
 

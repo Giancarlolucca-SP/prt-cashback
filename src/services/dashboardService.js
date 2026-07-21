@@ -26,7 +26,14 @@ function resolveEstablishmentId(operator, query) {
   // literal IS NULL filter (unlike `undefined`, which is dropped), so every
   // dashboard/ranking call for a SUPERADMIN matched zero rows regardless of
   // the requested establishmentId.
-  if ((operator.role === 'ADMIN' || operator.role === 'SUPERADMIN') && query.establishmentId) {
+  //
+  // ONLY SUPERADMIN may override via the query param. This previously also
+  // let plain ADMIN (a per-station role — see establishmentController's
+  // assertOwnEstablishment, which treats ADMIN as NOT exempt) override too:
+  // any station's admin could pass ?establishmentId=<victim> and read a
+  // completely different establishment's dashboard/ranking/ratings data.
+  // Real cross-tenant leak, not hypothetical.
+  if (operator.role === 'SUPERADMIN' && query.establishmentId) {
     return query.establishmentId;
   }
   return operator.establishmentId;

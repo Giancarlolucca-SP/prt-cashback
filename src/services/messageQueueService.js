@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const whatsappService = require('./whatsappService');
+const { createError } = require('../middlewares/errorMiddleware');
 
 const prisma = new PrismaClient();
 
@@ -164,7 +165,16 @@ async function getQueueStatus(establishmentId) {
 
 // ── getCampaignQueueStatus ────────────────────────────────────────────────────
 
-async function getCampaignQueueStatus(campaignId) {
+async function getCampaignQueueStatus(campaignId, establishmentId) {
+  // Was previously callable with just a campaignId — no check that it
+  // belonged to the caller's own establishment. Any ADMIN who obtained/
+  // guessed another establishment's campaign UUID (e.g. leaked in a URL or
+  // log) could read that competitor's WhatsApp campaign send progress.
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { establishmentId: true } });
+  if (!campaign || campaign.establishmentId !== establishmentId) {
+    throw createError('Campanha não encontrada.', 404);
+  }
+
   const [pending, sent, failed, processing] = await Promise.all([
     prisma.messageQueue.count({ where: { campaignId, status: 'PENDING' } }),
     prisma.messageQueue.count({ where: { campaignId, status: 'SENT' } }),
