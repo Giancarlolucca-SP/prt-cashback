@@ -38,11 +38,20 @@ async function sendPush({ to, title, body, data = {} }) {
 // ── Get customer push token ───────────────────────────────────────────────────
 
 async function getToken(customerId) {
-  const c = await prisma.customer.findUnique({
-    where:  { id: customerId },
-    select: { pushToken: true },
-  });
-  return c?.pushToken ?? null;
+  // Every notify*() below awaits this unguarded — sendPush() itself never
+  // throws, but this DB lookup could, making the module's "never breaks the
+  // caller's flow" contract only hold by accident (both current call sites
+  // happen to append .catch(() => {})) rather than by guarantee.
+  try {
+    const c = await prisma.customer.findUnique({
+      where:  { id: customerId },
+      select: { pushToken: true },
+    });
+    return c?.pushToken ?? null;
+  } catch (err) {
+    console.error('[Push] Falha ao buscar token do cliente:', err.message);
+    return null;
+  }
 }
 
 // ── Notification templates ────────────────────────────────────────────────────

@@ -8,7 +8,7 @@
  * Does NOT touch NFC-e / fiscal / Petros.
  */
 const { PrismaClient } = require('@prisma/client');
-const { isValidCpf, stripCpf, formatCpf } = require('../utils/cpfValidator');
+const { isValidCpf, stripCpf, formatCpf, maskCpf } = require('../utils/cpfValidator');
 const { formatBRL } = require('../utils/currencyFormatter');
 const { generateReceiptCode } = require('../utils/receiptCode');
 const { createError } = require('../middlewares/errorMiddleware');
@@ -204,7 +204,7 @@ async function accrueByCpf({ cpf, amount, fuelType, liters, bomba, attendantId, 
   try {
     await audit.log({
       action: 'PISTA_ACCRUAL', entity: 'Transaction', entityId: transaction.id, operatorId,
-      metadata: { cpf: strippedCpf, amount: parsedAmount, cashbackValue, fuelType: fuelType || null, bomba: bomba || null, stubCreated, establishmentId },
+      metadata: { cpf: maskCpf(strippedCpf), amount: parsedAmount, cashbackValue, fuelType: fuelType || null, bomba: bomba || null, stubCreated, establishmentId },
     });
   } catch (err) {
     console.error(`[pistaService] Falha ao registrar auditoria do acúmulo (transação ${transaction.id} já confirmada):`, err.message);

@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { isValidCpf, stripCpf, formatCpf } = require('../utils/cpfValidator');
+const { isValidCpf, stripCpf, formatCpf, maskCpf } = require('../utils/cpfValidator');
 const { formatBRL } = require('../utils/currencyFormatter');
 const { formatDateBR } = require('../utils/dateFormatter');
 const { createError } = require('../middlewares/errorMiddleware');
@@ -38,7 +38,7 @@ async function upsert({ name, cpf, phone }, operator) {
       entity: 'Customer',
       entityId: existing.id,
       operatorId,
-      metadata: { cpf: cleanCpf },
+      metadata: { cpf: maskCpf(cleanCpf) },
     });
 
     return {
@@ -87,7 +87,7 @@ async function upsert({ name, cpf, phone }, operator) {
     entity: 'Customer',
     entityId: customer.id,
     operatorId,
-    metadata: { cpf: cleanCpf, name: customer.name },
+    metadata: { cpf: maskCpf(cleanCpf), name: customer.name },
   });
 
   return {

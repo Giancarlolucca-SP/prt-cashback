@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { isValidCpf, stripCpf } = require('../utils/cpfValidator');
+const { isValidCpf, stripCpf, maskCpf } = require('../utils/cpfValidator');
 const { formatBRL } = require('../utils/currencyFormatter');
 const { formatDateBR } = require('../utils/dateFormatter');
 const { generateReceiptCode } = require('../utils/receiptCode');
@@ -267,7 +267,7 @@ async function earn({ cpf, amount, fuelType, liters }, operator) {
       entityId: transaction.id,
       operatorId,
       metadata: {
-        cpf: stripCpf(cpf),
+        cpf: maskCpf(stripCpf(cpf)),
         amount: parsedAmount,
         cashbackPercent: effectivePercent,
         cashbackValue,

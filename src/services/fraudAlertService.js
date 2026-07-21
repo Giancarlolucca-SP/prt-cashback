@@ -56,30 +56,41 @@ async function checkDailyRedemptions(customerId, establishmentId) {
 // Flags as suspicious if > 300 km/h implied speed (fast commercial flight excluded).
 
 async function checkVelocity(customerId, newLat, newLng) {
-  const customer = await prisma.customer.findUnique({
-    where:  { id: customerId },
-    select: { lastLat: true, lastLng: true, lastLocAt: true },
-  });
+  // Called pre-commit from generateRedemption() purely to decide whether to
+  // log an advisory alert — never to block the request. Unlike logAlert/
+  // updateCustomerLocation, this had no try/catch: a transient DB hiccup here
+  // threw uncaught and 500'd a legitimate customer's redemption over a flaky
+  // fraud-check subsystem. Fails to the same "not suspicious" default the
+  // function already returns for its own early-exit cases below.
+  try {
+    const customer = await prisma.customer.findUnique({
+      where:  { id: customerId },
+      select: { lastLat: true, lastLng: true, lastLocAt: true },
+    });
 
-  if (!customer?.lastLat || !customer?.lastLng || !customer?.lastLocAt) {
+    if (!customer?.lastLat || !customer?.lastLng || !customer?.lastLocAt) {
+      return { suspicious: false };
+    }
+
+    const distM   = haversineMetres(
+      parseFloat(customer.lastLat),
+      parseFloat(customer.lastLng),
+      newLat,
+      newLng,
+    );
+    const elapsedMs = Date.now() - new Date(customer.lastLocAt).getTime();
+    const elapsedH  = elapsedMs / 3_600_000;
+
+    if (elapsedH <= 0) return { suspicious: false };
+
+    const speedKmh = distM / 1000 / elapsedH;
+    const suspicious = speedKmh > 300;
+
+    return { suspicious, speedKmh: Math.round(speedKmh), distanceKm: Math.round(distM / 1000) };
+  } catch (err) {
+    console.error('[FraudAlert] Falha ao checar velocidade:', err.message);
     return { suspicious: false };
   }
-
-  const distM   = haversineMetres(
-    parseFloat(customer.lastLat),
-    parseFloat(customer.lastLng),
-    newLat,
-    newLng,
-  );
-  const elapsedMs = Date.now() - new Date(customer.lastLocAt).getTime();
-  const elapsedH  = elapsedMs / 3_600_000;
-
-  if (elapsedH <= 0) return { suspicious: false };
-
-  const speedKmh = distM / 1000 / elapsedH;
-  const suspicious = speedKmh > 300;
-
-  return { suspicious, speedKmh: Math.round(speedKmh), distanceKm: Math.round(distM / 1000) };
 }
 
 // ── updateCustomerLocation ────────────────────────────────────────────────────
@@ -99,28 +110,37 @@ async function updateCustomerLocation(customerId, lat, lng) {
 // Returns null if valid, or an error message string if too far.
 
 async function validateGeolocation(establishmentId, customerLat, customerLng) {
-  const establishment = await prisma.establishment.findUnique({
-    where:  { id: establishmentId },
-    select: { latitude: true, longitude: true, name: true },
-  });
+  // Same fail-safe reasoning as checkVelocity() above: this is advisory
+  // (generateRedemption logs a warning, it doesn't block), so a transient
+  // error here must return the same "no warning" default as a missing
+  // establishment location, not throw and 500 the whole request.
+  try {
+    const establishment = await prisma.establishment.findUnique({
+      where:  { id: establishmentId },
+      select: { latitude: true, longitude: true, name: true },
+    });
 
-  if (!establishment?.latitude || !establishment?.longitude) {
-    // Establishment has no coordinates set → skip geo check
+    if (!establishment?.latitude || !establishment?.longitude) {
+      // Establishment has no coordinates set → skip geo check
+      return null;
+    }
+
+    const distM = haversineMetres(
+      parseFloat(establishment.latitude),
+      parseFloat(establishment.longitude),
+      customerLat,
+      customerLng,
+    );
+
+    if (distM > 500) {
+      return `Você precisa estar no posto para validar o cupom. Distância atual: ${Math.round(distM)}m.`;
+    }
+
+    return null;
+  } catch (err) {
+    console.error('[FraudAlert] Falha ao validar geolocalização:', err.message);
     return null;
   }
-
-  const distM = haversineMetres(
-    parseFloat(establishment.latitude),
-    parseFloat(establishment.longitude),
-    customerLat,
-    customerLng,
-  );
-
-  if (distM > 500) {
-    return `Você precisa estar no posto para validar o cupom. Distância atual: ${Math.round(distM)}m.`;
-  }
-
-  return null;
 }
 
 module.exports = {
