@@ -264,7 +264,18 @@ async function runLoop() {
           }
         } else {
           const why = result.err ? result.err.message : `HTTP ${result.status} ${result.body || ''}`;
-          log.error(`Falha ao enviar para a nuvem: ${why}. Mantendo o ponteiro; nova tentativa em ${config.retryIntervalMs}ms.`);
+          // A 401/403 means the AGENT_TOKEN is missing/revoked/rotated — no
+          // amount of retrying fixes that on its own, unlike a network blip
+          // or a 5xx. Still retry (giving up would mean silently losing this
+          // fueling once the token IS fixed — the local queue.persist() above
+          // already guarantees nothing is lost), but log it unmistakably
+          // differently so whoever's watching knows to go fix the token
+          // instead of waiting for the network to recover.
+          if (result.status === 401 || result.status === 403) {
+            log.error(`Token do agente rejeitado (HTTP ${result.status}) — verifique AGENT_TOKEN no .env. Mantendo o ponteiro; nova tentativa em ${config.retryIntervalMs}ms.`);
+          } else {
+            log.error(`Falha ao enviar para a nuvem: ${why}. Mantendo o ponteiro; nova tentativa em ${config.retryIntervalMs}ms.`);
+          }
           await sleep(config.retryIntervalMs);
         }
       }
