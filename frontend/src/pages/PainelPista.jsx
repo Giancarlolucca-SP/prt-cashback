@@ -480,13 +480,16 @@ function CaixaTab() {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
 
+  const invalidRange = startDate > endDate;
+
   const load = useCallback(() => {
+    if (invalidRange) return;
     setLoading(true);
     pistaAPI.caixa({ startDate, endDate })
       .then((res) => setData(res.data))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [startDate, endDate]);
+  }, [startDate, endDate, invalidRange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -503,7 +506,8 @@ function CaixaTab() {
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
             className="h-9 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-300" />
         </div>
-        <button onClick={load} className="h-9 px-4 bg-amber-400 text-white text-sm font-semibold rounded-lg hover:bg-amber-500">Aplicar</button>
+        <button onClick={load} disabled={invalidRange} className="h-9 px-4 bg-amber-400 text-white text-sm font-semibold rounded-lg hover:bg-amber-500 disabled:opacity-50">Aplicar</button>
+        {invalidRange && <p className="text-xs text-red-600 w-full">O período final não pode ser antes do inicial.</p>}
       </div>
 
       {/* Total resgatado — the figure that covers the cash drawer */}

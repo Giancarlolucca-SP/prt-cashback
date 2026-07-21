@@ -154,7 +154,7 @@ function AttendantCard({ attendant, color, onChanged, onError, onShowRatings }) 
               <button onClick={toggleActive} disabled={busy} title={attendant.active ? 'Desativar' : 'Ativar'} className="px-2 h-8 text-[11px] font-semibold rounded-lg text-slate-500 hover:bg-slate-100">
                 {attendant.active ? 'Ativo' : 'Inativo'}
               </button>
-              <button onClick={() => setEditing(true)} title="Editar" className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <button onClick={() => setEditing(true)} disabled={busy} title="Editar" className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                 <PencilSimple size={16} weight="bold" />
               </button>
               <button onClick={remove} disabled={busy} title="Remover" className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600">
