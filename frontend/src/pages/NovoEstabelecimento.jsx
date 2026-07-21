@@ -42,15 +42,6 @@ function applyPhoneMask(v) {
   return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
 }
 
-function applyCardNumberMask(v) {
-  return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})(?=.)/g, '$1 ');
-}
-
-function applyValidityMask(v) {
-  const d = v.replace(/\D/g, '').slice(0, 4);
-  return d.length <= 2 ? d : `${d.slice(0,2)}/${d.slice(2)}`;
-}
-
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -267,7 +258,6 @@ export default function NovoEstabelecimento() {
   const [op, setOp] = useState({
     nome: '', email: '', senha: generatePassword(),
     pagamento: 'cartao',
-    cartaoNome: '', cartaoNumero: '', cartaoValidade: '', cartaoCvv: '',
   });
 
   // Step 3 — Logo (optional)
@@ -317,12 +307,6 @@ export default function NovoEstabelecimento() {
     const e = {};
     if (!op.nome.trim())            e.opNome  = 'Nome é obrigatório.';
     if (!isValidEmail(op.email))    e.opEmail = 'E-mail inválido.';
-    if (op.pagamento === 'cartao') {
-      if (!op.cartaoNome.trim())    e.cartaoNome     = 'Nome no cartão é obrigatório.';
-      if (op.cartaoNumero.replace(/\D/g,'').length < 16) e.cartaoNumero = 'Número inválido.';
-      if (op.cartaoValidade.replace(/\D/g,'').length < 4) e.cartaoValidade = 'Validade inválida.';
-      if (op.cartaoCvv.replace(/\D/g,'').length < 3)     e.cartaoCvv = 'CVV inválido.';
-    }
     return e;
   }
 
@@ -443,7 +427,7 @@ export default function NovoEstabelecimento() {
               setResult(null);
               setStep(1);
               setEst({ nome: '', cnpj: '', telefone: '', endereco: '', cidade: '', estado: '' });
-              setOp({ nome: '', email: '', senha: generatePassword(), pagamento: 'cartao', cartaoNome: '', cartaoNumero: '', cartaoValidade: '', cartaoCvv: '' });
+              setOp({ nome: '', email: '', senha: generatePassword(), pagamento: 'cartao' });
               setLogoFile(null);
               setLogoPreview(null);
               setCfg({ cashbackPercent: '5', minRedemption: '10' });
@@ -614,42 +598,16 @@ export default function NovoEstabelecimento() {
             </div>
           </div>
 
-          {/* Credit card fields */}
+          {/* Credit card message — this form never collected a real payment
+              method server-side (establishmentsAPI.create() doesn't send
+              `pagamento` or any card field at all); it used to also ask for a
+              full card number + CVV here despite never using them anywhere,
+              which was pure liability with no function. Real billing goes
+              through the Stripe subscription flow, separate from this step. */}
           {op.pagamento === 'cartao' && (
-            <div className="space-y-4 pt-1">
-              <Input
-                label="Nome no cartão *"
-                placeholder="JOAO DA SILVA"
-                value={op.cartaoNome}
-                onChange={(e) => setOpField('cartaoNome', e.target.value.toUpperCase())}
-                error={errors.cartaoNome}
-              />
-              <Input
-                label="Número do cartão *"
-                placeholder="0000 0000 0000 0000"
-                value={op.cartaoNumero}
-                onChange={(e) => setOpField('cartaoNumero', applyCardNumberMask(e.target.value))}
-                inputMode="numeric"
-                error={errors.cartaoNumero}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Validade *"
-                  placeholder="MM/AA"
-                  value={op.cartaoValidade}
-                  onChange={(e) => setOpField('cartaoValidade', applyValidityMask(e.target.value))}
-                  inputMode="numeric"
-                  error={errors.cartaoValidade}
-                />
-                <Input
-                  label="CVV *"
-                  placeholder="000"
-                  value={op.cartaoCvv}
-                  onChange={(e) => setOpField('cartaoCvv', e.target.value.replace(/\D/g,'').slice(0,4))}
-                  inputMode="numeric"
-                  error={errors.cartaoCvv}
-                />
-              </div>
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+              <Info size={20} weight="duotone" className="text-blue-500 shrink-0" />
+              <p>A cobrança por cartão de crédito é configurada separadamente, pela assinatura do estabelecimento (Stripe) — não é preciso informar os dados do cartão aqui.</p>
             </div>
           )}
 
