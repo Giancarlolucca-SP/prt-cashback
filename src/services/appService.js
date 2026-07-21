@@ -721,7 +721,15 @@ async function getConfig(customerPayload) {
 
 async function savePushToken({ token: pushToken }, customerPayload) {
   const customerId = customerPayload?.sub;
-  if (!customerId || !pushToken) return { mensagem: 'Token não salvo.' };
+  if (!customerId) return { mensagem: 'Token não salvo.' };
+
+  // Explicit null clears it (customer turned off push notifications in the
+  // app) — distinct from an absent/falsy token, which is just a bad request.
+  if (pushToken === null) {
+    await prisma.customer.update({ where: { id: customerId }, data: { pushToken: null } });
+    return { mensagem: 'Token de push removido.' };
+  }
+  if (!pushToken) return { mensagem: 'Token não salvo.' };
 
   await prisma.customer.update({
     where: { id: customerId },

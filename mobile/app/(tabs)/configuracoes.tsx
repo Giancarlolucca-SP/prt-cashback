@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Switch, Alert, Linking,
 } from 'react-native';
@@ -7,11 +7,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import { useAuthStore } from '../../src/store/auth';
 import { useAppConfig } from '../../src/context/AppConfigContext';
 import { useBranding } from '../../src/hooks/useBranding';
 import BrandLogo from '../../src/components/BrandLogo';
+import { BALANCE_CACHE_KEY } from './index';
+import {
+  NOTIFICATIONS_ENABLED_KEY, registerForPushNotifications, unregisterPushNotifications,
+} from '../../src/hooks/usePushNotifications';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +123,24 @@ export default function ConfiguracoesScreen() {
 
   const [notificacoes, setNotificacoes] = useState(true);
 
+  // Load the persisted preference — previously this was always true and reset
+  // on every app restart regardless of what the customer had chosen.
+  useEffect(() => {
+    SecureStore.getItemAsync(NOTIFICATIONS_ENABLED_KEY).then((v) => {
+      if (v === 'false') setNotificacoes(false);
+    });
+  }, []);
+
+  async function handleToggleNotifications(value: boolean) {
+    setNotificacoes(value);
+    await SecureStore.setItemAsync(NOTIFICATIONS_ENABLED_KEY, value ? 'true' : 'false');
+    if (value) {
+      await registerForPushNotifications();
+    } else {
+      await unregisterPushNotifications();
+    }
+  }
+
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   const cpfMascarado   = user?.cpf      ? maskCpf(user.cpf)       : '—';
@@ -136,6 +160,7 @@ export default function ConfiguracoesScreen() {
           onPress: async () => {
             await logout();
             queryClient.clear();
+            await AsyncStorage.removeItem(BALANCE_CACHE_KEY);
             router.replace('/(auth)/login');
           },
         },
@@ -225,7 +250,7 @@ export default function ConfiguracoesScreen() {
             </View>
             <Switch
               value={notificacoes}
-              onValueChange={setNotificacoes}
+              onValueChange={handleToggleNotifications}
               trackColor={{ false: '#e2e8f0', true: primaryColor }}
               thumbColor={notificacoes ? '#ffffff' : '#f4f3f4'}
             />

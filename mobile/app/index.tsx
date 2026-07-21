@@ -47,6 +47,7 @@ export default function Entry() {
 
   async function init() {
     // 1. Silent token refresh if expiring within 7 days
+    let refreshFailed = false;
     try {
       const exp = decodeJwtExp(token!);
       const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
@@ -60,7 +61,27 @@ export default function Entry() {
         await store.setAuth(data.token, data.cliente, store.establishmentName ?? '');
       }
     } catch {
-      // Refresh failed — token may be expired; biometric gate will handle it
+      refreshFailed = true;
+    }
+
+    // If refresh was attempted and failed, and the token is (or looks) already
+    // expired — not just "expiring soon" — there's no valid session left to
+    // gate with biometrics. Previously this fell through to the biometrics
+    // check below regardless, and with biometricsEnabled=false (the default)
+    // straight to 'ready' with a dead token: the app would open normally and
+    // then every single API call would 401, with no forced re-login and no
+    // obvious way out for the customer. A corrupted/undecodable token
+    // (decodeJwtExp returning null) is treated the same as expired here,
+    // rather than as "never expires" — that combination is exactly what let
+    // a corrupted token skip refresh AND skip this check.
+    if (refreshFailed) {
+      const exp = decodeJwtExp(token!);
+      const alreadyExpired = exp == null || exp * 1000 <= Date.now();
+      if (alreadyExpired) {
+        await logout();
+        setState('unauthenticated');
+        return;
+      }
     }
 
     // 2. Biometric gate
@@ -74,15 +95,14 @@ export default function Entry() {
   async function triggerBiometric() {
     setState('biometrics');
     try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled   = await LocalAuthentication.isEnrolledAsync();
-
-      if (!compatible || !enrolled) {
-        // Hardware not available — skip biometric gate
-        setState('ready');
-        return;
-      }
-
+      // Deliberately NOT pre-checking hasHardwareAsync()/isEnrolledAsync() and
+      // skipping straight to 'ready' when they fail — that was a fail-OPEN
+      // bypass of a security feature the customer explicitly turned on: if a
+      // phone is stolen and the thief wipes the fingerprint/Face ID enrollment
+      // in system settings, the app's lock must not just wave them through.
+      // authenticateAsync() itself still falls back to the device PIN/pattern
+      // (disableDeviceFallback: false) when biometric enrollment is missing,
+      // so calling it directly covers strictly more real cases correctly.
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage:   'Confirme sua identidade para entrar',
         fallbackLabel:   'Usar código',
@@ -91,6 +111,11 @@ export default function Entry() {
       });
 
       if (result.success) {
+        setState('ready');
+      } else if (result.error === 'not_available' || result.error === 'passcode_not_set') {
+        // Genuinely nothing to gate with: no biometric hardware AND no device
+        // PIN/pattern/password configured at all — not "enrollment removed"
+        // (that still falls back to the device passcode above).
         setState('ready');
       } else {
         const msg = result.error === 'user_cancel'

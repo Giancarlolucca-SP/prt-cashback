@@ -15,7 +15,7 @@ import { customerApi } from '../../src/api/client';
 import { useAuthStore } from '../../src/store/auth';
 import { useBranding } from '../../src/hooks/useBranding';
 
-const BALANCE_CACHE_KEY = 'postocash_balance_cache';
+export const BALANCE_CACHE_KEY = 'postocash_balance_cache';
 
 interface BalanceCache {
   saldo:           number;
@@ -75,6 +75,12 @@ export default function HomeScreen() {
         onPress: async () => {
           await logout();
           queryClient.clear();
+          // logout()/queryClient.clear() don't touch this cache — without
+          // removing it, the next login (different account on the same
+          // device, or the same account after a slow network) would render
+          // the PREVIOUS user's name/balance on mount before the fresh
+          // balance query resolves.
+          await AsyncStorage.removeItem(BALANCE_CACHE_KEY);
           router.replace('/(auth)/login');
         },
       },

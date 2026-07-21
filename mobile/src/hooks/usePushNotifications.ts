@@ -16,14 +16,21 @@ Notifications.setNotificationHandler({
 });
 
 const PUSH_TOKEN_KEY = 'postocash_push_token_sent';
+export const NOTIFICATIONS_ENABLED_KEY = 'postocash_notifications_enabled';
 
 export function usePushNotifications() {
   useEffect(() => {
-    registerForPushNotifications();
+    SecureStore.getItemAsync(NOTIFICATIONS_ENABLED_KEY).then((v) => {
+      // Default enabled (matches the settings screen's default) — only skip
+      // registration if the customer explicitly turned it off before.
+      if (v !== 'false') registerForPushNotifications();
+    });
   }, []);
 }
 
-async function registerForPushNotifications() {
+// Exported so the settings screen can call it immediately when the customer
+// flips the toggle back on, instead of waiting for the next app launch.
+export async function registerForPushNotifications() {
   try {
     // Android: create notification channel
     if (Platform.OS === 'android') {
@@ -61,5 +68,17 @@ async function registerForPushNotifications() {
     await SecureStore.setItemAsync(PUSH_TOKEN_KEY, pushToken);
   } catch {
     // Push registration failing must never crash the app
+  }
+}
+
+// Called when the customer turns the "Notificações push" switch off — clears
+// the token server-side (so no more pushes get sent) and the local "already
+// sent" marker (so turning it back on re-registers cleanly).
+export async function unregisterPushNotifications() {
+  try {
+    await api.post('/app/push-token', { token: null });
+    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
+  } catch {
+    // Same non-fatal contract as registration
   }
 }
