@@ -102,8 +102,17 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Only intercept 401 once per request (prevent loops)
-    if (status !== 401 || error.config._retry) {
+    // Only intercept 401 once per request (prevent loops). Also never retry
+    // a failed call to the refresh endpoint itself: tryRefreshToken() below
+    // calls this same endpoint — a 401 here would otherwise re-enter this
+    // interceptor while isRefreshing is still true from the outer call,
+    // which takes the "wait for pendingResolve" branch below. That resolve
+    // only fires when THIS call finishes, which is waiting on tryRefreshToken(),
+    // which is waiting on that same nested call — a deadlock, not just a
+    // slow retry. Concretely: a token whose signature production rejects
+    // (e.g. signed by a different JWT_SECRET, such as a local-dev token used
+    // against prod) leaves the app stuck on "Atualizando sessão…" forever.
+    if (status !== 401 || error.config._retry || error.config.url?.includes('/app/token/refresh')) {
       return Promise.reject(error);
     }
 
